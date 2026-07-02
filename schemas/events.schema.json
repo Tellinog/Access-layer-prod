@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Access Layer Audit Event",
+  "type": "object",
+  "required": [
+    "event_id",
+    "event_type",
+    "created_at",
+    "outcome",
+    "correlation_id"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string"
+    },
+    "event_type": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "success",
+        "denied",
+        "error",
+        "info"
+      ]
+    },
+    "correlation_id": {
+      "type": "string"
+    },
+    "tool_slug": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "actor_google_sub": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "actor_email": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "email"
+    },
+    "actor_hd": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "request_ip_hash": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "user_agent_hash": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "reason_code": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

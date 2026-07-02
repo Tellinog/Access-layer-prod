@@ -1,0 +1,10 @@
+{
+  "tool_slug": "crm",
+  "email": "mario.rossi@unguess.io",
+  "role": "tool_user",
+  "permissions": [
+    "crm:read",
+    "crm:write"
+  ],
+  "valid_until": null
+}

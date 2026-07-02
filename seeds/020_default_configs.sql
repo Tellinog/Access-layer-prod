@@ -1,0 +1,2 @@
+-- Default configuration is environment-driven in v1.
+-- Keep this file for future DB-backed config values if needed.

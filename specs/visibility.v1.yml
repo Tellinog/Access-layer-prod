@@ -1,0 +1,48 @@
+version: 1
+visibility:
+  user:
+    can_view:
+      - own_identity
+      - own_tool_access_result
+    cannot_view:
+      - other_users
+      - audit_logs
+      - tool_secrets
+  tool_backend:
+    can_view:
+      - exchanged_user_identity_for_own_tool
+      - own_token_introspection
+    cannot_view:
+      - other_tools
+      - admin_grants
+      - audit_logs
+      - google_tokens
+  tool_admin:
+    can_view:
+      - assigned_tools
+      - assigned_tool_grants
+      - assigned_tool_access_requests
+      - assigned_tool_audit_logs
+    cannot_view:
+      - tool_client_secret_after_creation
+      - unrelated_tools
+  platform_admin:
+    can_view:
+      - all_tools
+      - all_users
+      - all_grants
+      - all_access_requests
+      - audit_logs
+    cannot_view:
+      - stored_secret_hash_plaintext
+      - token_plaintext
+  auditor:
+    can_view:
+      - audit_logs
+      - users_read_only
+      - tools_read_only
+    cannot_write:
+      - tools
+      - users
+      - grants
+      - access_requests

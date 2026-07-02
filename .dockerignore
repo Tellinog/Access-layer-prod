@@ -1,0 +1,17 @@
+.git
+.tmp
+tmp
+.cache
+.local
+node_modules
+dist
+build
+logs
+*.log
+.env
+.env.*
+!.env.example
+!.env.docker.example
+!.env.production.example
+Dockerfile
+docker-compose.yml

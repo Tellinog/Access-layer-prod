@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Access Layer Config",
+  "type": "object",
+  "required": [
+    "APP_ENV",
+    "APP_BASE_URL",
+    "AUTH_ISSUER",
+    "DATABASE_URL",
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET",
+    "GOOGLE_REDIRECT_URI",
+    "GOOGLE_ALLOWED_HD",
+    "JWT_PUBLIC_KEY_ID",
+    "SESSION_SECRET",
+    "TOOL_CLIENT_SECRET_PEPPER",
+    "LOG_IP_SALT"
+  ],
+  "anyOf": [
+    { "required": ["JWT_PRIVATE_KEY_PEM_PATH"] },
+    { "required": ["JWT_PRIVATE_KEY_PEM"] }
+  ],
+  "properties": {
+    "APP_ENV": {
+      "type": "string",
+      "enum": ["development", "staging", "production", "test"]
+    },
+    "APP_BASE_URL": {
+      "type": "string",
+      "format": "uri"
+    },
+    "AUTH_ISSUER": {
+      "type": "string",
+      "format": "uri"
+    },
+    "PORT": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    },
+    "LOG_LEVEL": {
+      "type": "string"
+    },
+    "DATABASE_URL": {
+      "type": "string"
+    },
+    "GOOGLE_CLIENT_ID": {
+      "type": "string",
+      "minLength": 10
+    },
+    "GOOGLE_CLIENT_SECRET": {
+      "type": "string",
+      "minLength": 10
+    },
+    "GOOGLE_REDIRECT_URI": {
+      "type": "string",
+      "format": "uri"
+    },
+    "GOOGLE_ALLOWED_HD": {
+      "type": "string",
+      "minLength": 3,
+      "description": "Comma-separated Google Workspace hosted domains validated through the Google ID token hd claim. Use domain names only; do not include localhost, URLs, ports or IP addresses.",
+      "pattern": "^(?!.*(?:https?://|localhost|127\\.0\\.0\\.1|::1))([A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z]{2,63}(\\s*,\\s*([A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z]{2,63})*$"
+    },
+    "GOOGLE_OIDC_SCOPE": {
+      "type": "string"
+    },
+    "JWT_PRIVATE_KEY_PEM_PATH": {
+      "type": "string"
+    },
+    "JWT_PRIVATE_KEY_PEM": {
+      "type": "string"
+    },
+    "JWT_PUBLIC_KEY_ID": {
+      "type": "string",
+      "minLength": 3
+    },
+    "ACCESS_TOKEN_TTL_SECONDS": {
+      "type": "integer",
+      "minimum": 60,
+      "maximum": 3600
+    },
+    "REFRESH_TOKEN_TTL_SECONDS": {
+      "type": "integer",
+      "minimum": 300,
+      "maximum": 86400
+    },
+    "ONE_TIME_CODE_TTL_SECONDS": {
+      "type": "integer",
+      "minimum": 15,
+      "maximum": 300
+    },
+    "ENABLE_REFRESH_TOKENS": {
+      "type": "boolean"
+    },
+    "SESSION_COOKIE_NAME": {
+      "type": "string"
+    },
+    "SESSION_SECRET": {
+      "type": "string",
+      "minLength": 16
+    },
+    "TOOL_CLIENT_SECRET_PEPPER": {
+      "type": "string",
+      "minLength": 16
+    },
+    "BACKUP_ENCRYPTION_KEY": {
+      "type": "string",
+      "minLength": 32,
+      "description": "Secret key material used to encrypt exported backup JSON envelopes. Required in production."
+    },
+    "CORS_ALLOWED_ORIGINS": {
+      "type": "string"
+    },
+    "RETURN_URL_ALLOWED_SCHEMES": {
+      "type": "string"
+    },
+    "TRUST_PROXY_HOPS": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5,
+      "description": "Number of trusted reverse-proxy hops. Use 1 for the expected Coolify proxy path; use 0 for direct local development."
+    },
+    "ADMIN_BOOTSTRAP_EMAILS": {
+      "type": "string"
+    },
+    "LOG_IP_SALT": {
+      "type": "string",
+      "minLength": 16
+    },
+    "AUDIT_LOG_RETENTION_DAYS": {
+      "type": "integer",
+      "minimum": 30
+    },
+    "AUDIT_LOG_RAW_IP": {
+      "type": "boolean"
+    },
+    "ACCESS_REQUEST_REOPEN_AFTER_DAYS": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3650
+    },
+    "SIEM_EXPORT_ENABLED": {
+      "type": "boolean"
+    },
+    "SIEM_EXPORT_ENDPOINT": {
+      "type": "string"
+    },
+    "SIEM_EXPORT_TOKEN": {
+      "type": "string"
+    },
+    "BACKUP_API_TOKEN": {
+      "type": "string",
+      "minLength": 32,
+      "description": "Optional Bearer token for machine-to-machine backup export."
+    }
+  }
+}

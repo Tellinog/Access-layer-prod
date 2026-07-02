@@ -1,0 +1,91 @@
+# ARCHITECTURE.md
+
+## Overview
+
+Access Layer is a centralized web service used by internal tools for authentication, authorization and access audit.
+
+It sits between internal tools and Google Auth Platform:
+
+- Tools send users to Access Layer.
+- Access Layer authenticates with Google OpenID Connect.
+- Access Layer verifies company domain and user grants.
+- Access Layer returns a short-lived, tool-scoped identity to the tool backend.
+- Tools create local sessions and call introspection/JWKS as needed.
+
+## Components
+
+| Component | Responsibility | Technology | Notes |
+|---|---|---|---|
+| Public Auth API | Start login, handle Google callback, exchange one-time code | Node.js/TypeScript reference | Must be HTTPS in production |
+| Google OIDC Adapter | Build authorization URL, exchange code, validate ID token | Google auth library | Must validate `aud`, `iss`, `exp`, `hd` |
+| Permission Service | Resolve grants for user/tool | DB-backed service | Must handle pending email grants |
+| Token Service | Issue Access Layer JWT and refresh tokens | JOSE/JWT | Tool-scoped, short TTL |
+| JWKS Endpoint | Publish public signing keys | HTTP endpoint | Used by tools for offline validation |
+| Introspection API | Online token status check | Tool-authenticated API | Useful for revocation |
+| Admin API/UI | Manage users, tools, grants, logs | Same service in v1 | Admin itself protected by Access Layer |
+| Audit Logger | Persist structured security events | DB table + optional SIEM | Must not log tokens/secrets |
+| Database | Store users, tools, grants, sessions, audit logs | PostgreSQL reference | See `docs/DB.md` |
+
+## Data flow
+
+### Auth flow
+
+1. Tool redirects browser to `/v1/auth/start` in production, or the configured local base path plus `/v1/auth/start`, with `tool_slug`, `return_url` and `state`.
+2. Access Layer validates tool and return URL, creates a correlation record and redirects to Google.
+3. Google redirects back to `/v1/auth/google/callback` in production with authorization code.
+4. Access Layer exchanges code server-side and validates ID token.
+5. Access Layer upserts user by `google_sub`.
+6. Access Layer checks active grant for requested tool.
+7. Access Layer creates session and one-time code.
+8. Browser is redirected to tool callback with code and original state.
+9. Tool backend calls `/v1/auth/exchange` using tool client credentials.
+10. Access Layer returns identity, permissions, session ID and JWT.
+
+### Authorization decision
+
+A request is allowed only if all checks pass:
+
+- tool exists and is active;
+- return URL is allowed for that tool;
+- Google ID token is valid;
+- `email_verified` is true;
+- `hd` is present and allowed;
+- user status is active;
+- active grant exists for user/email and tool;
+- grant validity dates are satisfied.
+
+## Invariants
+
+- Google callback can only resume a known auth request through server-side `state`.
+- Access Layer never returns Google tokens to tools.
+- One-time code is single-use, short-lived and stored hashed.
+- Access token audience is the requested `tool_slug` or tool client ID.
+- All sensitive state transitions write audit events.
+
+## Integration points
+
+| Integration | Purpose | Auth | Notes |
+|---|---|---|---|
+| Google Auth Platform | User login and ID token | OAuth client ID/secret | Configured in Google Cloud |
+| Internal tools | Login start, exchange, introspection | Tool client credentials | Each tool must be registered |
+| Admin users | Manage access | Google login + platform admin role | Bootstrap through env for first deploy |
+| SIEM/log export | Optional audit export | API token or managed identity | Deferred scope |
+
+## Operational constraints
+
+- Production must run behind HTTPS.
+- Redirect URIs must exactly match Google OAuth client configuration.
+- System time must be synchronized for token expiration checks.
+- DB write path for audit logs must be available before accepting auth traffic.
+- Avoid browser-delivered long-lived tokens.
+
+## Risks
+
+| Risk | Mitigation |
+|---|---|
+| External Google users try login | Google internal audience plus backend `hd` validation |
+| Email domain spoofing or stale email | Use `sub` and validate `hd`, do not trust email domain alone |
+| Token leakage in URL | Use one-time code, not access token, in callback URL |
+| Replay of one-time code | Store hash, consume atomically, TTL 60 seconds |
+| Tool secret leaked | Secret rotation, hashing, audit, per-tool credentials |
+| Missing logs on failure paths | Audit middleware and required tests for denial cases |

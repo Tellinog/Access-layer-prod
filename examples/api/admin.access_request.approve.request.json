@@ -1,0 +1,6 @@
+{
+  "role": "operator",
+  "permissions": ["crm:read", "crm:write"],
+  "valid_until": null,
+  "note": "Approvato per team commerciale"
+}

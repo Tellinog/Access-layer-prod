@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "AUTH_NOT_AUTHORIZED_FOR_TOOL",
+    "message": "Account valido, ma non autorizzato per questo tool.",
+    "correlation_id": "corr_01HYEXAMPLE",
+    "details": {}
+  }
+}

@@ -1,0 +1,23 @@
+version: 1
+validation:
+  tool_slug:
+    regex: "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$"
+    normalize: lowercase
+  email:
+    normalize: lowercase_trim
+    require_email_verified_from_google: true
+  hosted_domain:
+    source: google_id_token_hd_claim
+    must_be_in_env: GOOGLE_ALLOWED_HD
+  return_url:
+    default_match_mode: exact
+    allowed_schemes:
+      - https
+      - http_localhost_only
+    reject_userinfo_component: true
+    reject_unregistered_query_variants: true
+  state:
+    min_entropy_bits: 128
+    max_length: 512
+  permission_key:
+    regex: "^[a-z0-9-]+:[a-z0-9-]+$"

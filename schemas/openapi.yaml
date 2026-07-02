@@ -1,0 +1,924 @@
+openapi: 3.1.0
+info:
+  title: Access Layer Google SSO API
+  version: 1.0.0
+  description: Shared authentication, authorization and audit API for internal tools.
+servers:
+  - url: https://access-layer.draftapps.it
+    description: Production
+  - url: http://localhost:8080
+    description: Local development
+security: []
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Healthy
+  /v1/auth/start:
+    get:
+      summary: Start Google login for a registered tool
+      parameters:
+        - in: query
+          name: tool_slug
+          required: true
+          schema: { type: string }
+        - in: query
+          name: return_url
+          required: true
+          schema: { type: string, format: uri }
+        - in: query
+          name: state
+          required: true
+          schema: { type: string }
+        - in: query
+          name: login_hint
+          required: false
+          schema: { type: string }
+      responses:
+        '302':
+          description: Redirect to Google or tool callback on existing session
+        '400':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+  /v1/auth/google/callback:
+    get:
+      summary: Google OAuth callback
+      parameters:
+        - in: query
+          name: code
+          required: false
+          schema: { type: string }
+        - in: query
+          name: state
+          required: true
+          schema: { type: string }
+        - in: query
+          name: error
+          required: false
+          schema: { type: string }
+      responses:
+        '302':
+          description: Redirect to tool callback with one-time code or safe error page
+  /v1/auth/exchange:
+    post:
+      summary: Exchange one-time code for Access Layer identity and token
+      security:
+        - toolClientBasic: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExchangeRequest'
+      responses:
+        '200':
+          description: Exchange successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExchangeResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+  /v1/auth/introspect:
+    post:
+      summary: Introspect Access Layer token
+      security:
+        - toolClientBasic: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IntrospectionRequest'
+      responses:
+        '200':
+          description: Token activity result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntrospectionResponse'
+  /v1/auth/logout:
+    post:
+      summary: Revoke a session or token
+      security:
+        - toolClientBasic: []
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                session_id: { type: string }
+                refresh_token: { type: string }
+      responses:
+        '204':
+          description: Logged out
+  /v1/me:
+    get:
+      summary: Current identity for a user/token
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserIdentity'
+  /v1/.well-known/jwks.json:
+    get:
+      summary: Public JSON Web Key Set
+      responses:
+        '200':
+          description: JWKS
+  /v1/admin/tools:
+    get:
+      summary: List tools
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: search
+          schema: { type: string }
+          description: Case-insensitive search across tool slug and display name.
+        - in: query
+          name: status
+          schema: { type: string, enum: [active, disabled, maintenance] }
+        - in: query
+          name: owner_email
+          schema: { type: string, format: email }
+      responses:
+        '200':
+          description: Tools list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolListResponse'
+    post:
+      summary: Create tool
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ToolCreateRequest'
+      responses:
+        '201':
+          description: Created with one-time tool client secret
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolCreateResponse'
+  /v1/admin/tools/{tool_id}:
+    patch:
+      summary: Update tool configuration
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: tool_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ToolUpdateRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolUpdateResponse'
+    delete:
+      summary: Delete a non-reserved tool registration
+      description: Deletes the tool and cascades linked operational data. Audit logs are preserved with tool_id set to null and tool_slug retained.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: tool_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Deleted tool metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolUpdateResponse'
+        '403':
+          description: Reserved access-admin tool cannot be deleted or actor lacks permission
+  /v1/admin/tools/{tool_id}/rotate-secret:
+    post:
+      summary: Rotate tool client secret
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: tool_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                revoke_existing:
+                  type: boolean
+                  description: Disable existing active clients for this tool before creating the new credential.
+      responses:
+        '200':
+          description: New client credential shown once
+  /v1/admin/grants:
+    get:
+      summary: List grants
+      security:
+        - bearerAuth: []
+      responses:
+        '200': { description: OK }
+    post:
+      summary: Create grant
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GrantCreateRequest'
+      responses:
+        '201': { description: Created }
+  /v1/admin/grants/export:
+    get:
+      summary: Export grants as CSV
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: CSV export of grants scoped by admin actor
+          content:
+            text/csv:
+              schema:
+                type: string
+  /v1/admin/grants/bulk/template:
+    get:
+      summary: Download bulk grant CSV template
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: CSV template
+          content:
+            text/csv:
+              schema:
+                type: string
+  /v1/admin/grants/bulk/preview:
+    post:
+      summary: Preview bulk grant CSV import
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkGrantImportRequest'
+      responses:
+        '200':
+          description: Row-level preview without writes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkGrantImportResponse'
+  /v1/admin/grants/bulk/commit:
+    post:
+      summary: Commit bulk grant CSV import
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkGrantImportRequest'
+      responses:
+        '200':
+          description: Not committed because validation errors were present
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkGrantImportResponse'
+        '201':
+          description: Bulk import committed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkGrantImportResponse'
+  /v1/admin/tools/permissions/export:
+    get:
+      summary: Export registered tool permission keys as CSV
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: CSV export of registered tool permission keys scoped by admin actor
+          content:
+            text/csv:
+              schema:
+                type: string
+  /v1/admin/grants/{grant_id}:
+    patch:
+      summary: Update or revoke grant
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: grant_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GrantUpdateRequest'
+      responses:
+        '200': { description: Updated }
+  /v1/admin/users:
+    get:
+      summary: List users
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: search
+          schema: { type: string }
+          description: Case-insensitive search across email and Google sub.
+        - in: query
+          name: status
+          schema: { type: string, enum: [active, suspended, disabled] }
+      responses:
+        '200':
+          description: Users list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListResponse'
+  /v1/admin/users/{user_id}:
+    patch:
+      summary: Update user status
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdateRequest'
+      responses:
+        '200':
+          description: Updated user status and session revocation count
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserUpdateResponse'
+  /v1/admin/access-requests:
+    get:
+      summary: List access requests generated by valid internal no-grant attempts
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [pending, approved, rejected, closed, expired] }
+        - in: query
+          name: tool_slug
+          schema: { type: string }
+        - in: query
+          name: email
+          schema: { type: string, format: email }
+        - in: query
+          name: cursor
+          schema: { type: string }
+      responses:
+        '200':
+          description: Access requests list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessRequestListResponse'
+  /v1/admin/access-requests/{request_id}/approve:
+    post:
+      summary: Approve access request and create a grant
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: request_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccessRequestApproveRequest'
+      responses:
+        '200':
+          description: Approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessRequestDecisionResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/admin/access-requests/{request_id}/reject:
+    post:
+      summary: Reject access request without creating a grant
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: request_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccessRequestRejectRequest'
+      responses:
+        '200':
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessRequestDecisionResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /v1/admin/access-requests/{request_id}/close:
+    post:
+      summary: Close access request without grant or rejection decision
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: request_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccessRequestRejectRequest'
+      responses:
+        '200':
+          description: Closed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessRequestDecisionResponse'
+  /v1/admin/audit-logs:
+    get:
+      summary: Query audit logs
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: tool_slug
+          schema: { type: string }
+        - in: query
+          name: email
+          schema: { type: string }
+        - in: query
+          name: google_sub
+          schema: { type: string }
+        - in: query
+          name: outcome
+          schema: { type: string, enum: [success, denied, error, info] }
+        - in: query
+          name: reason_code
+          schema: { type: string }
+        - in: query
+          name: correlation_id
+          schema: { type: string }
+        - in: query
+          name: date_from
+          schema: { type: string, format: date-time }
+        - in: query
+          name: date_to
+          schema: { type: string, format: date-time }
+      responses:
+        '200': { description: OK }
+  /v1/admin/backup/export:
+    get:
+      summary: Export durable Access Layer backup JSON
+      security:
+        - bearerAuth: []
+        - backupApiToken: []
+      responses:
+        '200':
+          description: Backup JSON
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupPayload'
+        '403':
+          $ref: '#/components/responses/Error'
+  /v1/admin/backup/import:
+    post:
+      summary: Import durable Access Layer backup JSON
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                backup:
+                  $ref: '#/components/schemas/BackupPayload'
+                replace_existing: { type: boolean }
+                confirm_replace: { type: boolean }
+      responses:
+        '200': { description: Imported }
+        '400':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+components:
+  securitySchemes:
+    toolClientBasic:
+      type: http
+      scheme: basic
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    backupApiToken:
+      type: http
+      scheme: bearer
+      description: Optional BACKUP_API_TOKEN for machine-to-machine backup export
+  responses:
+    Error:
+      description: Standard error response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    BackupPayload:
+      type: object
+      required: [schema, version, generated_at, data]
+      properties:
+        schema: { type: string, const: access-layer-backup }
+        version: { type: integer, const: 1 }
+        generated_at: { type: string, format: date-time }
+        generated_by: { type: object }
+        contents: { type: object }
+        restore_requirements:
+          type: array
+          items: { type: string }
+        data:
+          type: object
+          additionalProperties: true
+    ExchangeRequest:
+      type: object
+      required: [code, redirect_uri]
+      properties:
+        code: { type: string }
+        redirect_uri: { type: string, format: uri }
+    ExchangeResponse:
+      type: object
+      required: [access_token, token_type, expires_in, session, user, tool, grant, correlation_id]
+      properties:
+        access_token: { type: string }
+        token_type: { type: string, const: Bearer }
+        expires_in: { type: integer }
+        refresh_token: { type: string }
+        session:
+          type: object
+          properties:
+            id: { type: string }
+            issued_at: { type: string, format: date-time }
+            expires_at: { type: string, format: date-time }
+        user:
+          $ref: '#/components/schemas/UserIdentity'
+        tool:
+          type: object
+          properties:
+            slug: { type: string }
+            display_name: { type: string }
+        grant:
+          type: object
+          properties:
+            role: { type: string }
+            permissions:
+              type: array
+              items: { type: string, pattern: "^[a-z0-9-]+(?::[a-z0-9-]+)+$" }
+        correlation_id: { type: string }
+    IntrospectionRequest:
+      type: object
+      required: [token]
+      properties:
+        token: { type: string }
+    IntrospectionResponse:
+      type: object
+      required: [active]
+      properties:
+        active: { type: boolean }
+        reason: { type: string }
+        issuer: { type: string }
+        audience: { type: string }
+        expires_at: { type: string, format: date-time }
+        session_id: { type: string }
+        user:
+          $ref: '#/components/schemas/UserIdentity'
+        permissions:
+          type: array
+          items: { type: string, pattern: "^[a-z0-9-]+(?::[a-z0-9-]+)+$" }
+    UserIdentity:
+      type: object
+      properties:
+        id: { type: string }
+        google_sub: { type: string }
+        email: { type: string, format: email }
+        email_verified: { type: boolean }
+        hd: { type: string }
+        display_name: { type: string }
+    AdminUser:
+      type: object
+      required: [id, google_sub, email, email_verified, hd, status]
+      properties:
+        id: { type: string }
+        google_sub: { type: string }
+        email: { type: string, format: email }
+        email_verified: { type: boolean }
+        hd: { type: string }
+        display_name: { type: string, nullable: true }
+        picture_url: { type: string, format: uri, nullable: true }
+        status: { type: string, enum: [active, suspended, disabled] }
+        first_seen_at: { type: string, format: date-time }
+        last_seen_at: { type: string, format: date-time }
+    UserListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminUser'
+    UserUpdateResponse:
+      type: object
+      required: [user, revoked_sessions]
+      properties:
+        user:
+          $ref: '#/components/schemas/AdminUser'
+        revoked_sessions: { type: integer }
+    Tool:
+      type: object
+      required: [id, slug, display_name, status, allowed_return_urls, permission_keys]
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        display_name: { type: string }
+        description: { type: string, nullable: true }
+        status: { type: string, enum: [active, disabled, maintenance] }
+        owner_email: { type: string, format: email, nullable: true }
+        allowed_return_urls:
+          type: array
+          items: { type: string, format: uri }
+        permission_keys:
+          type: array
+          items: { type: string, pattern: "^[a-z0-9-]+(?::[a-z0-9-]+)+$" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    ToolListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tool'
+    ToolCreateResponse:
+      type: object
+      required: [tool, tool_client_id, tool_client_secret]
+      properties:
+        tool:
+          $ref: '#/components/schemas/Tool'
+        tool_client_id: { type: string }
+        tool_client_secret:
+          type: string
+          description: One-time secret value shown only in this response.
+    ToolUpdateResponse:
+      type: object
+      required: [tool]
+      properties:
+        tool:
+          $ref: '#/components/schemas/Tool'
+    ToolCreateRequest:
+      type: object
+      required: [slug, display_name, allowed_return_urls]
+      properties:
+        slug: { type: string }
+        display_name: { type: string }
+        description: { type: string }
+        owner_email: { type: string, format: email }
+        allowed_return_urls:
+          type: array
+          items: { type: string, format: uri }
+        permission_keys:
+          type: array
+          items: { type: string, pattern: "^[a-z0-9-]+(?::[a-z0-9-]+)+$" }
+    ToolUpdateRequest:
+      type: object
+      properties:
+        display_name: { type: string }
+        description: { type: string, nullable: true }
+        status: { type: string, enum: [active, disabled, maintenance] }
+        owner_email: { type: string, format: email, nullable: true }
+        allowed_return_urls:
+          type: array
+          items: { type: string, format: uri }
+        permission_keys:
+          type: array
+          items: { type: string, pattern: "^[a-z0-9-]+(?::[a-z0-9-]+)+$" }
+    GrantCreateRequest:
+      type: object
+      required: [tool_slug, role, permissions]
+      properties:
+        tool_slug: { type: string }
+        user_id: { type: string }
+        email: { type: string, format: email }
+        role: { type: string }
+        permissions:
+          type: array
+          items: { type: string, pattern: "^[a-z0-9-]+(?::[a-z0-9-]+)+$" }
+        valid_until: { type: string, format: date-time }
+    GrantUpdateRequest:
+      type: object
+      properties:
+        role: { type: string }
+        permissions:
+          type: array
+          items: { type: string, pattern: "^[a-z0-9-]+(?::[a-z0-9-]+)+$" }
+        status: { type: string, enum: [active, revoked, expired, pending_user_link] }
+        valid_until: { type: string, format: date-time, nullable: true }
+    BulkGrantImportRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          description: CSV content with headers email, tool_slug, role, permissions, valid_until, action and note.
+        delimiter:
+          type: string
+          enum: [",", ";"]
+          default: ","
+    BulkGrantImportRow:
+      type: object
+      required: [row, email, tool_slug, role, permissions, valid_until, action, result]
+      properties:
+        row: { type: integer }
+        email: { type: string, format: email }
+        tool_slug: { type: string }
+        role: { type: string }
+        permissions:
+          type: array
+          items: { type: string, pattern: "^[a-z0-9-]+(?::[a-z0-9-]+)+$" }
+        valid_until: { type: string, format: date-time, nullable: true }
+        action: { type: string, enum: [upsert, revoke], nullable: true }
+        note: { type: string, nullable: true }
+        result: { type: string, enum: [ok, warning, error] }
+        reason: { type: string, nullable: true }
+        resolved_user: { type: string, enum: [known_user, pending_user_link], nullable: true }
+        status_after: { type: string, enum: [active, revoked, expired, pending_user_link], nullable: true }
+        existing_grant_id: { type: string, nullable: true }
+        operation: { type: string, enum: [create, update, revoke, skip] }
+    BulkGrantImportSummary:
+      type: object
+      required: [total_rows, ok, warning, error]
+      properties:
+        total_rows: { type: integer }
+        ok: { type: integer }
+        warning: { type: integer }
+        error: { type: integer }
+        created: { type: integer }
+        updated: { type: integer }
+        revoked: { type: integer }
+        skipped: { type: integer }
+    BulkGrantImportResponse:
+      type: object
+      required: [rows, summary]
+      properties:
+        committed: { type: boolean }
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/BulkGrantImportRow'
+        summary:
+          $ref: '#/components/schemas/BulkGrantImportSummary'
+    UserUpdateRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [active, suspended, disabled] }
+    AccessRequest:
+      type: object
+      required: [id, status, tool_slug, user, attempts_count, first_seen_at, last_seen_at, last_correlation_id]
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [pending, approved, rejected, closed, expired] }
+        tool_slug: { type: string }
+        tool_display_name: { type: string }
+        user:
+          type: object
+          properties:
+            id: { type: string }
+            email: { type: string, format: email }
+            google_sub: { type: string }
+            hd: { type: string }
+            display_name: { type: string }
+        attempts_count: { type: integer }
+        first_seen_at: { type: string, format: date-time }
+        last_seen_at: { type: string, format: date-time }
+        last_correlation_id: { type: string }
+        reason_code: { type: string }
+        reviewed_at: { type: string, format: date-time }
+        reviewed_by_user_id: { type: string }
+        review_note: { type: string }
+        grant_id: { type: string }
+    AccessRequestListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AccessRequest'
+        pagination:
+          type: object
+          properties:
+            next_cursor: { type: string, nullable: true }
+    AccessRequestApproveRequest:
+      type: object
+      required: [role, permissions]
+      properties:
+        role: { type: string }
+        permissions:
+          type: array
+          items: { type: string, pattern: "^[a-z0-9-]+(?::[a-z0-9-]+)+$" }
+        valid_until: { type: string, format: date-time, nullable: true }
+        note: { type: string }
+    AccessRequestRejectRequest:
+      type: object
+      properties:
+        note: { type: string }
+    AccessRequestDecisionResponse:
+      type: object
+      required: [request_id, status]
+      properties:
+        request_id: { type: string }
+        status: { type: string, enum: [approved, rejected, closed] }
+        grant_id: { type: string }
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, correlation_id]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            correlation_id: { type: string }
+            details: { type: object }

@@ -1,0 +1,14 @@
+version: 1
+feature_flags:
+  enable_refresh_tokens:
+    default: true
+    description: Issue opaque Access Layer refresh tokens to tool backend.
+  enable_siem_export:
+    default: false
+    description: Export audit events to external SIEM.
+  enable_google_group_sync:
+    default: false
+    description: Deferred automatic grant sync from Google Groups.
+  fail_open_if_audit_log_down:
+    default: false
+    description: Emergency-only. Must remain false for normal production.

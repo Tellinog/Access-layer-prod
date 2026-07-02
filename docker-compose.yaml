@@ -1,0 +1,87 @@
+name: access-layer-google-sso
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in Coolify}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in Coolify}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in Coolify}
+    volumes:
+      - access_layer_postgres_data_v2:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build:
+      context: .
+    restart: unless-stopped
+    environment:
+      APP_ENV: ${APP_ENV:?Set APP_ENV in Coolify}
+      PUBLIC_BASE_PATH: ${PUBLIC_BASE_PATH-}
+      APP_BASE_URL: ${APP_BASE_URL:?Set APP_BASE_URL in Coolify}
+      AUTH_ISSUER: ${AUTH_ISSUER:?Set AUTH_ISSUER in Coolify}
+      PORT: ${PORT:-8080}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+
+      # IMPORTANT: la URL viene costruita dagli stessi valori usati da Postgres.
+      # Non impostare una DATABASE_URL diversa in Coolify, altrimenti torna il loop.
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID in Coolify}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?Set GOOGLE_CLIENT_SECRET in Coolify}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:?Set GOOGLE_REDIRECT_URI in Coolify}
+      GOOGLE_ALLOWED_HD: ${GOOGLE_ALLOWED_HD:?Set GOOGLE_ALLOWED_HD in Coolify}
+      GOOGLE_OIDC_SCOPE: ${GOOGLE_OIDC_SCOPE:-openid email profile}
+
+      JWT_PRIVATE_KEY_PEM: ${JWT_PRIVATE_KEY_PEM:-}
+      JWT_PRIVATE_KEY_PEM_PATH: ${JWT_PRIVATE_KEY_PEM_PATH:-}
+      JWT_PUBLIC_KEY_ID: ${JWT_PUBLIC_KEY_ID:?Set JWT_PUBLIC_KEY_ID in Coolify}
+      ACCESS_TOKEN_TTL_SECONDS: ${ACCESS_TOKEN_TTL_SECONDS:-900}
+      REFRESH_TOKEN_TTL_SECONDS: ${REFRESH_TOKEN_TTL_SECONDS:-28800}
+      ONE_TIME_CODE_TTL_SECONDS: ${ONE_TIME_CODE_TTL_SECONDS:-60}
+      ENABLE_REFRESH_TOKENS: ${ENABLE_REFRESH_TOKENS:-true}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-access_layer_admin_session}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in Coolify}
+
+      TOOL_CLIENT_SECRET_PEPPER: ${TOOL_CLIENT_SECRET_PEPPER:?Set TOOL_CLIENT_SECRET_PEPPER in Coolify}
+      BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:?Set BACKUP_ENCRYPTION_KEY in Coolify}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?Set CORS_ALLOWED_ORIGINS in Coolify}
+      RETURN_URL_ALLOWED_SCHEMES: ${RETURN_URL_ALLOWED_SCHEMES:-https}
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
+
+      ADMIN_BOOTSTRAP_EMAILS: ${ADMIN_BOOTSTRAP_EMAILS:?Set ADMIN_BOOTSTRAP_EMAILS in Coolify}
+
+      LOG_IP_SALT: ${LOG_IP_SALT:?Set LOG_IP_SALT in Coolify}
+      AUDIT_LOG_RETENTION_DAYS: ${AUDIT_LOG_RETENTION_DAYS:-365}
+      AUDIT_LOG_RAW_IP: ${AUDIT_LOG_RAW_IP:-false}
+      ACCESS_REQUEST_REOPEN_AFTER_DAYS: ${ACCESS_REQUEST_REOPEN_AFTER_DAYS:-30}
+
+      RUN_MIGRATIONS_ON_START: ${RUN_MIGRATIONS_ON_START:-true}
+      RUN_SEED_ON_START: ${RUN_SEED_ON_START:-true}
+      SEED_EXAMPLE_TOOLS: ${SEED_EXAMPLE_TOOLS:-false}
+
+      SIEM_EXPORT_ENABLED: ${SIEM_EXPORT_ENABLED:-false}
+      SIEM_EXPORT_ENDPOINT: ${SIEM_EXPORT_ENDPOINT:-}
+      SIEM_EXPORT_TOKEN: ${SIEM_EXPORT_TOKEN:-}
+      BACKUP_API_TOKEN: ${BACKUP_API_TOKEN:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - access_layer_jwt_secrets:/run/secrets
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"const http=require('http');const base=process.env.PUBLIC_BASE_PATH||'';const req=http.get('http://127.0.0.1:8080'+base+'/health',res=>process.exit(res.statusCode<500?0:1));req.on('error',()=>process.exit(1));req.setTimeout(3000,()=>{req.destroy();process.exit(1);});\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  access_layer_postgres_data:
+  access_layer_jwt_secrets:

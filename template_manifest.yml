@@ -1,0 +1,19 @@
+template_name: access-layer-google-sso
+version: 0.1.0
+purpose: source-of-truth driven repository scaffold for a shared internal Google SSO access layer
+main_entrypoints:
+  - AGENTS.md
+  - CURRENT_STATE.md
+  - README.md
+  - docs/GOOGLE_CLOUD_SETUP.md
+  - docs/INTEGRATION_GUIDE.md
+  - prompts/CODEX_SHORT_PROMPT.md
+philosophy:
+  - centralized authentication and authorization
+  - Google Workspace identity source
+  - deny by default
+  - audit every access decision
+  - source of truth in repository
+  - no secrets in code or logs
+notes:
+  - Added explicit Access Requests workflow for admin notification/approval queue.

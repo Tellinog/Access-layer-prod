@@ -1,0 +1,43 @@
+version: 1
+identity:
+  provider: google_openid_connect
+  required_scopes:
+    - openid
+    - email
+    - profile
+  required_id_token_checks:
+    - signature
+    - aud
+    - iss
+    - exp
+    - email_verified
+    - hd
+  primary_user_key: google_sub
+  email_primary_key_allowed: false
+domain_policy:
+  allowed_hd_env: GOOGLE_ALLOWED_HD
+  deny_missing_hd: true
+  deny_wrong_hd: true
+authorization_policy:
+  require_active_tool: true
+  require_allowed_return_url: true
+  require_active_user: true
+  require_active_grant: true
+  deny_by_default: true
+token_policy:
+  access_token_ttl_seconds: 900
+  refresh_token_ttl_seconds: 28800
+  one_time_code_ttl_seconds: 60
+  one_time_code_single_use: true
+  jwt_audience: tool_slug
+logging_policy:
+  audit_every_access_decision: true
+  audit_every_admin_change: true
+  forbidden_log_fields:
+    - google_id_token
+    - authorization_code
+    - access_token
+    - refresh_token
+    - cookie
+    - client_secret
+    - password

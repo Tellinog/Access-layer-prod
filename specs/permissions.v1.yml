@@ -1,0 +1,47 @@
+version: 1
+roles:
+  platform_admin:
+    description: Full administration of Access Layer.
+    permissions:
+      - admin:tools:read
+      - admin:tools:write
+      - admin:users:read
+      - admin:users:write
+      - admin:grants:read
+      - admin:grants:write
+      - admin:access_requests:read
+      - admin:access_requests:write
+      - admin:audit:read
+      - admin:backup:read
+      - admin:backup:write
+      - admin:backup:secrets
+      - admin:secrets:rotate
+  tool_admin:
+    description: Delegated administrator for one or more tools.
+    permissions:
+      - admin:tools:read_assigned
+      - admin:grants:read_assigned
+      - admin:grants:write_assigned
+      - admin:access_requests:read_assigned
+      - admin:access_requests:write_assigned
+      - admin:audit:read_assigned
+  auditor:
+    description: Read-only audit viewer.
+    permissions:
+      - admin:audit:read
+      - admin:tools:read
+      - admin:users:read
+      - admin:grants:read
+      - admin:access_requests:read
+  user:
+    description: Default authenticated internal user.
+    permissions: []
+tool_permission_rules:
+  format: "{namespace}:{action}[:scope...]"
+  examples:
+    - crm:read
+    - crm:write
+    - reporting:view
+    - reporting:export
+    - petyr:read:all
+  unknown_permission_behavior: deny

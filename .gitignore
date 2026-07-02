@@ -1,0 +1,35 @@
+# Environment
+.env
+.env.*
+prod.env
+!.env.example
+!.env.docker.example
+!.env.production.example
+
+# Dependencies
+node_modules/
+vendor/
+.venv/
+venv/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Logs
+logs/
+*.log
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Temporary files
+.tmp/
+tmp/
+.cache/
+.local/

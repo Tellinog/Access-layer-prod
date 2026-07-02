@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Access Layer Payloads",
+  "$defs": {
+    "ExchangeRequest": {
+      "type": "object",
+      "required": [
+        "code",
+        "redirect_uri"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 10
+        },
+        "redirect_uri": {
+          "type": "string",
+          "format": "uri"
+        }
+      },
+      "additionalProperties": false
+    },
+    "IntrospectionRequest": {
+      "type": "object",
+      "required": [
+        "token"
+      ],
+      "properties": {
+        "token": {
+          "type": "string",
+          "minLength": 20
+        }
+      },
+      "additionalProperties": false
+    },
+    "GrantCreateRequest": {
+      "type": "object",
+      "required": [
+        "tool_slug",
+        "role",
+        "permissions"
+      ],
+      "properties": {
+        "tool_slug": {
+          "type": "string"
+        },
+        "user_id": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "role": {
+          "type": "string"
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+(?::[a-z0-9-]+)+$"
+          }
+        },
+        "valid_until": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "user_id"
+          ]
+        },
+        {
+          "required": [
+            "email"
+          ]
+        }
+      ],
+      "additionalProperties": false
+    },
+    "ToolCreateRequest": {
+      "type": "object",
+      "required": [
+        "slug",
+        "display_name",
+        "allowed_return_urls"
+      ],
+      "properties": {
+        "slug": {
+          "type": "string"
+        },
+        "display_name": {
+          "type": "string"
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "owner_email": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "email"
+        },
+        "allowed_return_urls": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "permission_keys": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+(?::[a-z0-9-]+)+$"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "AccessRequestApproveRequest": {
+      "type": "object",
+      "required": [
+        "role",
+        "permissions"
+      ],
+      "properties": {
+        "role": {
+          "type": "string"
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+(?::[a-z0-9-]+)+$"
+          }
+        },
+        "valid_until": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ToolRotateSecretRequest": {
+      "type": "object",
+      "properties": {
+        "revoke_existing": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

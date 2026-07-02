@@ -1,0 +1,38 @@
+version: 1
+project: access-layer-google-sso
+functional_requirements:
+  - id: FR-001
+    text: The service must start authentication for a registered active tool.
+  - id: FR-002
+    text: The service must authenticate users with Google OpenID Connect.
+  - id: FR-003
+    text: The service must reject users whose ID token has missing or non-allowed hd claim.
+  - id: FR-004
+    text: The service must require an active grant for the requested tool.
+  - id: FR-005
+    text: The service must issue one-time codes and consume them once.
+  - id: FR-006
+    text: The service must return verified identity and permissions to registered tool backends.
+  - id: FR-007
+    text: The service must expose JWKS for internal JWT verification.
+  - id: FR-008
+    text: The service must support token introspection.
+  - id: FR-009
+    text: The service must provide admin management for tools, users, grants and logs.
+  - id: FR-010
+    text: The service must audit every access decision and admin change.
+  - id: FR-011
+    text: The service must create an admin-visible access request when a valid internal user lacks a grant for a requested tool.
+  - id: FR-012
+    text: Admins must be able to approve or reject pending access requests, with approval creating a grant transactionally.
+non_functional_requirements:
+  - id: NFR-001
+    text: Production traffic must use HTTPS.
+  - id: NFR-002
+    text: Tokens, codes and secrets must not be logged.
+  - id: NFR-003
+    text: Access decision endpoints must fail closed on validation uncertainty.
+  - id: NFR-004
+    text: The API contract must be documented in OpenAPI.
+  - id: NFR-005
+    text: Audit logs must be queryable by time, tool, actor and outcome.

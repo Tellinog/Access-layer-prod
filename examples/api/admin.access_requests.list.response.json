@@ -1,0 +1,25 @@
+{
+  "items": [
+    {
+      "id": "arq_01J...",
+      "status": "pending",
+      "tool_slug": "crm",
+      "tool_display_name": "CRM interno",
+      "user": {
+        "id": "usr_01J...",
+        "email": "mario.rossi@unguess.io",
+        "google_sub": "112233445566778899000",
+        "hd": "unguess.io",
+        "display_name": "Mario Rossi"
+      },
+      "attempts_count": 3,
+      "first_seen_at": "2026-06-10T09:12:00Z",
+      "last_seen_at": "2026-06-10T13:45:00Z",
+      "last_correlation_id": "01J...",
+      "reason_code": "AUTH_NOT_AUTHORIZED_FOR_TOOL"
+    }
+  ],
+  "pagination": {
+    "next_cursor": null
+  }
+}

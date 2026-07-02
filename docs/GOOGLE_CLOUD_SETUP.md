@@ -15,10 +15,10 @@ Fonti ufficiali utili:
 - Account Google Workspace aziendale.
 - Permessi per creare o amministrare un progetto Google Cloud nella Organization aziendale.
 - Domini Workspace autorizzati: `unguess.io` e `nuotounostiledivita.it`.
-- Dominio del servizio Access Layer in produzione: `access-layer.draftapps.it`.
+- Dominio del servizio Access Layer in produzione: `access-layer.unguess-internal.net`.
 - URL previsti per Access Layer:
   - local: `http://localhost:8080/access-control/v1/auth/google/callback`
-  - production: `https://access-layer.draftapps.it/v1/auth/google/callback`
+  - production: `https://access-layer.unguess-internal.net/v1/auth/google/callback`
 
 Nota: `GOOGLE_ALLOWED_HD` deve contenere solo domini Google Workspace validati tramite claim `hd` dell'ID token. Non inserire `localhost` in `GOOGLE_ALLOWED_HD`.
 
@@ -68,11 +68,11 @@ Non richiedere scopes Gmail, Drive, Calendar o altri accessi Google se non servo
 3. Tipo applicazione: `Web application`.
 4. Nome: `Access Layer Web Client - production`.
 5. Inserire Authorized JavaScript origins se si usa Google Identity Services lato browser nella pagina Access Layer. Per il flusso server redirect puro puo non essere necessario, ma e utile se l'admin UI avvia login da frontend:
-   - `https://access-layer.draftapps.it`
+   - `https://access-layer.unguess-internal.net`
    - `http://localhost:8080` nel progetto dev
 6. Inserire Authorized redirect URIs:
    - `http://localhost:8080/access-control/v1/auth/google/callback`
-   - `https://access-layer.draftapps.it/v1/auth/google/callback`
+   - `https://access-layer.unguess-internal.net/v1/auth/google/callback`
 7. Creare il client.
 8. Copiare subito `Client ID` e `Client Secret`.
 9. Salvare il client secret in un secret manager, non nel repository.
@@ -84,7 +84,7 @@ Aggiornare le variabili ambiente:
 ```env
 GOOGLE_CLIENT_ID=<client-id>.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=<client-secret>
-GOOGLE_REDIRECT_URI=https://access-layer.draftapps.it/v1/auth/google/callback
+GOOGLE_REDIRECT_URI=https://access-layer.unguess-internal.net/v1/auth/google/callback
 GOOGLE_ALLOWED_HD=unguess.io,nuotounostiledivita.it
 GOOGLE_OIDC_SCOPE=openid email profile
 ```

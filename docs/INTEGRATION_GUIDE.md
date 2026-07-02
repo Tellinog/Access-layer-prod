@@ -37,12 +37,12 @@ Se il tool usa permessi granulari, le permission keys devono essere registrate i
 ## 2. Aggiungere env al tool
 
 ```env
-ACCESS_LAYER_BASE_URL=https://access-layer.draftapps.it
+ACCESS_LAYER_BASE_URL=https://access-layer.unguess-internal.net
 ACCESS_LAYER_TOOL_SLUG=crm
 ACCESS_LAYER_CLIENT_ID=tool_client_id
 ACCESS_LAYER_CLIENT_SECRET=tool_client_secret
 ACCESS_LAYER_CALLBACK_URL=https://crm.draftapps.it/auth/callback
-ACCESS_LAYER_JWKS_URL=https://access-layer.draftapps.it/v1/.well-known/jwks.json
+ACCESS_LAYER_JWKS_URL=https://access-layer.unguess-internal.net/v1/.well-known/jwks.json
 ```
 
 ## 3. Login route del tool

@@ -1,5 +1,44 @@
 # DEVLOG.md
 
+## 2026-07-02 - Production domain migration to UNGUESS internal origin
+
+Changed by: ChatGPT
+Related task: Make the application run on `https://access-layer.unguess-internal.net/` instead of `https://access-layer.draftapps.it/`.
+
+### Changed
+- Updated the production Access Layer origin to `https://access-layer.unguess-internal.net` across runtime templates, Coolify/deployment docs, Google OAuth guidance, OpenAPI, integration examples, reference seed callback URL and config tests.
+- Kept production root-mounted with `PUBLIC_BASE_PATH=`, Admin UI at `/admin`, APIs under `/v1/*` and Google OAuth callback at `/v1/auth/google/callback`.
+- Kept local Docker development on `http://localhost:8080/access-control` and left third-party tool example domains such as `crm.draftapps.it` unchanged.
+
+### Docs/specs/schemas updated
+- `.env.production.example`
+- `COOLIFY.md`
+- `DEPLOY.md`
+- `README.md`
+- `CURRENT_STATE.md`
+- `DECISIONS.md`
+- `BACKLOG.md`
+- `docs/DEPLOYMENT.md`
+- `docs/GOOGLE_CLOUD_SETUP.md`
+- `docs/INTEGRATION_GUIDE.md`
+- `docs/API_PAYLOADS.md`
+- `docs/PROTOCOLS.md`
+- `docs/TESTING.md`
+- `schemas/openapi.yaml`
+- `examples/api/`
+- `seeds/010_reference_data.sql`
+
+### Tests/checks
+- Updated `tests/config.test.ts` for the new production root-domain deployment.
+- `npm.cmd ci` completed and restored local dependencies.
+- `npm.cmd run lint` passed.
+- `npm.cmd run build` passed.
+- `npm.cmd test` passed with 9 files and 95 tests.
+
+### Follow-ups
+- Add `https://access-layer.unguess-internal.net` as an authorized JavaScript origin and `https://access-layer.unguess-internal.net/v1/auth/google/callback` as an authorized redirect URI in Google Cloud before switching traffic.
+- Update Coolify environment variables from `.env.production.example`, then smoke-test `/health`, `/v1/.well-known/jwks.json`, `/admin` and the Google admin login flow on the new domain.
+
 ## 2026-07-02 - Admin UI authenticated logout action
 
 Changed by: ChatGPT
@@ -71,14 +110,14 @@ Related task: Refactor the application visually to align the Admin UI with the U
 
 ## 2026-06-22 - Local production env file
 
-- Created local `prod.env` from `.env.production.example`, using the available local `.env.docker` values for copied credentials and production URL defaults for `https://access-layer.draftapps.it`.
+- Created local `prod.env` from `.env.production.example`, using the available local `.env.docker` values for copied credentials and production URL defaults for `https://access-layer.unguess-internal.net`.
 - Generated missing required production secret values without printing them to logs or documentation.
 - Added `prod.env` to `.gitignore` because it contains real secret-bearing environment values and does not match the existing `.env.*` ignore pattern.
 - Verification: checked `prod.env` contains the expected 41 environment keys and no placeholder values. `git status` could not run because Git is unavailable in this shell.
 
 ## 2026-06-21 - Production access-layer subdomain
 
-- Prepared production configuration for `https://access-layer.draftapps.it` with `PUBLIC_BASE_PATH=` instead of serving production under `https://draftapps.it/access-control`.
+- Prepared production configuration for `https://access-layer.unguess-internal.net` with `PUBLIC_BASE_PATH=` instead of serving production under `https://draftapps.it/access-control`.
 - Updated Coolify/deployment examples, Google OAuth redirect guidance, OpenAPI production paths, integration examples, seed reference callback URL and current-state documentation.
 - Kept local Docker development on `http://localhost:8080/access-control` and retained base-path route coverage.
 - Added config coverage for the production root-domain deployment.

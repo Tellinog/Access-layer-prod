@@ -5,7 +5,7 @@
 | Environment | Purpose | URL pattern |
 |---|---|---|
 | local | Developer testing | `http://localhost:8080` |
-| production | Internal production | `https://access-layer.draftapps.it` |
+| production | Internal production | `https://access-layer.unguess-internal.net` |
 
 No separate staging environment is required for v1 unless specified later. If staging is introduced later, use a separate Google Cloud project and OAuth client for it.
 

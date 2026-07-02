@@ -6,12 +6,12 @@ The service must be deployed as an HTTPS-only backend reachable by all internal 
 
 Recommended production URL pattern:
 
-- `https://access-layer.draftapps.it`
+- `https://access-layer.unguess-internal.net`
 
 Recommended environments:
 
 - local: `http://localhost:8080/access-control`
-- production: `https://access-layer.draftapps.it`
+- production: `https://access-layer.unguess-internal.net`
 
 No separate staging environment is required for v1 unless specified later.
 
@@ -35,9 +35,9 @@ Use `docker-compose.yml` as the Coolify compose application. Do not commit or up
 
 ```env
 PUBLIC_BASE_PATH=
-APP_BASE_URL=https://access-layer.draftapps.it
-AUTH_ISSUER=https://access-layer.draftapps.it
-GOOGLE_REDIRECT_URI=https://access-layer.draftapps.it/v1/auth/google/callback
+APP_BASE_URL=https://access-layer.unguess-internal.net
+AUTH_ISSUER=https://access-layer.unguess-internal.net
+GOOGLE_REDIRECT_URI=https://access-layer.unguess-internal.net/v1/auth/google/callback
 GOOGLE_ALLOWED_HD=unguess.io,nuotounostiledivita.it
 TRUST_PROXY_HOPS=1
 ```

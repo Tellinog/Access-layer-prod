@@ -5,7 +5,7 @@ VALUES (
   'access-admin',
   'Access Layer Admin',
   'Admin UI for Access Layer itself',
-  '["https://access-layer.draftapps.it/admin/auth/callback", "http://localhost:8080/access-control/auth/callback"]'::jsonb,
+  '["https://access-layer.unguess-internal.net/admin/auth/callback", "http://localhost:8080/access-control/auth/callback"]'::jsonb,
   'lorenzo.prandi@unguess.io'
 )
 ON CONFLICT (slug) DO NOTHING;

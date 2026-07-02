@@ -8,6 +8,14 @@ V1 implementation scaffold complete, with local dependency, typecheck, build and
 
 This repository now contains the product/security/API/data specifications plus a Node.js/TypeScript Fastify implementation for the Access Layer Google SSO v1 service.
 
+## Latest production domain update, 2026-07-02
+
+- Production Access Layer configuration and documentation now target `https://access-layer.unguess-internal.net` instead of `https://access-layer.draftapps.it`.
+- Production remains root-mounted with `PUBLIC_BASE_PATH=`, Admin UI at `/admin`, APIs under `/v1/*` and Google OAuth callback at `/v1/auth/google/callback`.
+- Updated production env template, Coolify/deployment guidance, Google OAuth setup, OpenAPI server URL, integration examples, reference seed return URL and config test coverage.
+- `GOOGLE_ALLOWED_HD` remains restricted to Google Workspace hosted domains: `unguess.io,nuotounostiledivita.it`.
+- Verification: config test coverage was updated; final lint/build/test results for this task are recorded in `DEVLOG.md`.
+
 ## Latest Admin UI authenticated logout update, 2026-07-02
 
 - The authenticated Admin UI top bar no longer renders a fixed `Login` button after a valid admin session is present.
@@ -81,7 +89,7 @@ This repository now contains the product/security/API/data specifications plus a
 - Client IP proxy trust is bounded by `TRUST_PROXY_HOPS`, defaulting to one hop for production/Coolify and zero for local development.
 - Pending grant creation by email now requires a well-formed company email domain listed in `GOOGLE_ALLOWED_HD`.
 - Example native Node tool harness that demonstrates login, callback, exchange, local session and logout.
-- Reference seed data aligned to the confirmed `unguess.io` Google Workspace domain, while production service URLs are prepared for `access-layer.draftapps.it`.
+- Reference seed data aligned to the confirmed `unguess.io` Google Workspace domain, while production service URLs are prepared for `access-layer.unguess-internal.net`.
 - `Dockerfile`, `docker-compose.yml`, `.env.docker.example` and `docker/entrypoint.sh` for local Docker execution. The app container waits for PostgreSQL health, runs migrations, optionally runs seed data, probes the app health endpoint every 10 seconds and starts the built service on port `8080`. App health routes are intentionally silent in request logs.
 - The runtime seed reconciles the reserved `access-admin` tool return URLs with the configured public base path, so persisted local databases are updated from legacy `/admin/auth/callback` URLs to `/access-control/auth/callback` when the current Docker seed runs.
 
@@ -116,12 +124,12 @@ This repository now contains the product/security/API/data specifications plus a
 ## Confirmed before production
 
 - Company Google Workspace hosted domain is confirmed as `unguess.io` for `GOOGLE_ALLOWED_HD`.
-- `access-layer.draftapps.it` is the Access Layer production service domain, not the Google Workspace `hd` value.
+- `access-layer.unguess-internal.net` is the Access Layer production service domain, not the Google Workspace `hd` value.
 - Local base URL is confirmed as `http://localhost:8080/access-control`.
-- Production base URL is confirmed as `https://access-layer.draftapps.it`.
+- Production base URL is confirmed as `https://access-layer.unguess-internal.net`.
 - Authorized OAuth redirect URIs are confirmed as:
   - `http://localhost:8080/access-control/v1/auth/google/callback`
-  - `https://access-layer.draftapps.it/v1/auth/google/callback`
+  - `https://access-layer.unguess-internal.net/v1/auth/google/callback`
 - No separate staging environment is required for v1 unless specified later.
 
 ## Assumptions to validate before production
@@ -159,12 +167,12 @@ This repository now contains the product/security/API/data specifications plus a
 
 ## Recommended next step
 
-For production, create a Coolify compose app from this package, fill variables from `.env.production.example`, then verify `GET https://access-layer.draftapps.it/health` and complete the Google OAuth flow. In local Docker, repeated health probes are expected; open `http://localhost:8080/access-control` to start the admin Google login when no session is present.
+For production, create a Coolify compose app from this package, fill variables from `.env.production.example`, then verify `GET https://access-layer.unguess-internal.net/health` and complete the Google OAuth flow. In local Docker, repeated health probes are expected; open `http://localhost:8080/access-control` to start the admin Google login when no session is present.
 
 ## Latest local production env file update, 2026-06-22
 
 - Created ignored local `prod.env` from `.env.production.example` using the available `.env.docker` source because no root `.env` file was present in this workspace.
-- Production URL values are aligned to `https://access-layer.draftapps.it`, with an empty production `PUBLIC_BASE_PATH`, root `/v1/auth/google/callback`, `GOOGLE_ALLOWED_HD=unguess.io,nuotounostiledivita.it` and `TRUST_PROXY_HOPS=1`.
+- Production URL values are aligned to `https://access-layer.unguess-internal.net`, with an empty production `PUBLIC_BASE_PATH`, root `/v1/auth/google/callback`, `GOOGLE_ALLOWED_HD=unguess.io,nuotounostiledivita.it` and `TRUST_PROXY_HOPS=1`.
 - Required copied/generated secret values were written only to `prod.env` and were not printed in logs or documentation.
 - Added `prod.env` to `.gitignore` because the existing `.env.*` pattern does not cover that filename.
 - Verification: `prod.env` contains 41 environment keys and no placeholder values. `git status` could not run because Git is unavailable in this shell.
@@ -179,8 +187,8 @@ For production, create a Coolify compose app from this package, fill variables f
 
 ## Latest production URL topology update, 2026-06-21
 
-- Production is now prepared for the dedicated origin `https://access-layer.draftapps.it` with no `/access-control` public base path.
-- Production configuration should set `PUBLIC_BASE_PATH=` (empty), `APP_BASE_URL=https://access-layer.draftapps.it`, `AUTH_ISSUER=https://access-layer.draftapps.it` and `GOOGLE_REDIRECT_URI=https://access-layer.draftapps.it/v1/auth/google/callback`.
+- Production is now prepared for the dedicated origin `https://access-layer.unguess-internal.net` with no `/access-control` public base path.
+- Production configuration should set `PUBLIC_BASE_PATH=` (empty), `APP_BASE_URL=https://access-layer.unguess-internal.net`, `AUTH_ISSUER=https://access-layer.unguess-internal.net` and `GOOGLE_REDIRECT_URI=https://access-layer.unguess-internal.net/v1/auth/google/callback`.
 - Local Docker development remains on `http://localhost:8080/access-control`.
 - Verification for this update: `npm.cmd run lint`, `npm.cmd run build` and `npm.cmd test` passed; test suite result is 9 files and 87 tests.
 

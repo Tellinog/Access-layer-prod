@@ -9,11 +9,12 @@
 - 2026-06-17: Corrected and confirmed real Google Workspace domain list for `GOOGLE_ALLOWED_HD`: `unguess.io`.
 - 2026-06-16: Confirmed production and local redirect URIs before creating OAuth clients:
   - `http://localhost:8080/access-control/v1/auth/google/callback`
-  - `https://access-layer.draftapps.it/v1/auth/google/callback`
+  - `https://access-layer.unguess-internal.net/v1/auth/google/callback`
   - No separate staging redirect URI is required for v1 unless specified later.
 
 ## QUESTION
 
+- 2026-07-02: `AGENTS.md`, `docs/DEPLOYMENT.md` and `docs/SECURITY.md` reference `.env.example`, but this workspace currently provides `.env.production.example` and no root `.env.example`. Confirm whether `.env.production.example` is the canonical template or restore a general `.env.example`.
 - Should raw IP be stored for audit, or only salted hash plus country/ASN metadata?
 - Should logs be exported to an external SIEM in v1?
 - Should per-tool role labels remain free-form strings after v1, or become centrally managed values?
@@ -44,13 +45,14 @@
 ## RESOLVED_2026_06_17
 
 - Access Layer production base path was previously confirmed as `/access-control`; this is superseded for production by the 2026-06-21 dedicated-subdomain update below.
-- 2026-06-21: Superseded the production `/access-control` base path with the dedicated production origin `https://access-layer.draftapps.it`; local Docker remains on `/access-control`.
+- 2026-06-21: Superseded the production `/access-control` base path with the dedicated production origin `https://access-layer.unguess-internal.net`; local Docker remains on `/access-control`.
 - Tool onboarding will be performed through the Admin UI for v1, not through production seed files.
 - Coolify variables will be configured in the Coolify UI from `.env.production.example`; real `.env` files must not be included in deployment packages.
 
 ## FOLLOW_UP
 
+- After the production domain switch, update Google Cloud, Coolify and any integrated tools to use `https://access-layer.unguess-internal.net`, then verify `GET https://access-layer.unguess-internal.net/health`, `GET https://access-layer.unguess-internal.net/v1/.well-known/jwks.json` and the Google OAuth callback flow.
 - Re-run Admin UI verification for the 2026-07-02 UNGUESS visual alignment once dependencies are already available locally or external dependency installation is explicitly allowed: `npm ci`, `npm run lint`, `npm run build`, `npm test` and a browser smoke test.
 - Run `docker compose config` and a real container smoke test on a host with Docker/Coolify access.
-- After Coolify deploy, verify `GET https://access-layer.draftapps.it/health` and `GET https://access-layer.draftapps.it/v1/.well-known/jwks.json`.
+- After Coolify deploy, verify `GET https://access-layer.unguess-internal.net/health` and `GET https://access-layer.unguess-internal.net/v1/.well-known/jwks.json`.
 - Login as bootstrap admin and create the first real tool from the Tools UI.

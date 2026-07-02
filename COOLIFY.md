@@ -5,7 +5,7 @@
 Canonical production origin:
 
 ```text
-https://access-layer.draftapps.it
+https://access-layer.unguess-internal.net
 ```
 
 All Access Layer API endpoints are mounted at the production root:
@@ -38,8 +38,8 @@ Minimum production values:
 ```env
 APP_ENV=production
 PUBLIC_BASE_PATH=
-APP_BASE_URL=https://access-layer.draftapps.it
-AUTH_ISSUER=https://access-layer.draftapps.it
+APP_BASE_URL=https://access-layer.unguess-internal.net
+AUTH_ISSUER=https://access-layer.unguess-internal.net
 PORT=8080
 
 POSTGRES_USER=access_layer
@@ -49,7 +49,7 @@ DATABASE_URL=postgresql://access_layer:<same password>@postgres:5432/access_laye
 
 GOOGLE_CLIENT_ID=<google web oauth client id>
 GOOGLE_CLIENT_SECRET=<google web oauth client secret>
-GOOGLE_REDIRECT_URI=https://access-layer.draftapps.it/v1/auth/google/callback
+GOOGLE_REDIRECT_URI=https://access-layer.unguess-internal.net/v1/auth/google/callback
 GOOGLE_ALLOWED_HD=unguess.io,nuotounostiledivita.it
 GOOGLE_OIDC_SCOPE=openid email profile
 
@@ -60,7 +60,7 @@ SESSION_SECRET=<long random secret>
 TOOL_CLIENT_SECRET_PEPPER=<long random secret>
 LOG_IP_SALT=<long random secret>
 
-CORS_ALLOWED_ORIGINS=https://access-layer.draftapps.it
+CORS_ALLOWED_ORIGINS=https://access-layer.unguess-internal.net
 RETURN_URL_ALLOWED_SCHEMES=https
 ADMIN_BOOTSTRAP_EMAILS=lorenzo.prandi@unguess.io,lorenzo@nuotounostiledivita.it
 
@@ -76,7 +76,7 @@ For production, prefer `JWT_PRIVATE_KEY_PEM` as a Coolify secret/environment var
 The authorized redirect URI in Google Cloud must exactly match the production root-path callback:
 
 ```text
-https://access-layer.draftapps.it/v1/auth/google/callback
+https://access-layer.unguess-internal.net/v1/auth/google/callback
 ```
 
 For local tests:
@@ -91,13 +91,13 @@ http://localhost:8080/access-control/v1/auth/google/callback
 GOOGLE_ALLOWED_HD=unguess.io,nuotounostiledivita.it
 ```
 
-Do not put `localhost`, URLs, ports, `draftapps.it` or `access-layer.draftapps.it` in `GOOGLE_ALLOWED_HD` unless that is also the actual Google Workspace hosted domain in the Google ID token `hd` claim.
+Do not put `localhost`, URLs, ports, `draftapps.it` or `access-layer.unguess-internal.net` in `GOOGLE_ALLOWED_HD` unless that is also the actual Google Workspace hosted domain in the Google ID token `hd` claim.
 
 ## First login
 
 After deploy:
 
-1. open `https://access-layer.draftapps.it`;
+1. open `https://access-layer.unguess-internal.net`;
 2. click Login;
 3. login with an email listed in `ADMIN_BOOTSTRAP_EMAILS`;
 4. verify the dashboard loads;
@@ -122,9 +122,9 @@ The cleartext tool client secret is shown only once. If lost, rotate the secret 
 After deploy, verify:
 
 ```text
-GET https://access-layer.draftapps.it/health
-GET https://access-layer.draftapps.it/v1/.well-known/jwks.json
-GET https://access-layer.draftapps.it/admin
+GET https://access-layer.unguess-internal.net/health
+GET https://access-layer.unguess-internal.net/v1/.well-known/jwks.json
+GET https://access-layer.unguess-internal.net/admin
 ```
 
 Then test:

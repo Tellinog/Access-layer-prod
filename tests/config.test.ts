@@ -60,16 +60,16 @@ describe("loadConfig", () => {
   it("accepts the production root-domain deployment without a public base path", () => {
     vi.stubEnv("APP_ENV", "production");
     vi.stubEnv("PUBLIC_BASE_PATH", "");
-    vi.stubEnv("APP_BASE_URL", "https://access-layer.draftapps.it");
-    vi.stubEnv("AUTH_ISSUER", "https://access-layer.draftapps.it");
-    vi.stubEnv("GOOGLE_REDIRECT_URI", "https://access-layer.draftapps.it/v1/auth/google/callback");
+    vi.stubEnv("APP_BASE_URL", "https://access-layer.unguess-internal.net");
+    vi.stubEnv("AUTH_ISSUER", "https://access-layer.unguess-internal.net");
+    vi.stubEnv("GOOGLE_REDIRECT_URI", "https://access-layer.unguess-internal.net/v1/auth/google/callback");
     vi.stubEnv("JWT_PRIVATE_KEY_PEM", "placeholder-production-private-key");
     vi.stubEnv("BACKUP_ENCRYPTION_KEY", "0123456789abcdef0123456789abcdef");
 
     const config = loadConfig();
 
     expect(config.publicBasePath).toBe("");
-    expect(config.appBaseUrl).toBe("https://access-layer.draftapps.it");
-    expect(config.googleRedirectUri).toBe("https://access-layer.draftapps.it/v1/auth/google/callback");
+    expect(config.appBaseUrl).toBe("https://access-layer.unguess-internal.net");
+    expect(config.googleRedirectUri).toBe("https://access-layer.unguess-internal.net/v1/auth/google/callback");
   });
 });

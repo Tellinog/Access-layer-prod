@@ -127,7 +127,7 @@ Decision: v1 uses `unguess.io` as the only confirmed Google Workspace hosted dom
 
 No separate staging environment is required for v1 unless specified later.
 
-Rationale: Google hosted-domain validation must use only Workspace domains from the Google ID token `hd` claim. Google returns `hd=unguess.io` for company accounts. Runtime hosts such as `draftapps.it`, `access-layer.draftapps.it` and `localhost` are not Google Workspace hosted domains, so they must never be included in `GOOGLE_ALLOWED_HD`.
+Rationale: Google hosted-domain validation must use only Workspace domains from the Google ID token `hd` claim. Google returns `hd=unguess.io` for company accounts. Runtime hosts such as `draftapps.it`, `access-layer.unguess-internal.net` and `localhost` are not Google Workspace hosted domains, so they must never be included in `GOOGLE_ALLOWED_HD`.
 
 ## D-016 - Local Docker Compose runtime
 
@@ -199,16 +199,16 @@ Rationale: Access Layer rate limits and audit hashes depend on client IP. Boundi
 
 Status: accepted
 
-Decision: production Access Layer runs on the dedicated origin `https://access-layer.draftapps.it` without the `/access-control` public base path. Local Docker development continues to use `http://localhost:8080/access-control`.
+Decision: production Access Layer runs on the dedicated origin `https://access-layer.unguess-internal.net` without the `/access-control` public base path. Local Docker development continues to use `http://localhost:8080/access-control`.
 
 Canonical production URLs:
 
-- Admin UI: `https://access-layer.draftapps.it/admin`
-- Google callback: `https://access-layer.draftapps.it/v1/auth/google/callback`
-- Admin API: `https://access-layer.draftapps.it/v1/admin/*`
-- Tool auth API: `https://access-layer.draftapps.it/v1/auth/*`
+- Admin UI: `https://access-layer.unguess-internal.net/admin`
+- Google callback: `https://access-layer.unguess-internal.net/v1/auth/google/callback`
+- Admin API: `https://access-layer.unguess-internal.net/v1/admin/*`
+- Tool auth API: `https://access-layer.unguess-internal.net/v1/auth/*`
 
-Operational consequence: production must set `PUBLIC_BASE_PATH=` (empty), `APP_BASE_URL=https://access-layer.draftapps.it`, `AUTH_ISSUER=https://access-layer.draftapps.it` and `GOOGLE_REDIRECT_URI=https://access-layer.draftapps.it/v1/auth/google/callback`. Tools should configure `ACCESS_LAYER_BASE_URL=https://access-layer.draftapps.it` and call `/v1/...` paths relative to that base URL.
+Operational consequence: production must set `PUBLIC_BASE_PATH=` (empty), `APP_BASE_URL=https://access-layer.unguess-internal.net`, `AUTH_ISSUER=https://access-layer.unguess-internal.net` and `GOOGLE_REDIRECT_URI=https://access-layer.unguess-internal.net/v1/auth/google/callback`. Tools should configure `ACCESS_LAYER_BASE_URL=https://access-layer.unguess-internal.net` and call `/v1/...` paths relative to that base URL.
 
 Rationale: a dedicated `access-layer` subdomain avoids mounting Access Layer below `draftapps.it/access-control`, simplifies reverse-proxy routing and makes the production service boundary explicit while preserving local base-path coverage.
 
@@ -246,3 +246,22 @@ Decision: the v1 same-service Admin UI uses the UNGUESS-aligned visual direction
 Rationale: Access Layer is an internal administrative product for the UNGUESS ecosystem and should feel native to that environment, while preserving the already accepted v1 API, security, authorization, routing and data-flow decisions.
 
 Operational consequence: visual refactors must not change authentication flows, permission behavior, API contracts, database behavior, environment variables, tool integrations or business logic unless a separate product/security decision explicitly authorizes that change.
+
+## D-027 - Production Access Layer origin moved to UNGUESS internal domain
+
+Status: accepted
+
+Confirmed: 2026-07-02
+
+Decision: production Access Layer uses `https://access-layer.unguess-internal.net` as its public origin, with no `/access-control` public base path. This supersedes the previous production origin `https://access-layer.draftapps.it`. Local Docker development remains on `http://localhost:8080/access-control`.
+
+Canonical production URLs:
+
+- Admin UI: `https://access-layer.unguess-internal.net/admin`
+- Google callback: `https://access-layer.unguess-internal.net/v1/auth/google/callback`
+- Admin API: `https://access-layer.unguess-internal.net/v1/admin/*`
+- Tool auth API: `https://access-layer.unguess-internal.net/v1/auth/*`
+
+Operational consequence: production must set `PUBLIC_BASE_PATH=` (empty), `APP_BASE_URL=https://access-layer.unguess-internal.net`, `AUTH_ISSUER=https://access-layer.unguess-internal.net`, `GOOGLE_REDIRECT_URI=https://access-layer.unguess-internal.net/v1/auth/google/callback` and `CORS_ALLOWED_ORIGINS=https://access-layer.unguess-internal.net`. Google Cloud must allow the matching redirect URI and origin. Tools should configure their Access Layer public/internal base URL as `https://access-layer.unguess-internal.net` unless a documented private internal URL is introduced.
+
+Rationale: the Access Layer production service now belongs on the UNGUESS internal domain. The Google Workspace hosted-domain allow-list remains `unguess.io,nuotounostiledivita.it`; runtime service hosts such as `access-layer.unguess-internal.net` must not be added to `GOOGLE_ALLOWED_HD`.

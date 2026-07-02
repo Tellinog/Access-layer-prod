@@ -37,7 +37,7 @@ Lo stack puo essere cambiato, ma la modifica va registrata in `DECISIONS.md` e d
 
 ## Produzione Coolify
 
-Il pacchetto e predisposto per Coolify in produzione su `https://access-layer.draftapps.it`, senza base path pubblico. Le variabili reali vanno inserite nella UI di Coolify, partendo da `.env.production.example`; non caricare file `.env` con segreti nello zip/repository.
+Il pacchetto e predisposto per Coolify in produzione su `https://access-layer.unguess-internal.net`, senza base path pubblico. Le variabili reali vanno inserite nella UI di Coolify, partendo da `.env.production.example`; non caricare file `.env` con segreti nello zip/repository.
 
 Leggere `COOLIFY.md` prima del deploy.
 

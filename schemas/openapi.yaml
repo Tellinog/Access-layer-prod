@@ -4,7 +4,7 @@ info:
   version: 1.0.0
   description: Shared authentication, authorization and audit API for internal tools.
 servers:
-  - url: https://access-layer.draftapps.it
+  - url: https://access-layer.unguess-internal.net
     description: Production
   - url: http://localhost:8080
     description: Local development

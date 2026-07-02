@@ -6,7 +6,7 @@ Recommended claims:
 
 ```json
 {
-  "iss": "https://access-layer.draftapps.it",
+  "iss": "https://access-layer.unguess-internal.net",
   "sub": "110000000000000000000",
   "aud": "crm",
   "exp": 1760000000,

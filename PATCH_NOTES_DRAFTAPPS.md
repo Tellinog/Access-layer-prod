@@ -1,15 +1,15 @@
-# Draftapps deployment patch
+# UNGUESS internal deployment patch
 
 Target deployment origin:
 
-- `https://access-layer.draftapps.it`
+- `https://access-layer.unguess-internal.net`
 
 Runtime/auth changes:
 
-- `APP_BASE_URL=https://access-layer.draftapps.it`
-- `AUTH_ISSUER=https://access-layer.draftapps.it`
-- `GOOGLE_REDIRECT_URI=https://access-layer.draftapps.it/v1/auth/google/callback`
-- `CORS_ALLOWED_ORIGINS=https://access-layer.draftapps.it`
+- `APP_BASE_URL=https://access-layer.unguess-internal.net`
+- `AUTH_ISSUER=https://access-layer.unguess-internal.net`
+- `GOOGLE_REDIRECT_URI=https://access-layer.unguess-internal.net/v1/auth/google/callback`
+- `CORS_ALLOWED_ORIGINS=https://access-layer.unguess-internal.net`
 - `GOOGLE_ALLOWED_HD=unguess.io,nuotounostiledivita.it`
 - `ADMIN_BOOTSTRAP_EMAILS=lorenzo.prandi@unguess.io,lorenzo@nuotounostiledivita.it`
 
@@ -19,5 +19,6 @@ Important Google OAuth note:
 
 Verification performed:
 
-- `npm test` passed: 89 tests.
-- `npm run build` passed.
+- `npm.cmd run lint` passed.
+- `npm.cmd run build` passed.
+- `npm.cmd test` passed: 95 tests.

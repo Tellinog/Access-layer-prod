@@ -5,7 +5,7 @@
 Browser redirect from tool:
 
 ```http
-GET https://access-layer.draftapps.it/v1/auth/start?tool_slug=crm&return_url=https%3A%2F%2Fcrm.draftapps.it%2Fauth%2Fcallback&state=tool-generated-random-state
+GET https://access-layer.unguess-internal.net/v1/auth/start?tool_slug=crm&return_url=https%3A%2F%2Fcrm.draftapps.it%2Fauth%2Fcallback&state=tool-generated-random-state
 ```
 
 Required query params:
@@ -91,7 +91,7 @@ Response active:
 ```json
 {
   "active": true,
-  "issuer": "https://access-layer.draftapps.it",
+  "issuer": "https://access-layer.unguess-internal.net",
   "audience": "crm",
   "expires_at": "2026-06-10T10:15:00Z",
   "session_id": "01HYSESSIONABC",

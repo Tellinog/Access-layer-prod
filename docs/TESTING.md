@@ -96,7 +96,7 @@ Latest production URL topology verification, 2026-06-21:
 - `npm.cmd run lint` passed.
 - `npm.cmd run build` passed.
 - `npm.cmd test` passed with 9 files and 87 tests.
-- Added config coverage for production on `https://access-layer.draftapps.it` with empty `PUBLIC_BASE_PATH` and root `/v1/auth/google/callback`.
+- Added config coverage for production on `https://access-layer.unguess-internal.net` with empty `PUBLIC_BASE_PATH` and root `/v1/auth/google/callback`.
 
 Docker verification status, 2026-06-17:
 

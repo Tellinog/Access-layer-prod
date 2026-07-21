@@ -92,3 +92,5 @@ The Grants page includes operational CSV controls:
 - `Bulk import` opens an inline textarea with `Preview` and `Commit import` actions.
 
 Preview must show row-level `ok`, `warning` and `error` results without writing data. Commit must refuse to write when preview contains errors, then display the applied result summary.
+
+The input accepts both comma- and semicolon-delimited CSV files, detecting the delimiter from the required header row.

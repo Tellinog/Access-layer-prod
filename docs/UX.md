@@ -90,4 +90,5 @@ Bulk grant import is designed as a guarded admin operation:
 - admins download a template and permission catalog before editing data;
 - preview is mandatory in practice because it returns row-level validation before commit;
 - commit applies no changes when any row is invalid;
+- the CSV separator may be either a comma or a semicolon and is detected from the header row;
 - `pending_user_link` copy must clarify that approval already exists and the grant will activate automatically at first verified Google login.

@@ -194,6 +194,8 @@ petyr,Petyr,active,petyr:read:all,
 
 ### POST /v1/admin/grants/bulk/preview
 
+Il separatore viene rilevato automaticamente dalla riga di intestazione: sono supportati sia `,` sia `;`. Le API client possono anche inviare esplicitamente `delimiter` con uno dei due valori.
+
 Request:
 
 ```json

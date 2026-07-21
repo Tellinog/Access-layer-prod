@@ -72,7 +72,7 @@ Flusso consigliato:
 
 1. Scaricare `Template CSV`.
 2. Scaricare `Export permessi` per verificare `tool_slug` e permission key disponibili.
-3. Compilare il CSV con colonne `email,tool_slug,role,permissions,valid_until,action,note`.
+3. Compilare il CSV con colonne `email,tool_slug,role,permissions,valid_until,action,note`. Sono accettati sia la virgola (`,`) sia il punto e virgola (`;`) come separatore.
 4. Incollare il CSV in `Bulk import` e lanciare `Preview`.
 5. Correggere tutte le righe `error`.
 6. Lanciare `Commit import` solo quando la preview non contiene errori.

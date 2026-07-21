@@ -799,11 +799,11 @@ components:
       properties:
         content:
           type: string
-          description: CSV content with headers email, tool_slug, role, permissions, valid_until, action and note.
+          description: CSV content with headers email, tool_slug, role, permissions, valid_until, action and note. Comma and semicolon delimiters are auto-detected from the header row unless delimiter is provided.
         delimiter:
           type: string
           enum: [",", ";"]
-          default: ","
+          description: Optional explicit CSV delimiter. If omitted, the delimiter is detected from the header row.
     BulkGrantImportRow:
       type: object
       required: [row, email, tool_slug, role, permissions, valid_until, action, result]

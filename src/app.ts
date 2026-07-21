@@ -2349,7 +2349,9 @@ function parseBulkGrantRequest(body: unknown, correlationId: string): { rows: Bu
     throw new AppError("VALIDATION_ERROR", correlationId, { expected: "JSON body with CSV content" });
   }
   const payload = body as { content: string; delimiter?: string };
-  const delimiter = payload.delimiter === ";" ? ";" : ",";
+  const delimiter = payload.delimiter === ";" || payload.delimiter === ","
+    ? payload.delimiter
+    : detectCsvDelimiter(payload.content);
   const table = parseCsv(payload.content, delimiter);
   if (table.length < 2) {
     throw new AppError("VALIDATION_ERROR", correlationId, { expected: "CSV header plus at least one data row" });
@@ -2639,6 +2641,15 @@ function parsePermissionList(value: string): string[] {
 
 function normalizeCsvHeader(value: string): string {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
+
+function detectCsvDelimiter(content: string): "," | ";" {
+  const requiredHeaders = ["email", "tool_slug", "role", "permissions", "valid_until", "action", "note"];
+  const score = (delimiter: "," | ";"): number => {
+    const header = parseCsv(content, delimiter).find((row) => row.some((cell) => cell.trim() !== "")) ?? [];
+    return requiredHeaders.filter((requiredHeader) => header.map(normalizeCsvHeader).includes(requiredHeader)).length;
+  };
+  return score(";") > score(",") ? ";" : ",";
 }
 
 function parseCsv(content: string, delimiter: string): string[][] {
@@ -3436,7 +3447,7 @@ function adminHtml(config: Config): string {
       title.textContent = 'Bulk import grant';
       content.innerHTML = '<form class="form-card" id="grant-bulk-form">' +
         '<h2>Bulk import grant</h2>' +
-        '<p class="field-help">Incolla un CSV con colonne email, tool_slug, role, permissions, valid_until, action, note. Preview non scrive dati; Commit applica solo se non ci sono errori.</p>' +
+        '<p class="field-help">Incolla un CSV con colonne email, tool_slug, role, permissions, valid_until, action, note. Sono accettati i separatori virgola e punto e virgola. Preview non scrive dati; Commit applica solo se non ci sono errori.</p>' +
         '<label class="full-row">CSV<br><textarea id="grant-bulk-content" rows="12" placeholder="email,tool_slug,role,permissions,valid_until,action,note"></textarea></label>' +
         '<p class="danger" id="grant-bulk-error" role="alert"></p>' +
         '<div class="form-actions"><button class="secondary" id="grant-bulk-preview" type="button">Preview</button><button class="primary" id="grant-bulk-commit" type="button">Commit import</button><button class="secondary" id="grant-bulk-cancel" type="button">Annulla</button></div>' +

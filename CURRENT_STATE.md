@@ -8,6 +8,13 @@ V1 implementation scaffold complete, with local dependency, typecheck, build and
 
 This repository now contains the product/security/API/data specifications plus a Node.js/TypeScript Fastify implementation for the Access Layer Google SSO v1 service.
 
+## Latest bulk grant CSV delimiter fix, 2026-07-21
+
+- Bulk grant preview and commit now detect whether the required header row uses comma or semicolon delimiters when the client does not specify one.
+- The Admin UI explicitly documents both accepted separators, avoiding false `missing_headers` errors for semicolon-delimited CSV content.
+- API, UI and test documentation now describe the automatic detection behavior.
+- Verification: targeted Admin bulk-import regression coverage was added; final check results are recorded in `DEVLOG.md`.
+
 ## Latest production domain update, 2026-07-02
 
 - Production Access Layer configuration and documentation now target `https://access-layer.unguess-internal.net` instead of `https://access-layer.draftapps.it`.

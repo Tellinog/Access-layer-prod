@@ -180,7 +180,7 @@ For the configured v1 environment:
 - Backup export is encrypted and backup/restore permissions are explicit.
 - Cookie-authenticated admin write requests require same-origin validation.
 - Pending email grants reject external or malformed email addresses.
-- Bulk grant import rejects external domains, unknown tools, unassigned tools for delegated admins, malformed dates and unknown permission keys before writing.
+- Bulk grant import accepts comma- and semicolon-delimited templates, and rejects external domains, unknown tools, unassigned tools for delegated admins, malformed dates and unknown permission keys before writing.
 - Bulk grant commit creates or updates grants idempotently, keeps unknown company emails as `pending_user_link`, and revokes matching sessions on `revoke` rows.
 
 ## Manual test checklist

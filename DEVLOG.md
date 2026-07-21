@@ -1,5 +1,33 @@
 # DEVLOG.md
 
+## 2026-07-21 - Accept semicolon-delimited bulk grant CSV imports
+
+Changed by: Codex
+Related task: Fix the bulk grant import reporting missing headers when the CSV uses semicolons.
+
+### Changed
+- Added header-based delimiter detection for bulk grant preview and commit when the request does not set `delimiter` explicitly.
+- Preserved explicit `,` and `;` API delimiter choices and the existing comma-delimited template output.
+- Updated the Admin UI help copy to state that comma- and semicolon-delimited CSV files are accepted.
+- Added regression coverage for a semicolon-delimited bulk grant preview submitted through the Admin API/UI payload shape.
+
+### Docs/specs/schemas updated
+- `CURRENT_STATE.md`
+- `docs/ADMIN_GUIDE.md`
+- `docs/API_PAYLOADS.md`
+- `docs/TESTING.md`
+- `docs/UI_SYSTEM.md`
+- `docs/UX.md`
+- `schemas/openapi.yaml`
+
+### Tests/checks
+- `npm.cmd run lint` passed.
+- `npm.cmd test -- tests/app.admin.test.ts` passed: 1 file, 50 tests.
+- `npm.cmd test` passed: 9 files, 96 tests.
+
+### Follow-ups
+- Validate the updated import flow in the deployed Admin UI with an actual semicolon-delimited CSV exported by the local spreadsheet tool.
+
 ## 2026-07-02 - Production domain migration to UNGUESS internal origin
 
 Changed by: ChatGPT

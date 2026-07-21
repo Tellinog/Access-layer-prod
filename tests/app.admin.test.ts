@@ -1150,6 +1150,26 @@ describe("admin access request routes", () => {
     await app.close();
   });
 
+  it("auto-detects semicolon-delimited bulk grant CSV imports", async () => {
+    const repos = new AdminRepos();
+    const app = await buildAdminApp(repos);
+    const content = "email;tool_slug;role;permissions;valid_until;action;note\nMario.Rossi@unguess.io;crm;tool_user;crm:read;;upsert;Accesso bulk\n";
+
+    const preview = await app.inject({
+      method: "POST",
+      url: "/v1/admin/grants/bulk/preview",
+      headers: { authorization: "Bearer admin-token" },
+      payload: { content }
+    });
+
+    expect(preview.statusCode).toBe(200);
+    expect(preview.json()).toMatchObject({
+      summary: { total_rows: 1, ok: 1, warning: 0, error: 0 },
+      rows: [{ email: "mario.rossi@unguess.io", tool_slug: "crm", result: "ok" }]
+    });
+    await app.close();
+  });
+
   it("does not commit bulk grant imports with validation errors", async () => {
     const repos = new AdminRepos();
     const app = await buildAdminApp(repos);

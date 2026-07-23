@@ -265,3 +265,11 @@ Canonical production URLs:
 Operational consequence: production must set `PUBLIC_BASE_PATH=` (empty), `APP_BASE_URL=https://access-layer.unguess-internal.net`, `AUTH_ISSUER=https://access-layer.unguess-internal.net`, `GOOGLE_REDIRECT_URI=https://access-layer.unguess-internal.net/v1/auth/google/callback` and `CORS_ALLOWED_ORIGINS=https://access-layer.unguess-internal.net`. Google Cloud must allow the matching redirect URI and origin. Tools should configure their Access Layer public/internal base URL as `https://access-layer.unguess-internal.net` unless a documented private internal URL is introduced.
 
 Rationale: the Access Layer production service now belongs on the UNGUESS internal domain. The Google Workspace hosted-domain allow-list remains `unguess.io,nuotounostiledivita.it`; runtime service hosts such as `access-layer.unguess-internal.net` must not be added to `GOOGLE_ALLOWED_HD`.
+
+## D-028 - Native SVG favicon for the Admin UI
+
+Status: accepted
+
+Decision: the Admin UI uses a native SVG favicon with an Access Layer "A" mark, petrol-teal primary background and mint accent. It is served beneath `PUBLIC_BASE_PATH` and linked from the Admin UI HTML.
+
+Rationale: SVG keeps the mark sharp at the small dimensions used by browser tabs while following the accepted presentation-only UNGUESS UI direction.

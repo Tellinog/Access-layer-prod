@@ -40,6 +40,10 @@ The Admin UI should align with the UNGUESS enterprise SaaS visual language while
 
 The visual treatment must stay presentation-only unless a separate task explicitly changes behavior. Do not change routing, API calls, authentication, authorization, database behavior, environment variables or tool integration flows as part of visual alignment.
 
+## Favicon
+
+The Admin UI exposes a compact SVG favicon under the configured public base path. It uses the Access Layer "A" mark on the petrol-teal primary color with a mint accent, and must remain legible at 16×16 pixels.
+
 ## States
 
 Every table needs:

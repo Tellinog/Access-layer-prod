@@ -654,6 +654,7 @@ describe("admin access request routes", () => {
     });
     expect(htmlResponse.statusCode).toBe(200);
     expect(htmlResponse.body).toContain("/access-control/v1");
+    expect(htmlResponse.body).toContain('rel="icon" href="/access-control/favicon.svg"');
     expect(htmlResponse.body).toContain('ADMIN_BASE_PATH = "/access-control"');
     expect(htmlResponse.body).toContain('id="auth-action">Logout</button>');
     expect(htmlResponse.body).not.toContain('id="login"');
@@ -664,6 +665,11 @@ describe("admin access request routes", () => {
       headers: { authorization: "Bearer admin-token" }
     });
     expect(toolsResponse.statusCode).toBe(200);
+
+    const faviconResponse = await app.inject({ method: "GET", url: "/access-control/favicon.svg" });
+    expect(faviconResponse.statusCode).toBe(200);
+    expect(faviconResponse.headers["content-type"]).toContain("image/svg+xml");
+    expect(faviconResponse.body).toContain("#004b63");
 
     await app.close();
   });

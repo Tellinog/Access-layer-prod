@@ -4,6 +4,7 @@ import Fastify, {
   type FastifyRequest,
   type RouteHandlerMethod
 } from "fastify";
+import { readFileSync } from "node:fs";
 import rateLimit from "@fastify/rate-limit";
 import type {
   AccessRequestStatus,
@@ -52,6 +53,7 @@ const ADMIN_SESSION_MAX_AGE_SECONDS = 8 * 60 * 60;
 const AUDIT_OUTCOMES = ["success", "denied", "error", "info"] as const;
 const BACKUP_SCHEMA = "access-layer-backup";
 const BACKUP_VERSION = 1;
+const FAVICON_SVG = readFileSync(new URL("../assets/ui/favicon.svg", import.meta.url), "utf8");
 
 
 function joinPublicPath(basePath: string, path = ""): string {
@@ -1303,6 +1305,13 @@ function registerAdminUi(
   deps: AppDependencies,
   contextFor: (request: FastifyRequest, correlationId?: string) => RequestContext
 ): void {
+  app.get(joinPublicPath(deps.config.publicBasePath, "/favicon.svg"), async (_request, reply) => {
+    return reply
+      .header("cache-control", "public, max-age=86400")
+      .type("image/svg+xml; charset=utf-8")
+      .send(FAVICON_SVG);
+  });
+
   app.get(adminUiPath(deps.config, "/login"), async (request, reply) => {
     const state = randomToken("adm_", 24);
     const adminCallbackPath = deps.config.publicBasePath ? "/auth/callback" : "/admin/auth/callback";
@@ -2809,11 +2818,13 @@ function cookieHeader(
 function adminHtml(config: Config): string {
   const adminBasePath = adminUiPath(config);
   const apiBasePath = apiPath(config, "/v1");
+  const faviconPath = joinPublicPath(config.publicBasePath, "/favicon.svg");
   return `<!doctype html>
 <html lang="it">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="${faviconPath}" type="image/svg+xml">
   <title>Access Layer Admin</title>
   <style>
     :root {

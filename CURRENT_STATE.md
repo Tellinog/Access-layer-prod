@@ -8,6 +8,11 @@ V1 implementation scaffold complete, with local dependency, typecheck, build and
 
 This repository now contains the product/security/API/data specifications plus a Node.js/TypeScript Fastify implementation for the Access Layer Google SSO v1 service.
 
+## Latest Admin UI favicon update, 2026-07-23
+
+- Added an SVG Access Layer favicon, served beneath the configured public base path and linked by the Admin UI HTML.
+- The favicon is copied into the compiled runtime output, so it is available through both local `npm start` and the production image.
+
 ## Latest bulk grant CSV delimiter fix, 2026-07-21
 
 - Bulk grant preview and commit now detect whether the required header row uses comma or semicolon delimiters when the client does not specify one.

@@ -1,5 +1,30 @@
 # DEVLOG.md
 
+## 2026-07-23 - Add Access Layer favicon
+
+Changed by: Codex
+Related task: Create a favicon for the tool.
+
+### Changed
+- Added a native SVG favicon with an Access Layer "A" mark, using the Admin UI petrol-teal primary color and mint accent.
+- Added a public favicon route that respects `PUBLIC_BASE_PATH`, and linked it from the Admin UI document head.
+- Added the asset to the compiled runtime output, making it available to both local `npm start` and the production image.
+
+### Docs/specs/schemas updated
+- `CURRENT_STATE.md`
+- `DECISIONS.md`
+- `BACKLOG.md`
+- `docs/UI_SYSTEM.md`
+
+### Tests/checks
+- Added Admin UI route and markup coverage for the favicon.
+
+### Decisions
+- Used SVG rather than a bitmap so the mark remains crisp at browser favicon sizes.
+
+### Follow-ups
+- Replace the mark only if/when an approved company logo system becomes available.
+
 ## 2026-07-21 - Accept semicolon-delimited bulk grant CSV imports
 
 Changed by: Codex

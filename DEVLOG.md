@@ -1,5 +1,38 @@
 # DEVLOG.md
 
+## 2026-07-24 - Fix Coolify Docker build after favicon asset pipeline
+
+Changed by: Codex
+Related task: Diagnose and correct repeated Coolify deployment failures at `RUN npm run build`.
+
+### Changed
+- Updated the Docker build stage to copy `scripts/copy-assets.mjs` and `assets/` before running the package build.
+- Preserved the multi-stage production image and existing runtime asset copy through `dist`.
+- Added a Dockerfile regression test that requires both build-time inputs to be copied before `RUN npm run build`.
+
+### Root cause
+- The favicon update changed the package build to run `node scripts/copy-assets.mjs` after TypeScript compilation.
+- The Docker builder stage still copied only `tsconfig.json` and `src`, so the script and its source assets were absent inside `/app`.
+- Coolify's `APP_ENV=production` warning was informational and unrelated to the failed command.
+
+### Docs/specs/schemas updated
+- Updated `CURRENT_STATE.md`, `BACKLOG.md`, `docs/TESTING.md` and `COOLIFY.md`.
+- No API, policy, schema, database or environment-variable change was required.
+
+### Tests/checks
+- Clean builder-stage simulation passed and produced `dist/assets/ui/favicon.svg`.
+- `npm.cmd run lint` passed.
+- `npm.cmd run build` passed.
+- `npm.cmd test` passed: 10 files, 100 tests.
+- A complete local `docker build` was not available because the Docker daemon is not running in this workspace.
+
+### Decisions
+- No new product or architecture decision. The Docker context now matches the already accepted asset build pipeline.
+
+### Follow-ups
+- Push the Dockerfile/test/docs changes and redeploy the resulting commit in Coolify.
+- Verify `/health`, `/v1/.well-known/jwks.json`, `/admin` and `/favicon.svg` after deployment.
+
 ## 2026-07-24 - Activity-driven sliding session refresh
 
 Changed by: Codex

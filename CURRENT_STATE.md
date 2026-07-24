@@ -8,6 +8,14 @@ V1 implementation scaffold complete, with local dependency, typecheck, build and
 
 This repository now contains the product/security/API/data specifications plus a Node.js/TypeScript Fastify implementation for the Access Layer Google SSO v1 service.
 
+## Latest Coolify Docker build fix, 2026-07-24
+
+- Coolify deploys at commits `bb3cac7d68935bc4f8478196774cfcadaee443e1` and `81d95a87adb09343fdc1195efe7f9f61b8b66867` failed at `RUN npm run build`.
+- Root cause: the favicon asset build script and `assets/` directory were not copied into the Docker builder stage.
+- The Dockerfile now copies both build-time inputs before compilation, and regression coverage protects their ordering.
+- Clean builder-stage simulation, lint and build passed; the full suite passes with 10 files and 100 tests.
+- Full local image construction remains unverified because the Docker daemon is unavailable in this workspace.
+
 ## Latest activity-driven session refresh update, 2026-07-24
 
 - Added `POST /v1/auth/refresh` with tool client authentication, opaque refresh-token rotation, active tool/user/session/grant revalidation and a new 15-minute JWT.
@@ -15,7 +23,7 @@ This repository now contains the product/security/API/data specifications plus a
 - Refresh tokens are single-use; invalid, expired, reused or no-longer-authorized refresh attempts return `AUTH_REFRESH_TOKEN_INVALID`.
 - The Admin UI now stores its refresh credential in a separate signed HttpOnly cookie, refreshes and retries once on authenticated activity, and clears both cookies when renewal fails or the user logs out.
 - The reference tool harness demonstrates server-side, activity-driven refresh and explicitly avoids background keepalive timers.
-- Verification passed with lint, build and the full automated suite: 9 test files and 99 tests.
+- Verification passes with lint, build and the current full automated suite: 10 test files and 100 tests.
 
 ## Latest Admin UI favicon update, 2026-07-23
 

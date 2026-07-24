@@ -29,6 +29,8 @@ Use this repository/package as a Docker Compose application.
 
 Do not upload real `.env`, `.env.docker`, generated `.tmp` or `.local` keys, `node_modules` or `dist` folders. The production package intentionally contains only examples and source files.
 
+The Docker builder stage must include `scripts/copy-assets.mjs` and `assets/` before `npm run build`; the build script compiles TypeScript and copies UI assets into `dist/assets`. A Coolify warning about `APP_ENV=production` is informational for this Node.js multi-stage image and is not by itself a build failure.
+
 ## Environment variables
 
 Create the variables in the Coolify resource Environment Variables section. Start from `.env.production.example` and replace all placeholder values.

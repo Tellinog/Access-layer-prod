@@ -12,6 +12,7 @@
   - `https://access-layer.unguess-internal.net/v1/auth/google/callback`
   - No separate staging redirect URI is required for v1 unless specified later.
 - 2026-07-24: Confirmed 15-minute access tokens and activity-driven sliding sessions. Each valid refresh rotates the token and moves the 8-hour idle deadline forward; background refresh without user activity is forbidden.
+- 2026-07-24: Resolved Coolify build failure introduced by the favicon asset pipeline by copying `scripts/copy-assets.mjs` and `assets/` into the Docker builder stage.
 
 ## QUESTION
 

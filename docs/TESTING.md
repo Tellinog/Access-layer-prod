@@ -67,6 +67,7 @@ The v1 implementation includes Vitest tests for:
 - Admin UI non-sensitive OAuth/runtime settings summary without secret disclosure.
 - Admin UI encrypted backup and restore secret material controls.
 - Admin UI served inline JavaScript parseability, catching generated-script errors before browser smoke tests.
+- Docker builder-stage asset inputs are copied before `npm run build`, preventing the favicon copy step from failing only in container builds.
 - Admin UI authenticated shell renders logout instead of the old fixed login button.
 - Admin UI refresh route rotates the protected refresh cookie and the client retries an Admin API request once after successful renewal.
 - Admin CSV bulk grant template export, permission catalog export, preview, commit and error-blocked commit behavior.

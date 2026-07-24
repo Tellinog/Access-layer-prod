@@ -9,6 +9,8 @@ FROM deps AS build
 
 COPY tsconfig.json ./
 COPY src ./src
+COPY scripts/copy-assets.mjs ./scripts/copy-assets.mjs
+COPY assets ./assets
 RUN npm run build
 RUN npm prune --omit=dev
 

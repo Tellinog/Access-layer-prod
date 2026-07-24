@@ -13,6 +13,8 @@
 
 Aprendo la root Admin UI senza sessione valida, il servizio avvia direttamente il login Google per il tool riservato `access-admin`; la dashboard viene servita solo dopo una sessione admin valida.
 
+La sessione Admin usa un JWT di 15 minuti e un refresh token protetto in un cookie HttpOnly separato. Le azioni dell'admin rinnovano la sessione e spostano in avanti il timeout inattivo di 8 ore; una pagina lasciata aperta senza attività non viene mantenuta viva da timer in background.
+
 Al primo deploy, impostare `ADMIN_BOOTSTRAP_EMAILS` con una o piu email aziendali.
 
 Dopo il primo login degli admin:

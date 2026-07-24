@@ -25,6 +25,10 @@ sequenceDiagram
     A->>DB: Consume code, create session, log token.exchanged
     A->>T: User profile + permissions + Access Layer JWT
     T->>U: Local tool session
+    U->>T: Later authenticated activity
+    T->>A: POST /auth/refresh with tool credentials + current refresh token
+    A->>DB: Consume token, revalidate, extend session, store replacement
+    A->>T: New JWT + rotated refresh token
 ```
 
 ## Trust boundaries

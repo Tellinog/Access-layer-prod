@@ -32,6 +32,8 @@ The v1 implementation includes Vitest tests for:
 - mocked pending-email grant linking on first valid Google login;
 - mocked active-grant callback creating a one-time code;
 - mocked one-time-code exchange success, refresh token hashing path and replay denial.
+- mocked activity-driven refresh success, refresh-token rotation, sliding session extension and old-token replay denial.
+- mocked refresh denial after inactivity expiry or grant revocation.
 - mocked one-time-code exchange denial with wrong tool client secret and audit event creation.
 - mocked introspection active result and inactive result after grant revocation.
 - mocked admin tool creation returning a one-time client secret, storing only a verifiable hash and writing `admin.tool.created`;
@@ -66,6 +68,7 @@ The v1 implementation includes Vitest tests for:
 - Admin UI encrypted backup and restore secret material controls.
 - Admin UI served inline JavaScript parseability, catching generated-script errors before browser smoke tests.
 - Admin UI authenticated shell renders logout instead of the old fixed login button.
+- Admin UI refresh route rotates the protected refresh cookie and the client retries an Admin API request once after successful renewal.
 - Admin CSV bulk grant template export, permission catalog export, preview, commit and error-blocked commit behavior.
 - Local root redirect to the Admin UI.
 
@@ -176,6 +179,7 @@ For the configured v1 environment:
 - Admin UI callback state failures write denied audit events.
 - Admin UI logout revokes the server-side session and writes a logout audit event.
 - Stale logout/revocation attempts write `session.revoke.denied`.
+- Refresh tokens are single-use, old-token replay is denied and inactive sessions/grants cannot be refreshed.
 - Logs do not contain token-like values.
 - Backup export is encrypted and backup/restore permissions are explicit.
 - Cookie-authenticated admin write requests require same-origin validation.

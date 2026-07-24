@@ -14,6 +14,7 @@
 | `AUTH_NOT_AUTHORIZED_FOR_TOOL` | 403 | No active grant for tool |
 | `AUTH_CODE_EXPIRED` | 400 | One-time code expired |
 | `AUTH_CODE_ALREADY_USED` | 400 | One-time code already consumed |
+| `AUTH_REFRESH_TOKEN_INVALID` | 401 | Refresh token invalid, expired, already used or linked session no longer authorized |
 | `TOOL_AUTH_FAILED` | 401 | Tool client authentication failed |
 | `TOKEN_IN_QUERY_REJECTED` | 400 | Token-like credential was sent in query string |
 | `TOKEN_INACTIVE` | 200 | Introspection token inactive |

@@ -1,7 +1,9 @@
 import { createServer } from "node:http";
 import { randomBytes, createHash } from "node:crypto";
 
-const accessLayerBaseUrl = requiredEnv("ACCESS_LAYER_BASE_URL", "http://localhost:8080");
+const legacyAccessLayerBaseUrl = process.env.ACCESS_LAYER_BASE_URL;
+const accessLayerPublicBaseUrl = requiredEnv("ACCESS_LAYER_PUBLIC_BASE_URL", legacyAccessLayerBaseUrl ?? "http://localhost:8080/access-control");
+const accessLayerInternalBaseUrl = requiredEnv("ACCESS_LAYER_INTERNAL_BASE_URL", legacyAccessLayerBaseUrl ?? "http://localhost:8080/access-control");
 const toolSlug = requiredEnv("ACCESS_LAYER_TOOL_SLUG", "crm");
 const clientId = requiredEnv("ACCESS_LAYER_CLIENT_ID");
 const clientSecret = requiredEnv("ACCESS_LAYER_CLIENT_SECRET");
@@ -17,6 +19,10 @@ function requiredEnv(name, fallback) {
     throw new Error(`Missing ${name}`);
   }
   return value;
+}
+
+function accessLayerUrl(baseUrl, path) {
+  return new URL(`${baseUrl.replace(/\/+$/, "")}${path}`);
 }
 
 function randomToken(prefix) {
@@ -60,7 +66,7 @@ function redirect(res, location, cookies = []) {
 }
 
 async function exchangeCode(code) {
-  const response = await fetch(new URL("/v1/auth/exchange", accessLayerBaseUrl), {
+  const response = await fetch(accessLayerUrl(accessLayerInternalBaseUrl, "/v1/auth/exchange"), {
     method: "POST",
     headers: {
       authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
@@ -77,14 +83,29 @@ async function exchangeCode(code) {
   return response.json();
 }
 
-async function logoutAccessLayer(sessionId) {
-  await fetch(new URL("/v1/auth/logout", accessLayerBaseUrl), {
+async function refreshAccessLayer(refreshToken) {
+  const response = await fetch(accessLayerUrl(accessLayerInternalBaseUrl, "/v1/auth/refresh"), {
     method: "POST",
     headers: {
       authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
       "content-type": "application/json"
     },
-    body: JSON.stringify({ session_id: sessionId })
+    body: JSON.stringify({ refresh_token: refreshToken })
+  });
+  if (!response.ok) {
+    throw new Error(`Access Layer refresh failed with HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
+async function logoutAccessLayer(sessionId, refreshToken) {
+  await fetch(accessLayerUrl(accessLayerInternalBaseUrl, "/v1/auth/logout"), {
+    method: "POST",
+    headers: {
+      authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({ session_id: sessionId, refresh_token: refreshToken })
   });
 }
 
@@ -97,7 +118,7 @@ const server = createServer(async (req, res) => {
     if (url.pathname === "/login") {
       const state = randomToken("state_");
       pendingStates.set(hash(state), { state, expiresAt: Date.now() + 5 * 60 * 1000 });
-      const startUrl = new URL("/v1/auth/start", accessLayerBaseUrl);
+      const startUrl = accessLayerUrl(accessLayerPublicBaseUrl, "/v1/auth/start");
       startUrl.searchParams.set("tool_slug", toolSlug);
       startUrl.searchParams.set("return_url", callbackUrl);
       startUrl.searchParams.set("state", state);
@@ -116,6 +137,10 @@ const server = createServer(async (req, res) => {
       const sessionId = randomToken("sess_");
       localSessions.set(sessionId, {
         accessLayerSessionId: exchanged.session.id,
+        accessToken: exchanged.access_token,
+        accessTokenExpiresAt: Date.now() + exchanged.expires_in * 1000,
+        refreshToken: exchanged.refresh_token,
+        refreshInFlight: null,
         googleSub: exchanged.user.google_sub,
         email: exchanged.user.email,
         permissions: exchanged.grant.permissions,
@@ -126,7 +151,7 @@ const server = createServer(async (req, res) => {
 
     if (url.pathname === "/logout") {
       if (localSession) {
-        await logoutAccessLayer(localSession.accessLayerSessionId);
+        await logoutAccessLayer(localSession.accessLayerSessionId, localSession.refreshToken);
         localSessions.delete(cookies.tool_session);
       }
       return redirect(res, "/", ["tool_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax"]);
@@ -134,6 +159,28 @@ const server = createServer(async (req, res) => {
 
     if (!localSession) {
       return html(res, 200, '<h1>Tool Harness</h1><p><a href="/login">Accedi con Google aziendale</a></p>');
+    }
+
+    if (localSession.accessTokenExpiresAt <= Date.now() + 30_000) {
+      try {
+        if (!localSession.refreshInFlight) {
+          localSession.refreshInFlight = refreshAccessLayer(localSession.refreshToken)
+            .then((refreshed) => {
+              localSession.accessToken = refreshed.access_token;
+              localSession.accessTokenExpiresAt = Date.now() + refreshed.expires_in * 1000;
+              localSession.refreshToken = refreshed.refresh_token;
+              localSession.accessLayerSessionId = refreshed.session.id;
+              localSession.permissions = refreshed.grant.permissions;
+            })
+            .finally(() => {
+              localSession.refreshInFlight = null;
+            });
+        }
+        await localSession.refreshInFlight;
+      } catch {
+        localSessions.delete(cookies.tool_session);
+        return redirect(res, "/login", ["tool_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax"]);
+      }
     }
 
     return html(

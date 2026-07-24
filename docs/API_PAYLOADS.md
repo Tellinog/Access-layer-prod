@@ -76,6 +76,29 @@ Response body:
 }
 ```
 
+## POST /v1/auth/refresh
+
+The tool backend calls refresh only as part of authenticated user activity, when the current access token is expired or close to expiration. Do not run unconditional background refresh timers.
+
+Request headers:
+
+```http
+Authorization: Basic base64(tool_client_id:tool_client_secret)
+Content-Type: application/json
+```
+
+Request body:
+
+```json
+{
+  "refresh_token": "rt_current-opaque-refresh-token"
+}
+```
+
+The successful response has the same identity/session shape as `/v1/auth/exchange`, with a new `access_token`, a new `refresh_token` and the extended `session.expires_at`. The submitted refresh token is revoked atomically and must be discarded immediately.
+
+An invalid, expired, already-used or no-longer-authorized refresh returns `401 AUTH_REFRESH_TOKEN_INVALID`. The tool must clear its local session and restart the login flow; it must not retry the same refresh token.
+
 ## POST /v1/auth/introspect
 
 Request:

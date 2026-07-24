@@ -273,3 +273,17 @@ Status: accepted
 Decision: the Admin UI uses a native SVG favicon with an Access Layer "A" mark, petrol-teal primary background and mint accent. It is served beneath `PUBLIC_BASE_PATH` and linked from the Admin UI HTML.
 
 Rationale: SVG keeps the mark sharp at the small dimensions used by browser tabs while following the accepted presentation-only UNGUESS UI direction.
+
+## D-029 - Activity-driven sliding sessions with rotating refresh tokens
+
+Status: accepted
+
+Confirmed: 2026-07-24
+
+Decision: Access Layer keeps authenticated sessions alive while the user remains active. Access tokens retain a 15-minute TTL. A successful server-to-server refresh, performed while handling authenticated user activity, atomically consumes the current opaque refresh token, issues a replacement, issues a new access token and moves the session idle deadline forward by 8 hours.
+
+Unconditional background refresh is forbidden because an open but inactive page must not keep a session alive. If no valid refresh occurs within 8 hours, or if the tool, user, session or grant is no longer active, refresh is denied and the tool must clear its local session and restart login.
+
+Operational consequence: tool backends must store refresh tokens only server-side, serialize concurrent refreshes for the same session, replace the rotated token atomically and treat `AUTH_REFRESH_TOKEN_INVALID` as a terminal local-session condition. The same-service Admin UI uses a protected HttpOnly refresh cookie and retries an Admin API request once after a successful activity-driven refresh.
+
+Rationale: short-lived JWTs retain a small exposure window while active users are not interrupted every 15 minutes. Rotation prevents routine reuse of a refresh credential and online revalidation preserves immediate user/grant/session revocation.

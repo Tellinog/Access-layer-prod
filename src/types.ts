@@ -119,6 +119,16 @@ export interface Session {
   revoked_at: Date | null;
 }
 
+export interface RefreshToken {
+  id: string;
+  token_hash: string;
+  session_id: string;
+  status: SessionStatus;
+  issued_at: Date;
+  expires_at: Date;
+  revoked_at: Date | null;
+}
+
 export interface OneTimeCode {
   id: string;
   code_hash: string;

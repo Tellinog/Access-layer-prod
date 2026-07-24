@@ -39,7 +39,11 @@ See also:
 - One-time codes expire after `ONE_TIME_CODE_TTL_SECONDS` and are single-use.
 - Store one-time codes hashed only.
 - Access Layer access tokens expire after `ACCESS_TOKEN_TTL_SECONDS`.
-- Refresh tokens, if enabled, are opaque, hashed at rest and revocable.
+- Refresh tokens, if enabled, are opaque, hashed at rest, single-use, rotated on every successful refresh and revocable.
+- A successful authenticated refresh extends both the refresh-token expiry and Access Layer session expiry by `REFRESH_TOKEN_TTL_SECONDS`.
+- Sliding renewal represents authenticated user activity. Tools must refresh while handling a user request; unconditional background timers or refreshes without user activity are forbidden.
+- If no valid refresh occurs within `REFRESH_TOKEN_TTL_SECONDS`, the session cannot be renewed and the tool must restart login.
+- Refresh validates the active tool, user, session and grant before issuing a new access token.
 - Tool local sessions must not outlive Access Layer grant/session rules unless the tool uses introspection or refresh checks.
 - Admin session cookies must be `HttpOnly`, `Secure`, `SameSite=Lax` or stricter.
 - Admin cookie-authenticated write requests must pass same-origin validation. Bearer-token admin API clients do not use browser cookies and are not subject to the CSRF browser threat model.
@@ -127,6 +131,7 @@ Apply rate limits to:
 
 - `/v1/auth/start` by IP hash and tool;
 - `/v1/auth/exchange` by tool client and code;
+- `/v1/auth/refresh` by tool client and refresh-token hash;
 - `/v1/auth/introspect` by tool client;
 - admin write endpoints by admin user.
 

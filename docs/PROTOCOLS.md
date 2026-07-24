@@ -32,6 +32,7 @@ Authorization: Basic base64(client_id:client_secret)
 Accepted endpoints:
 
 - `POST /v1/auth/exchange`
+- `POST /v1/auth/refresh`
 - `POST /v1/auth/introspect`
 - `POST /v1/auth/logout` when called by tool backend
 
@@ -43,6 +44,16 @@ Accepted endpoints:
 - TTL 60 seconds by default.
 - Atomic consume by hash and tool.
 - Bind to tool, return URL, user, grant and correlation ID.
+
+## Refresh token rules
+
+- Opaque value stored only as a hash by Access Layer and only server-side by the tool.
+- Single-use and atomically consumed.
+- Rotate on every successful refresh.
+- Bind indirectly to the originating tool through the Access Layer session.
+- Revalidate active tool, user, session and grant on refresh.
+- Extend the session idle deadline only for authenticated user activity.
+- Do not refresh on background timers without user activity.
 
 ## Return URL matching
 

@@ -16,6 +16,7 @@
 | `AUTH_NOT_AUTHORIZED_FOR_TOOL` | Account valido, ma non autorizzato per questo tool. |
 | `AUTH_CODE_EXPIRED` | Sessione di accesso scaduta. Riprova. |
 | `AUTH_CODE_ALREADY_USED` | Sessione di accesso gia utilizzata. Riprova. |
+| `AUTH_REFRESH_TOKEN_INVALID` | Sessione non rinnovabile. Accedi di nuovo. |
 | `TOOL_AUTH_FAILED` | Configurazione del tool non valida. |
 | `TOKEN_IN_QUERY_REJECTED` | Token non ammesso nella query string. |
 | `ADMIN_FORBIDDEN` | Non hai permessi amministrativi sufficienti. |

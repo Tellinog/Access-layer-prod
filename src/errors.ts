@@ -13,6 +13,7 @@ export type ErrorCode =
   | "AUTH_NOT_AUTHORIZED_FOR_TOOL"
   | "AUTH_CODE_EXPIRED"
   | "AUTH_CODE_ALREADY_USED"
+  | "AUTH_REFRESH_TOKEN_INVALID"
   | "TOOL_AUTH_FAILED"
   | "TOKEN_IN_QUERY_REJECTED"
   | "TOKEN_INACTIVE"
@@ -36,6 +37,7 @@ export const httpStatusByCode: Record<ErrorCode, number> = {
   AUTH_NOT_AUTHORIZED_FOR_TOOL: 403,
   AUTH_CODE_EXPIRED: 400,
   AUTH_CODE_ALREADY_USED: 400,
+  AUTH_REFRESH_TOKEN_INVALID: 401,
   TOOL_AUTH_FAILED: 401,
   TOKEN_IN_QUERY_REJECTED: 400,
   TOKEN_INACTIVE: 200,
@@ -61,6 +63,7 @@ export const safeMessageByCode: Record<ErrorCode, string> = {
     "Il tuo account aziendale e valido, ma non risulta autorizzato per questo tool. La richiesta e stata registrata per un amministratore.",
   AUTH_CODE_EXPIRED: "Sessione di accesso scaduta. Riprova.",
   AUTH_CODE_ALREADY_USED: "Sessione di accesso gia utilizzata. Riprova.",
+  AUTH_REFRESH_TOKEN_INVALID: "Sessione non rinnovabile. Accedi di nuovo.",
   TOOL_AUTH_FAILED: "Configurazione del tool non valida.",
   TOKEN_IN_QUERY_REJECTED: "Token non ammesso nella query string.",
   TOKEN_INACTIVE: "Token non attivo.",

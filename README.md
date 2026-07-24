@@ -20,6 +20,7 @@ Il servizio centralizza autenticazione, autorizzazione e audit trail per tutti i
 4. Se l'utente e autorizzato al tool, Access Layer genera un one-time code e reindirizza al callback del tool.
 5. Il backend del tool scambia il one-time code con `POST /v1/auth/exchange` in produzione, o `POST /access-control/v1/auth/exchange` in locale, autenticandosi come tool client.
 6. Il tool riceve identita, permessi e token firmato da Access Layer, crea la propria sessione locale e logga il `sub` Google e `session_id`.
+7. Durante una richiesta autenticata, quando il JWT sta per scadere, il backend del tool ruota il refresh token tramite `POST /v1/auth/refresh`; ogni refresh valido estende la scadenza inattiva della sessione.
 
 ## Stack di riferimento
 
@@ -89,6 +90,8 @@ Leggere in questo ordine:
 10. `docs/GOOGLE_CLOUD_SETUP.md`
 11. `docs/INTEGRATION_GUIDE.md`
 12. `docs/IMPLEMENTATION_PLAN.md`
+
+Per aggiornare un tool gia integrato alla rotazione refresh e alle sessioni sliding, usare `prompts/TOOL_REFRESH_MIGRATION_PROMPT.md`.
 
 ## Output atteso dell'implementazione
 

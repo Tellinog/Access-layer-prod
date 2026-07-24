@@ -26,7 +26,7 @@ Main data categories:
 | `access_requests` | Admin queue for valid internal users without grant | `tool_id`, `email_normalized`, `status`, `attempts_count` | Created only after valid company Google login and no active grant |
 | `one_time_codes` | Callback code for tool exchange | `code_hash`, `user_id`, `tool_id`, `expires_at`, `consumed_at` | Consume atomically |
 | `sessions` | Access Layer sessions | `user_id`, `tool_id`, `grant_id`, `status` | Revocable |
-| `refresh_tokens` | Optional central refresh tokens | `token_hash`, `session_id`, `expires_at` | Opaque and hashed |
+| `refresh_tokens` | Optional central refresh tokens | `token_hash`, `session_id`, `status`, `expires_at` | Opaque, hashed and single-use; rotated on refresh |
 | `audit_logs` | Central audit trail | `event_type`, `outcome`, `tool_slug`, `actor_email`, `correlation_id` | Append-only by application rule |
 
 ## Invariants

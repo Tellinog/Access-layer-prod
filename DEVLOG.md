@@ -1,5 +1,44 @@
 # DEVLOG.md
 
+## 2026-07-24 - Activity-driven sliding session refresh
+
+Changed by: Codex
+Related task: Keep authenticated users signed in while they remain active and provide migration instructions for existing Access Layer tools.
+
+### Changed
+- Added tool-authenticated `POST /v1/auth/refresh`.
+- Added atomic single-use refresh-token consumption, replacement-token creation, active tool/user/session/grant revalidation and 15-minute JWT re-issuance.
+- Successful refresh now extends the Access Layer session and replacement refresh-token idle deadline by 8 hours from authenticated user activity.
+- Added `AUTH_REFRESH_TOKEN_INVALID` for invalid, expired, reused or no-longer-authorized refresh attempts.
+- Added no-store token responses and refresh-specific rate limiting.
+- Updated tool logout with a refresh token to revoke the linked session only when it belongs to the authenticated tool.
+- Added a separate signed HttpOnly refresh cookie for the Admin UI, one refresh-and-retry attempt on authenticated Admin API activity, root-page recovery from an expired access cookie, and clearing of both auth cookies on failure/logout.
+- Updated the reference tool harness to store tokens only in its server-side session, refresh on an authenticated request near token expiry, rotate state and clear the local session if renewal fails; it now also separates public/internal Access Layer URLs while preserving configured base paths.
+- Added `prompts/TOOL_REFRESH_MIGRATION_PROMPT.md` as a ready-to-send Codex migration prompt for existing tools.
+
+### Docs/specs/schemas updated
+- Updated OpenAPI, API payloads, protocols, integration, architecture, domain, DB, security, logging/analytics, deployment, Admin UX/guide and testing documentation.
+- Updated `specs/policy.v1.yml` and `specs/feature_flags.v1.yml` with rotation, sliding idle timeout and the prohibition on background keepalive.
+- Recorded accepted decision `D-029`, resolved the token/session TTL assumptions in `BACKLOG.md` and updated `CURRENT_STATE.md`.
+
+### Tests/checks
+- `npm.cmd run lint` passed.
+- `npm.cmd run build` passed.
+- `npm.cmd test` passed: 9 files, 99 tests.
+- Added refresh success/rotation/sliding-extension/replay-denial coverage, inactivity/grant-revocation denial coverage, Admin refresh-cookie rotation coverage and Admin UI retry-script coverage.
+
+### Decisions
+- Access tokens remain valid for 15 minutes.
+- The 8-hour refresh/session TTL is a sliding inactivity timeout.
+- Only authenticated user activity renews the session; unconditional background timers are forbidden.
+- Refresh tokens rotate on every successful use and old tokens cannot be reused.
+
+### Follow-ups
+- Deploy Access Layer before or alongside tool migrations.
+- Migrate every existing tool using `prompts/TOOL_REFRESH_MIGRATION_PROMPT.md`; tools not yet migrated retain the previous 15-minute interruption behavior.
+- Define and automate retention cleanup for consumed/expired refresh-token rows.
+- Run an environment-backed PostgreSQL/Google OAuth smoke test after deployment.
+
 ## 2026-07-23 - Add Access Layer favicon
 
 Changed by: Codex

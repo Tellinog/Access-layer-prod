@@ -49,7 +49,6 @@ import {
 } from "./validation.js";
 
 const ADMIN_TOOL_SLUG = "access-admin";
-const ADMIN_SESSION_MAX_AGE_SECONDS = 8 * 60 * 60;
 const AUDIT_OUTCOMES = ["success", "denied", "error", "info"] as const;
 const BACKUP_SCHEMA = "access-layer-backup";
 const BACKUP_VERSION = 1;
@@ -72,6 +71,10 @@ function adminUiPath(config: Config, path = ""): string {
 
 function adminCookiePath(config: Config): string {
   return config.publicBasePath || "/";
+}
+
+function adminRefreshCookieName(config: Config): string {
+  return `${config.sessionCookieName}_refresh`;
 }
 
 function publicUrl(config: Config, path: string): string {
@@ -181,6 +184,15 @@ export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> 
     keyGenerator: (request) => {
       const body = request.body as { code?: string } | undefined;
       return `token-exchange:${readBasicClientId(request) ?? "unknown-client"}:${body?.code ? hashOpaque(body.code, deps.config.logIpSalt) : "missing-code"}`;
+    }
+  });
+
+  const tokenRefreshRateLimit = app.createRateLimit({
+    max: 60,
+    timeWindow: "1 minute",
+    keyGenerator: (request) => {
+      const body = request.body as { refresh_token?: string } | undefined;
+      return `token-refresh:${readBasicClientId(request) ?? "unknown-client"}:${body?.refresh_token ? hashOpaque(body.refresh_token, deps.config.logIpSalt) : "missing-refresh-token"}`;
     }
   });
 
@@ -637,7 +649,25 @@ export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> 
       requestIpHash: ctx.requestIpHash,
       userAgentHash: ctx.userAgentHash
     });
-    return reply.send(response);
+    return reply.header("Cache-Control", "no-store").header("Pragma", "no-cache").send(response);
+  });
+
+  app.post(apiPath(deps.config, "/v1/auth/refresh"), { preHandler: async (request, reply) => {
+    if (!(await enforceRateLimit(tokenRefreshRateLimit, request, reply))) return reply;
+  } }, async (request, reply) => {
+    const ctx = contextFor(request);
+    const toolClient = await authenticateToolClient(request, deps, ctx, "token.refresh.denied");
+    const body = request.body as { refresh_token?: string };
+    if (!deps.config.enableRefreshTokens || !body?.refresh_token) {
+      throw new AppError(body?.refresh_token ? "AUTH_REFRESH_TOKEN_INVALID" : "VALIDATION_ERROR", ctx.correlationId);
+    }
+    const response = await refreshAccessToken({
+      deps,
+      refreshToken: body.refresh_token,
+      tool: toolClient.tool,
+      ctx
+    });
+    return reply.header("Cache-Control", "no-store").header("Pragma", "no-cache").send(response);
   });
 
   app.post(apiPath(deps.config, "/v1/auth/introspect"), { preHandler: async (request, reply) => {
@@ -677,7 +707,14 @@ export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> 
         revoked += await deps.repositories.revokeSession(body.session_id, toolClient.tool.id);
       }
       if (body.refresh_token) {
-        revoked += await deps.repositories.revokeRefreshToken(hashOpaque(body.refresh_token, deps.config.toolClientSecretPepper));
+        const refreshHash = hashOpaque(body.refresh_token, deps.config.toolClientSecretPepper);
+        const refresh = await deps.repositories.findRefreshTokenByHash(refreshHash);
+        const refreshSession = refresh ? await deps.repositories.findSessionById(refresh.session_id) : null;
+        if (refreshSession?.tool_id === toolClient.tool.id) {
+          revoked += await deps.repositories.revokeRefreshToken(refreshHash);
+          revoked += await deps.repositories.revokeSession(refreshSession.id, toolClient.tool.id);
+          actor.sessionId = refreshSession.id;
+        }
       }
     } else {
       const token = readBearerOrAdminCookie(request, deps.config);
@@ -1062,6 +1099,137 @@ async function exchangeOneTimeCode(input: {
   };
 }
 
+async function refreshAccessToken(input: {
+  deps: AppDependencies;
+  refreshToken: string;
+  tool: Tool;
+  ctx: RequestContext;
+}) {
+  const tokenHash = hashOpaque(input.refreshToken, input.deps.config.toolClientSecretPepper);
+  const nextRefreshToken = randomToken("rt_", 32);
+  const nextExpiresAt = new Date(Date.now() + input.deps.config.refreshTokenTtlSeconds * 1000);
+  const refreshed = await input.deps.repositories.db.transaction(async (tx) => {
+    const repos = input.deps.repositories.withDb(tx);
+    const audit = new AuditLogger(repos);
+    const consumed = await repos.consumeRefreshToken(tokenHash);
+    if (!consumed) return null;
+
+    const session = await repos.findSessionById(consumed.session_id);
+    const user = session ? await repos.findUserById(session.user_id) : null;
+    const grant = session ? await repos.findGrantById(session.grant_id) : null;
+    const valid =
+      Boolean(session && session.tool_id === input.tool.id && session.status === "active" && session.expires_at > new Date()) &&
+      Boolean(user && user.status === "active") &&
+      Boolean(grant && grant.tool_id === input.tool.id && isGrantCurrentlyUsable(grant)) &&
+      input.tool.status === "active";
+
+    if (!valid || !session || !user || !grant) {
+      await audit.write({
+        event_type: "token.refresh.denied",
+        outcome: "denied",
+        correlation_id: input.ctx.correlationId,
+        tool_id: input.tool.id,
+        tool_slug: input.tool.slug,
+        actor_user_id: user?.id,
+        actor_google_sub: user?.google_sub,
+        actor_email: user?.email,
+        actor_hd: user?.hd,
+        reason_code: "AUTH_REFRESH_TOKEN_INVALID",
+        request_ip_hash: input.ctx.requestIpHash,
+        user_agent_hash: input.ctx.userAgentHash,
+        metadata: { session_id: session?.id ?? consumed.session_id }
+      });
+      return { error: new AppError("AUTH_REFRESH_TOKEN_INVALID", input.ctx.correlationId) };
+    }
+
+    const extendedSession = await repos.extendSession(session.id, input.tool.id, nextExpiresAt);
+    if (!extendedSession) {
+      await audit.write({
+        event_type: "token.refresh.denied",
+        outcome: "denied",
+        correlation_id: input.ctx.correlationId,
+        tool_id: input.tool.id,
+        tool_slug: input.tool.slug,
+        actor_user_id: user.id,
+        actor_google_sub: user.google_sub,
+        actor_email: user.email,
+        actor_hd: user.hd,
+        reason_code: "AUTH_REFRESH_TOKEN_INVALID",
+        request_ip_hash: input.ctx.requestIpHash,
+        user_agent_hash: input.ctx.userAgentHash,
+        metadata: { session_id: session.id }
+      });
+      return { error: new AppError("AUTH_REFRESH_TOKEN_INVALID", input.ctx.correlationId) };
+    }
+
+    await repos.createRefreshToken(
+      hashOpaque(nextRefreshToken, input.deps.config.toolClientSecretPepper),
+      extendedSession.id,
+      nextExpiresAt
+    );
+    const access = await input.deps.tokenService.issueAccessToken({
+      user,
+      tool: input.tool,
+      grant,
+      session: extendedSession
+    });
+    await audit.write({
+      event_type: "token.refreshed",
+      outcome: "success",
+      correlation_id: input.ctx.correlationId,
+      tool_id: input.tool.id,
+      tool_slug: input.tool.slug,
+      actor_user_id: user.id,
+      actor_google_sub: user.google_sub,
+      actor_email: user.email,
+      actor_hd: user.hd,
+      request_ip_hash: input.ctx.requestIpHash,
+      user_agent_hash: input.ctx.userAgentHash,
+      metadata: { session_id: extendedSession.id, grant_id: grant.id, token_jti: access.jti }
+    });
+
+    return {
+      access_token: access.token,
+      token_type: "Bearer",
+      expires_in: access.expiresIn,
+      refresh_token: nextRefreshToken,
+      session: {
+        id: extendedSession.id,
+        issued_at: extendedSession.issued_at,
+        expires_at: extendedSession.expires_at
+      },
+      user: userResponse(user),
+      tool: {
+        slug: input.tool.slug,
+        display_name: input.tool.display_name
+      },
+      grant: {
+        role: grant.role,
+        permissions: grant.permissions
+      },
+      correlation_id: input.ctx.correlationId
+    };
+  });
+
+  if (!refreshed) {
+    await input.deps.audit.write({
+      event_type: "token.refresh.denied",
+      outcome: "denied",
+      correlation_id: input.ctx.correlationId,
+      tool_id: input.tool.id,
+      tool_slug: input.tool.slug,
+      reason_code: "AUTH_REFRESH_TOKEN_INVALID",
+      request_ip_hash: input.ctx.requestIpHash,
+      user_agent_hash: input.ctx.userAgentHash
+    });
+    throw new AppError("AUTH_REFRESH_TOKEN_INVALID", input.ctx.correlationId);
+  }
+  if ("error" in refreshed) {
+    throw refreshed.error;
+  }
+  return refreshed;
+}
+
 async function introspectToken(token: string, tool: Tool, deps: AppDependencies) {
   let claims;
   try {
@@ -1131,6 +1299,42 @@ function readBearerOrAdminCookie(request: FastifyRequest, config: Config): strin
   const cookies = parseCookies(request.headers.cookie);
   const signed = cookies[config.sessionCookieName];
   return verifySignedCookie(signed, config.sessionSecret);
+}
+
+function readAdminRefreshCookie(request: FastifyRequest, config: Config): string | null {
+  const cookies = parseCookies(request.headers.cookie);
+  return verifySignedCookie(cookies[adminRefreshCookieName(config)], config.sessionSecret);
+}
+
+function adminAuthCookieHeaders(config: Config, accessToken: string, refreshToken: string): string[] {
+  const common = {
+    httpOnly: true,
+    secure: config.appEnv === "production",
+    path: adminCookiePath(config)
+  };
+  return [
+    cookieHeader(config.sessionCookieName, signCookie(accessToken, config.sessionSecret), {
+      ...common,
+      maxAge: config.accessTokenTtlSeconds
+    }),
+    cookieHeader(adminRefreshCookieName(config), signCookie(refreshToken, config.sessionSecret), {
+      ...common,
+      maxAge: config.refreshTokenTtlSeconds
+    })
+  ];
+}
+
+function clearAdminAuthCookieHeaders(config: Config): string[] {
+  const common = {
+    maxAge: 0,
+    httpOnly: true,
+    secure: config.appEnv === "production",
+    path: adminCookiePath(config)
+  };
+  return [
+    cookieHeader(config.sessionCookieName, "", common),
+    cookieHeader(adminRefreshCookieName(config), "", common)
+  ];
 }
 
 async function enforceRateLimit(
@@ -1371,19 +1575,61 @@ function registerAdminUi(
       requestIpHash: ctx.requestIpHash,
       userAgentHash: ctx.userAgentHash
     });
-    reply.header(
-      "Set-Cookie",
-      [
-        cookieHeader(deps.config.sessionCookieName, signCookie(result.access_token, deps.config.sessionSecret), {
-          maxAge: ADMIN_SESSION_MAX_AGE_SECONDS,
-          httpOnly: true,
-          secure: deps.config.appEnv === "production",
-          path: adminCookiePath(deps.config)
-        }),
-        cookieHeader("access_layer_admin_login_state", "", { maxAge: 0, httpOnly: true, secure: deps.config.appEnv === "production", path: adminCookiePath(deps.config) })
-      ]
-    );
+    const authCookies = result.refresh_token
+      ? adminAuthCookieHeaders(deps.config, result.access_token, result.refresh_token)
+      : [
+          cookieHeader(deps.config.sessionCookieName, signCookie(result.access_token, deps.config.sessionSecret), {
+            maxAge: deps.config.accessTokenTtlSeconds,
+            httpOnly: true,
+            secure: deps.config.appEnv === "production",
+            path: adminCookiePath(deps.config)
+          })
+        ];
+    reply.header("Set-Cookie", [
+      ...authCookies,
+      cookieHeader("access_layer_admin_login_state", "", {
+        maxAge: 0,
+        httpOnly: true,
+        secure: deps.config.appEnv === "production",
+        path: adminCookiePath(deps.config)
+      })
+    ]);
     return reply.redirect(adminUiPath(deps.config));
+  });
+
+  app.post(adminUiPath(deps.config, "/refresh"), async (request, reply) => {
+    const ctx = contextFor(request);
+    if (!isAllowedAdminMutationOrigin(request, deps.config)) {
+      await deps.audit.write({
+        event_type: "admin.csrf.denied",
+        outcome: "denied",
+        correlation_id: ctx.correlationId,
+        tool_slug: ADMIN_TOOL_SLUG,
+        reason_code: "ADMIN_FORBIDDEN",
+        request_ip_hash: ctx.requestIpHash,
+        user_agent_hash: ctx.userAgentHash
+      });
+      throw new AppError("ADMIN_FORBIDDEN", ctx.correlationId);
+    }
+    const refreshToken = readAdminRefreshCookie(request, deps.config);
+    const tool = await deps.repositories.findToolBySlug(ADMIN_TOOL_SLUG);
+    if (!deps.config.enableRefreshTokens || !refreshToken || !tool || tool.status !== "active") {
+      reply.header("Set-Cookie", clearAdminAuthCookieHeaders(deps.config));
+      throw new AppError("AUTH_REFRESH_TOKEN_INVALID", ctx.correlationId);
+    }
+    try {
+      const result = await refreshAccessToken({
+        deps,
+        refreshToken,
+        tool,
+        ctx
+      });
+      reply.header("Set-Cookie", adminAuthCookieHeaders(deps.config, result.access_token, result.refresh_token));
+      return reply.header("Cache-Control", "no-store").header("Pragma", "no-cache").status(204).send();
+    } catch (error) {
+      reply.header("Set-Cookie", clearAdminAuthCookieHeaders(deps.config));
+      throw error;
+    }
   });
 
   app.post(adminUiPath(deps.config, "/logout"), async (request, reply) => {
@@ -1399,6 +1645,7 @@ function registerAdminUi(
       });
       throw new AppError("ADMIN_FORBIDDEN", ctx.correlationId);
     }
+    const refreshToken = readAdminRefreshCookie(request, deps.config);
     const token = readBearerOrAdminCookie(request, deps.config);
     if (token) {
       let claims: Awaited<ReturnType<TokenService["verifyAccessToken"]>> | null = null;
@@ -1464,15 +1711,23 @@ function registerAdminUi(
         }
       }
     }
-    reply.header(
-      "Set-Cookie",
-      cookieHeader(deps.config.sessionCookieName, "", { maxAge: 0, httpOnly: true, secure: deps.config.appEnv === "production", path: adminCookiePath(deps.config) })
-    );
+    if (refreshToken) {
+      const refreshHash = hashOpaque(refreshToken, deps.config.toolClientSecretPepper);
+      const refresh = await deps.repositories.findRefreshTokenByHash(refreshHash);
+      const session = refresh ? await deps.repositories.findSessionById(refresh.session_id) : null;
+      if (session) {
+        await deps.repositories.revokeSession(session.id);
+      }
+      await deps.repositories.revokeRefreshToken(refreshHash);
+    }
+    reply.header("Set-Cookie", clearAdminAuthCookieHeaders(deps.config));
     return reply.status(204).send();
   });
 
   app.get(adminUiPath(deps.config), async (request, reply) => {
-    const hasSession = await hasRenderableAdminUiSession(request, deps);
+    const hasSession =
+      (await hasRenderableAdminUiSession(request, deps)) ||
+      (await refreshRenderableAdminUiSession(request, reply, deps, contextFor(request)));
     if (!hasSession) {
       return reply.redirect(adminUiPath(deps.config, "/login"));
     }
@@ -1491,21 +1746,51 @@ async function hasRenderableAdminUiSession(request: FastifyRequest, deps: AppDep
     if (!user || !session || !grant || user.status !== "active" || session.status !== "active" || !isGrantCurrentlyUsable(grant)) {
       return false;
     }
-    return (
-      hasPermission(grant.permissions, "admin:tools:read") ||
-      hasPermission(grant.permissions, "admin:tools:read_assigned") ||
-      hasPermission(grant.permissions, "admin:users:read") ||
-      hasPermission(grant.permissions, "admin:grants:read") ||
-      hasPermission(grant.permissions, "admin:grants:read_assigned") ||
-      hasPermission(grant.permissions, "admin:access_requests:read") ||
-      hasPermission(grant.permissions, "admin:access_requests:read_assigned") ||
-      hasPermission(grant.permissions, "admin:audit:read") ||
-      hasPermission(grant.permissions, "admin:audit:read_assigned") ||
-      hasPermission(grant.permissions, "admin:backup:read")
-    );
+    return hasRenderableAdminPermission(grant.permissions);
   } catch {
     return false;
   }
+}
+
+async function refreshRenderableAdminUiSession(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  deps: AppDependencies,
+  ctx: RequestContext
+): Promise<boolean> {
+  if (!deps.config.enableRefreshTokens) return false;
+  const refreshToken = readAdminRefreshCookie(request, deps.config);
+  if (!refreshToken) return false;
+  const tool = await deps.repositories.findToolBySlug(ADMIN_TOOL_SLUG);
+  if (!tool || tool.status !== "active") return false;
+  try {
+    const result = await refreshAccessToken({ deps, refreshToken, tool, ctx });
+    if (!hasRenderableAdminPermission(result.grant.permissions)) {
+      reply.header("Set-Cookie", clearAdminAuthCookieHeaders(deps.config));
+      return false;
+    }
+    reply.header("Set-Cookie", adminAuthCookieHeaders(deps.config, result.access_token, result.refresh_token));
+    reply.header("Cache-Control", "no-store");
+    return true;
+  } catch {
+    reply.header("Set-Cookie", clearAdminAuthCookieHeaders(deps.config));
+    return false;
+  }
+}
+
+function hasRenderableAdminPermission(permissions: string[]): boolean {
+  return (
+    hasPermission(permissions, "admin:tools:read") ||
+    hasPermission(permissions, "admin:tools:read_assigned") ||
+    hasPermission(permissions, "admin:users:read") ||
+    hasPermission(permissions, "admin:grants:read") ||
+    hasPermission(permissions, "admin:grants:read_assigned") ||
+    hasPermission(permissions, "admin:access_requests:read") ||
+    hasPermission(permissions, "admin:access_requests:read_assigned") ||
+    hasPermission(permissions, "admin:audit:read") ||
+    hasPermission(permissions, "admin:audit:read_assigned") ||
+    hasPermission(permissions, "admin:backup:read")
+  );
 }
 
 function registerAdminApi(
@@ -2984,7 +3269,7 @@ function adminHtml(config: Config): string {
         render();
       };
     });
-    async function api(path, options = {}) {
+    async function api(path, options = {}, refreshAttempted = false) {
       const headers = { ...(options.headers || {}) };
       if (options.body !== undefined && !Object.keys(headers).some(key => key.toLowerCase() === 'content-type')) {
         headers['content-type'] = 'application/json';
@@ -2996,6 +3281,17 @@ function adminHtml(config: Config): string {
       const code = payload?.error?.code;
       const correlationId = payload?.error?.correlation_id;
       if (res.status === 401 || code === 'AUTH_INVALID_STATE') {
+        if (!refreshAttempted) {
+          try {
+            const refreshed = await fetch(ADMIN_BASE_PATH + '/refresh', {
+              method: 'POST',
+              credentials: 'same-origin'
+            });
+            if (refreshed.ok) {
+              return api(path, options, true);
+            }
+          } catch {}
+        }
         handleExpiredAdminSession();
         const error = new Error('Sessione scaduta. Accedi di nuovo.');
         error.sessionExpired = true;

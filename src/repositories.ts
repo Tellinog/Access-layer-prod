@@ -5,6 +5,7 @@ import type {
   AuthRequest,
   AuthorizationGrant,
   OneTimeCode,
+  RefreshToken,
   Session,
   Tool,
   ToolClient,
@@ -676,6 +677,20 @@ export class Repositories {
     return result.rowCount ? (result.rows[0] as Session) : null;
   }
 
+  async extendSession(id: string, toolId: string, expiresAt: Date): Promise<Session | null> {
+    const result = await this.db.query(
+      `UPDATE sessions
+       SET expires_at = $3, last_seen_at = now()
+       WHERE id = $1
+        AND tool_id = $2
+        AND status = 'active'
+        AND expires_at > now()
+       RETURNING *`,
+      [id, toolId, expiresAt]
+    );
+    return result.rowCount ? (result.rows[0] as Session) : null;
+  }
+
   async revokeSession(id: string, toolId?: string): Promise<number> {
     const params: unknown[] = [id];
     const toolClause = toolId ? "AND tool_id = $2" : "";
@@ -756,6 +771,24 @@ export class Repositories {
       "INSERT INTO refresh_tokens (token_hash, session_id, expires_at) VALUES ($1,$2,$3)",
       [tokenHash, sessionId, expiresAt]
     );
+  }
+
+  async findRefreshTokenByHash(tokenHash: string): Promise<RefreshToken | null> {
+    const result = await this.db.query("SELECT * FROM refresh_tokens WHERE token_hash = $1", [tokenHash]);
+    return result.rowCount ? (result.rows[0] as RefreshToken) : null;
+  }
+
+  async consumeRefreshToken(tokenHash: string): Promise<RefreshToken | null> {
+    const result = await this.db.query(
+      `UPDATE refresh_tokens
+       SET status = 'revoked', revoked_at = now()
+       WHERE token_hash = $1
+        AND status = 'active'
+        AND expires_at > now()
+       RETURNING *`,
+      [tokenHash]
+    );
+    return result.rowCount ? (result.rows[0] as RefreshToken) : null;
   }
 
   async revokeRefreshToken(tokenHash: string): Promise<number> {

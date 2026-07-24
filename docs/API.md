@@ -17,6 +17,7 @@
 | `/v1/auth/start` | None, but tool and return URL must be valid |
 | `/v1/auth/google/callback` | Google OAuth callback plus server-side state validation |
 | `/v1/auth/exchange` | Tool client credentials |
+| `/v1/auth/refresh` | Tool client credentials |
 | `/v1/auth/introspect` | Tool client credentials |
 | `/v1/auth/logout` | Tool token or admin/user session |
 | `/v1/me` | Access Layer JWT or admin session |
@@ -31,6 +32,7 @@
 | GET | `/v1/auth/start` | Start login for a tool | No | Requires `tool_slug`, `return_url`, `state` |
 | GET | `/v1/auth/google/callback` | Receive Google callback | Google state | Internal endpoint for OAuth redirect |
 | POST | `/v1/auth/exchange` | Exchange one-time code for identity/token | Tool client | Consumes code once |
+| POST | `/v1/auth/refresh` | Rotate refresh token and renew access/session | Tool client | Sliding renewal on authenticated activity |
 | POST | `/v1/auth/introspect` | Validate token online | Tool client | Returns active/inactive and identity |
 | POST | `/v1/auth/logout` | Revoke Access Layer session/token | Tool client or user | Clears central session state |
 | GET | `/v1/me` | Return current identity | User token | Tool-scoped view |

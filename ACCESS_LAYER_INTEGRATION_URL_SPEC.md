@@ -68,6 +68,7 @@ URL usato dal backend del servizio integrato per chiamare Access Layer server-to
 Viene usato per:
 
 - exchange del one-time code;
+- refresh activity-driven della sessione/token;
 - introspection della sessione/token;
 - logout server-side;
 - eventuali chiamate API interne ad Access Layer.
@@ -131,6 +132,10 @@ Un servizio integrato deve usare gli URL cosi':
 introspect/session check
   usa ACCESS_LAYER_INTERNAL_BASE_URL
   perche' e' una chiamata backend-to-backend
+
+refresh
+  usa ACCESS_LAYER_INTERNAL_BASE_URL
+  perche' il refresh token e le credenziali del tool restano nel backend
 
 logout
   usa ACCESS_LAYER_INTERNAL_BASE_URL per invalidare sessioni/token lato server

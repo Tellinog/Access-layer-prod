@@ -41,6 +41,16 @@ It sits between internal tools and Google Auth Platform:
 9. Tool backend calls `/v1/auth/exchange` using tool client credentials.
 10. Access Layer returns identity, permissions, session ID and JWT.
 
+### Activity-driven session renewal
+
+1. The tool backend handles an authenticated user request.
+2. If the Access Layer JWT is expired or close to expiration, the backend calls `/v1/auth/refresh` with its tool client credentials and current opaque refresh token.
+3. Access Layer atomically consumes the refresh token and revalidates tool, user, session and grant.
+4. Access Layer issues a new 15-minute JWT, rotates the refresh token and moves the session idle deadline forward by 8 hours.
+5. If refresh is denied, the tool clears its local session and starts login again.
+
+Tools must not refresh on an unconditional background timer: remaining logged in depends on user activity.
+
 ### Authorization decision
 
 A request is allowed only if all checks pass:
@@ -67,7 +77,7 @@ A request is allowed only if all checks pass:
 | Integration | Purpose | Auth | Notes |
 |---|---|---|---|
 | Google Auth Platform | User login and ID token | OAuth client ID/secret | Configured in Google Cloud |
-| Internal tools | Login start, exchange, introspection | Tool client credentials | Each tool must be registered |
+| Internal tools | Login start, exchange, refresh, introspection | Tool client credentials | Each tool must be registered |
 | Admin users | Manage access | Google login + platform admin role | Bootstrap through env for first deploy |
 | SIEM/log export | Optional audit export | API token or managed identity | Deferred scope |
 

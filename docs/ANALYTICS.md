@@ -14,6 +14,8 @@ This project does not track product analytics for user behavior. It tracks secur
 | Denied no grant | `auth.denied.no_grant` | Access request demand |
 | Invalid return URL attempts | `auth.denied.invalid_return_url` | Misconfiguration/attack detection |
 | Token exchange failures | `token.exchange.denied` | Integration/security monitoring |
+| Successful active-session renewals | `token.refreshed` | Session continuity and tool migration monitoring |
+| Refresh failures | `token.refresh.denied` | Expiry, replay, integration and authorization monitoring |
 | Admin grant changes | `admin.grant.*` | Change tracking |
 
 ## Dashboards

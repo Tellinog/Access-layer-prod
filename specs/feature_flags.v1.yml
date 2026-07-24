@@ -2,7 +2,7 @@ version: 1
 feature_flags:
   enable_refresh_tokens:
     default: true
-    description: Issue opaque Access Layer refresh tokens to tool backend.
+    description: Issue opaque single-use refresh tokens and allow activity-driven sliding session renewal.
   enable_siem_export:
     default: false
     description: Export audit events to external SIEM.

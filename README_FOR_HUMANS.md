@@ -22,7 +22,7 @@ Con Access Layer:
 - Access Layer diventa authorization gateway aziendale;
 - ogni tool riceve una identita gia verificata;
 - admin e auditor hanno un punto unico per permessi e accessi;
-- i tool mantengono solo la sessione locale e i log applicativi.
+- i tool mantengono la propria sessione locale server-side, inclusi i token Access Layer necessari al rinnovo activity-driven, e i log applicativi.
 
 ## Come usare questo pacchetto
 
@@ -40,5 +40,6 @@ La prima versione e accettabile quando un tool pilota puo:
 - completare login Google con account aziendale;
 - ricevere negazione per account esterni o non autorizzati;
 - ricevere identita e permessi quando autorizzato;
+- mantenere la sessione mentre l'utente e attivo tramite refresh token monouso, senza keepalive in background;
 - registrare nei propri log `google_sub`, `email`, `tool_slug`, `access_session_id` e `correlation_id`;
 - mostrare agli admin i log di accesso del layer centrale.

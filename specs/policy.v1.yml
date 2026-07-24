@@ -27,6 +27,11 @@ authorization_policy:
 token_policy:
   access_token_ttl_seconds: 900
   refresh_token_ttl_seconds: 28800
+  refresh_token_rotation: required
+  refresh_token_single_use: true
+  session_renewal: sliding_on_authenticated_activity
+  session_idle_timeout_seconds: 28800
+  background_refresh_without_user_activity: forbidden
   one_time_code_ttl_seconds: 60
   one_time_code_single_use: true
   jwt_audience: tool_slug

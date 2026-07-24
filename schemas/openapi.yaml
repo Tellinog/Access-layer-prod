@@ -86,6 +86,29 @@ paths:
           $ref: '#/components/responses/Error'
         '403':
           $ref: '#/components/responses/Error'
+  /v1/auth/refresh:
+    post:
+      summary: Rotate a refresh token and extend an active Access Layer session
+      description: Activity-driven sliding renewal. Each successful call revokes the presented refresh token, issues a replacement and extends the session idle expiry.
+      security:
+        - toolClientBasic: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: Refresh successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExchangeResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
   /v1/auth/introspect:
     post:
       summary: Introspect Access Layer token
@@ -645,6 +668,13 @@ components:
               type: array
               items: { type: string, pattern: "^[a-z0-9-]+(?::[a-z0-9-]+)+$" }
         correlation_id: { type: string }
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+          description: Current opaque refresh token. It becomes invalid after a successful refresh.
     IntrospectionRequest:
       type: object
       required: [token]

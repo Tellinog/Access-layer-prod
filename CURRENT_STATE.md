@@ -8,6 +8,15 @@ V1 implementation scaffold complete, with local dependency, typecheck, build and
 
 This repository now contains the product/security/API/data specifications plus a Node.js/TypeScript Fastify implementation for the Access Layer Google SSO v1 service.
 
+## Latest activity-driven session refresh update, 2026-07-24
+
+- Added `POST /v1/auth/refresh` with tool client authentication, opaque refresh-token rotation, active tool/user/session/grant revalidation and a new 15-minute JWT.
+- Successful refresh extends the session and replacement refresh token idle deadline by 8 hours from authenticated user activity.
+- Refresh tokens are single-use; invalid, expired, reused or no-longer-authorized refresh attempts return `AUTH_REFRESH_TOKEN_INVALID`.
+- The Admin UI now stores its refresh credential in a separate signed HttpOnly cookie, refreshes and retries once on authenticated activity, and clears both cookies when renewal fails or the user logs out.
+- The reference tool harness demonstrates server-side, activity-driven refresh and explicitly avoids background keepalive timers.
+- Verification passed with lint, build and the full automated suite: 9 test files and 99 tests.
+
 ## Latest Admin UI favicon update, 2026-07-23
 
 - Added an SVG Access Layer favicon, served beneath the configured public base path and linked by the Admin UI HTML.

@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { AuditLogger } from "../src/audit.js";
 import { buildApp } from "../src/app.js";
 import { PLATFORM_ADMIN_PERMISSIONS, TOOL_ADMIN_PERMISSIONS } from "../src/permissions.js";
-import { decryptJsonPayload, signCookie, verifyToolSecret } from "../src/security.js";
-import type { AccessRequest, AuthorizationGrant, Config, Session, Tool, User } from "../src/types.js";
+import { decryptJsonPayload, hashOpaque, signCookie, verifyToolSecret } from "../src/security.js";
+import type { AccessRequest, AuthorizationGrant, Config, RefreshToken, Session, Tool, User } from "../src/types.js";
 
 const config: Config = {
   appEnv: "test",
@@ -122,6 +122,8 @@ class AdminRepos {
   };
 
   audits: unknown[] = [];
+  session: Session = { ...adminSession };
+  refreshTokens = new Map<string, RefreshToken>();
   adminGrant: AuthorizationGrant = adminGrant;
   grant: AuthorizationGrant | null = null;
   users = new Map<string, User>([
@@ -192,8 +194,8 @@ class AdminRepos {
     return adminUser;
   }
 
-  async findSessionById() {
-    return adminSession;
+  async findSessionById(id?: string) {
+    return !id || id === this.session.id ? this.session : null;
   }
 
   async findGrantById(id: string) {
@@ -218,8 +220,48 @@ class AdminRepos {
   }
 
   async revokeSession(id: string) {
-    if (id !== adminSession.id) return 0;
+    if (id !== this.session.id) return 0;
     this.revokedSessions += 1;
+    return 1;
+  }
+
+  async extendSession(id: string, toolId: string, expiresAt: Date) {
+    if (id !== this.session.id || toolId !== this.session.tool_id || this.session.status !== "active" || this.session.expires_at <= new Date()) {
+      return null;
+    }
+    this.session = { ...this.session, expires_at: expiresAt };
+    return this.session;
+  }
+
+  async createRefreshToken(tokenHash: string, sessionId: string, expiresAt: Date) {
+    this.refreshTokens.set(tokenHash, {
+      id: `refresh-${this.refreshTokens.size + 1}`,
+      token_hash: tokenHash,
+      session_id: sessionId,
+      status: "active",
+      issued_at: new Date(),
+      expires_at: expiresAt,
+      revoked_at: null
+    });
+  }
+
+  async findRefreshTokenByHash(tokenHash: string) {
+    return this.refreshTokens.get(tokenHash) ?? null;
+  }
+
+  async consumeRefreshToken(tokenHash: string) {
+    const refresh = this.refreshTokens.get(tokenHash);
+    if (!refresh || refresh.status !== "active" || refresh.expires_at <= new Date()) return null;
+    refresh.status = "revoked";
+    refresh.revoked_at = new Date();
+    return refresh;
+  }
+
+  async revokeRefreshToken(tokenHash: string) {
+    const refresh = this.refreshTokens.get(tokenHash);
+    if (!refresh || refresh.status !== "active") return 0;
+    refresh.status = "revoked";
+    refresh.revoked_at = new Date();
     return 1;
   }
 
@@ -570,6 +612,12 @@ function tokenServiceFor(permissions = PLATFORM_ADMIN_PERMISSIONS) {
       : "auditor";
   return {
     getJwks: () => ({ keys: [] }),
+    issueAccessToken: async () => ({
+      token: "refreshed-admin-token",
+      expiresAt: new Date(Date.now() + config.accessTokenTtlSeconds * 1000),
+      expiresIn: config.accessTokenTtlSeconds,
+      jti: "refreshed-admin-jti"
+    }),
     verifyAccessToken: async () => ({
       sub: adminUser.google_sub,
       sid: adminSession.id,
@@ -688,6 +736,8 @@ describe("admin access request routes", () => {
     const script = response.body.match(/<script>([\s\S]*?)<\/script>/)?.[1];
     if (!script) throw new Error("Admin UI script not found");
     expect(() => new Function(script)).not.toThrow();
+    expect(script).toContain("ADMIN_BASE_PATH + '/refresh'");
+    expect(script).toContain("return api(path, options, true)");
 
     await app.close();
   });
@@ -1153,6 +1203,43 @@ describe("admin access request routes", () => {
       })
     );
     expect(repos.audits).toContainEqual(expect.objectContaining({ event_type: "admin.grant.bulk_import_committed" }));
+    await app.close();
+  });
+
+  it("refreshes the Admin UI session on authenticated activity and rotates its refresh cookie", async () => {
+    const repos = new AdminRepos();
+    const refreshToken = "rt_admin-refresh-token-with-sufficient-entropy";
+    await repos.createRefreshToken(
+      hashOpaque(refreshToken, config.toolClientSecretPepper),
+      adminSession.id,
+      new Date(Date.now() + config.refreshTokenTtlSeconds * 1000)
+    );
+    const app = await buildAdminApp(repos);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/admin/refresh",
+      headers: {
+        origin: config.appBaseUrl,
+        cookie: `${config.sessionCookieName}_refresh=${encodeURIComponent(signCookie(refreshToken, config.sessionSecret))}`
+      }
+    });
+
+    expect(response.statusCode).toBe(204);
+    const setCookies = Array.isArray(response.headers["set-cookie"])
+      ? response.headers["set-cookie"]
+      : [String(response.headers["set-cookie"])];
+    expect(setCookies.some((cookie) => cookie.startsWith(`${config.sessionCookieName}=`))).toBe(true);
+    expect(setCookies.some((cookie) => cookie.startsWith(`${config.sessionCookieName}_refresh=`))).toBe(true);
+    expect(repos.refreshTokens.size).toBe(2);
+    expect(repos.refreshTokens.get(hashOpaque(refreshToken, config.toolClientSecretPepper))?.status).toBe("revoked");
+    expect(repos.audits).toContainEqual(
+      expect.objectContaining({
+        event_type: "token.refreshed",
+        outcome: "success",
+        tool_slug: "access-admin"
+      })
+    );
     await app.close();
   });
 

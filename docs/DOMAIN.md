@@ -14,6 +14,7 @@
 | Grant | Authorization that allows a user or pending email to access a tool with roles/permissions |
 | One-time code | Short-lived code sent to the tool callback and exchanged server-to-server |
 | Access token | Short-lived JWT issued by Access Layer for a specific user/tool/session |
+| Refresh token | Opaque, single-use server-side credential used to rotate the access token and extend an active session |
 | Introspection | API call by a tool backend to check whether an Access Layer token is still active |
 | Audit event | Structured log entry for access attempts, decisions and admin actions |
 
@@ -80,6 +81,8 @@ Required fields:
 - `status`: `active`, `revoked`, `expired`
 - `issued_at`, `expires_at`, `revoked_at`
 - `last_seen_at`
+
+`expires_at` is an idle deadline. A valid refresh performed during authenticated user activity moves it forward by the configured refresh/session TTL. No activity beyond that deadline requires a new login.
 
 ### Audit event
 

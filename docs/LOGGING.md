@@ -24,6 +24,8 @@ Access Layer deve sapere da chi arriva ogni richiesta di accesso, per quale tool
 | `auth.allowed` | utente autorizzato al tool | `success` |
 | `token.exchanged` | tool consuma one-time code | `success` |
 | `token.exchange.denied` | exchange fallito | `denied` |
+| `token.refreshed` | refresh activity-driven riuscito, token ruotato e sessione estesa | `success` |
+| `token.refresh.denied` | refresh non valido, scaduto, riutilizzato o non piu autorizzato | `denied` |
 | `auth.denied.token_in_query` | token-like credential ricevuta nella query string | `denied` |
 | `token.introspected` | tool chiama introspection | `info` |
 | `session.revoked` | sessione revocata | `success` |

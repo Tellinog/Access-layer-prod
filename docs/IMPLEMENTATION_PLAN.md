@@ -48,6 +48,7 @@ Acceptance:
 - Implement grant resolution.
 - Implement one-time code creation and atomic consumption.
 - Implement `/v1/auth/exchange` with tool client auth.
+- Implement `/v1/auth/refresh` with single-use rotation, active authorization revalidation and activity-driven sliding session expiry.
 - Issue Access Layer JWT.
 - Publish `/v1/.well-known/jwks.json`.
 - Implement `/v1/auth/introspect`.

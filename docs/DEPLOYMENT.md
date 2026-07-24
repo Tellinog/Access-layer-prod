@@ -32,6 +32,7 @@ Minimum production variables:
 - `LOG_IP_SALT`
 - `ADMIN_BOOTSTRAP_EMAILS` for first deploy only
 - `ENABLE_REFRESH_TOKENS` defaults to `true`
+- `ACCESS_TOKEN_TTL_SECONDS` defaults to `900`; `REFRESH_TOKEN_TTL_SECONDS` defaults to `28800` and acts as the sliding inactivity timeout after each authenticated refresh.
 - `ACCESS_REQUEST_REOPEN_AFTER_DAYS` defaults to `30`
 
 ## Infrastructure

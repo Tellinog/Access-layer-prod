@@ -1,0 +1,31 @@
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.redacted",
+  "token_type": "Bearer",
+  "expires_in": 900,
+  "refresh_token": "rt_replacement-redacted",
+  "session": {
+    "id": "01HYSESSIONABC",
+    "issued_at": "2026-07-24T10:00:00Z",
+    "expires_at": "2026-07-24T18:15:00Z"
+  },
+  "user": {
+    "id": "usr_01HY",
+    "google_sub": "110000000000000000000",
+    "email": "mario.rossi@unguess.io",
+    "email_verified": true,
+    "hd": "unguess.io",
+    "display_name": "Mario Rossi"
+  },
+  "tool": {
+    "slug": "crm",
+    "display_name": "CRM interno"
+  },
+  "grant": {
+    "role": "tool_user",
+    "permissions": [
+      "crm:read",
+      "crm:write"
+    ]
+  },
+  "correlation_id": "corr_01HYREFRESH"
+}

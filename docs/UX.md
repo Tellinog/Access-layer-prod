@@ -46,7 +46,7 @@ Nella Admin UI, mostrare un badge su `Richieste accesso` quando esistono richies
 
 ## Admin session expiry UX
 
-When an already-rendered Admin UI receives an API response indicating an invalid or expired admin session, it must immediately replace the current page content with `Sessione scaduta. Accedi di nuovo.` and redirect to the Admin UI login route.
+When an already-rendered Admin UI receives an API response indicating an invalid or expired access token, it must first attempt one same-origin activity-driven refresh and retry the original request once. If refresh fails, it must immediately replace the current page content with `Sessione scaduta. Accedi di nuovo.` and redirect to the Admin UI login route.
 
 ## Admin authenticated session UX
 

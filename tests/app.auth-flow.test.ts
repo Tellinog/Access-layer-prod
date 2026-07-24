@@ -3,7 +3,18 @@ import { AuditLogger } from "../src/audit.js";
 import { buildApp } from "../src/app.js";
 import { AppError, type ErrorCode } from "../src/errors.js";
 import { hashOpaque, hashToolSecret, sha256 } from "../src/security.js";
-import type { AuthRequest, AuthorizationGrant, Config, GoogleIdentity, OneTimeCode, Session, Tool, ToolClient, User } from "../src/types.js";
+import type {
+  AuthRequest,
+  AuthorizationGrant,
+  Config,
+  GoogleIdentity,
+  OneTimeCode,
+  RefreshToken,
+  Session,
+  Tool,
+  ToolClient,
+  User
+} from "../src/types.js";
 
 const config: Config = {
   appEnv: "test",
@@ -99,7 +110,7 @@ class MemoryRepos {
   grants = new Map<string, AuthorizationGrant>();
   pendingEmailGrant: AuthorizationGrant | null = null;
   client: ToolClient & { tool_slug: string } | null = null;
-  refreshTokens: string[] = [];
+  refreshTokens = new Map<string, RefreshToken>();
   recentReviewedAccessRequest: Record<string, unknown> | null = null;
 
   constructor(private readonly hasGrant: boolean) {}
@@ -307,8 +318,43 @@ class MemoryRepos {
     return this.sessions.get(id) ?? null;
   }
 
-  async createRefreshToken(tokenHash: string) {
-    this.refreshTokens.push(tokenHash);
+  async extendSession(id: string, toolId: string, expiresAt: Date) {
+    const session = this.sessions.get(id);
+    if (!session || session.tool_id !== toolId || session.status !== "active" || session.expires_at <= new Date()) return null;
+    session.expires_at = expiresAt;
+    return session;
+  }
+
+  async createRefreshToken(tokenHash: string, sessionId: string, expiresAt: Date) {
+    this.refreshTokens.set(tokenHash, {
+      id: `refresh-${this.refreshTokens.size + 1}`,
+      token_hash: tokenHash,
+      session_id: sessionId,
+      status: "active",
+      issued_at: new Date(),
+      expires_at: expiresAt,
+      revoked_at: null
+    });
+  }
+
+  async findRefreshTokenByHash(tokenHash: string) {
+    return this.refreshTokens.get(tokenHash) ?? null;
+  }
+
+  async consumeRefreshToken(tokenHash: string) {
+    const refresh = this.refreshTokens.get(tokenHash);
+    if (!refresh || refresh.status !== "active" || refresh.expires_at <= new Date()) return null;
+    refresh.status = "revoked";
+    refresh.revoked_at = new Date();
+    return refresh;
+  }
+
+  async revokeRefreshToken(tokenHash: string) {
+    const refresh = this.refreshTokens.get(tokenHash);
+    if (!refresh || refresh.status !== "active") return 0;
+    refresh.status = "revoked";
+    refresh.revoked_at = new Date();
+    return 1;
   }
 }
 
@@ -342,6 +388,33 @@ async function buildFlowApp(repos: MemoryRepos, google: FakeGoogle) {
     audit: new AuditLogger(repos as never),
     google,
     tokenService: fakeTokenService() as never
+  });
+}
+
+async function loginAndExchange(
+  app: Awaited<ReturnType<typeof buildFlowApp>>,
+  google: FakeGoogle,
+  state = "refresh-flow-state-with-entropy"
+) {
+  await app.inject({
+    method: "GET",
+    url: `/v1/auth/start?tool_slug=crm&return_url=${encodeURIComponent(tool.allowed_return_urls[0])}&state=${state}`
+  });
+  const callback = await app.inject({
+    method: "GET",
+    url: `/v1/auth/google/callback?state=${encodeURIComponent(google.state)}&code=fake-google-code`
+  });
+  const code = new URL(callback.headers.location as string).searchParams.get("code");
+  return app.inject({
+    method: "POST",
+    url: "/v1/auth/exchange",
+    headers: {
+      authorization: `Basic ${Buffer.from("client-id:client-secret").toString("base64")}`
+    },
+    payload: {
+      code,
+      redirect_uri: tool.allowed_return_urls[0]
+    }
   });
 }
 
@@ -531,7 +604,7 @@ describe("auth flow routes", () => {
       user: { google_sub: "google-sub-1", email: "mario.rossi@unguess.io" },
       grant: { permissions: ["crm:read"] }
     });
-    expect(repos.refreshTokens).toHaveLength(1);
+    expect(repos.refreshTokens.size).toBe(1);
 
     const replay = await app.inject({
       method: "POST",
@@ -547,6 +620,99 @@ describe("auth flow routes", () => {
     expect(replay.statusCode).toBe(400);
     expect(replay.json().error.code).toBe("AUTH_CODE_ALREADY_USED");
     expect(repos.oneTimeCodes.get(hashOpaque(code!, config.toolClientSecretPepper))?.consumed_at).toBeInstanceOf(Date);
+    await app.close();
+  });
+
+  it("rotates refresh tokens and extends the session while the user remains active", async () => {
+    const repos = new MemoryRepos(true);
+    await repos.createToolClient("client-secret");
+    const google = new FakeGoogle();
+    const app = await buildFlowApp(repos, google);
+    const exchange = await loginAndExchange(app, google);
+    const firstRefreshToken = exchange.json().refresh_token as string;
+    const session = repos.sessions.get("session-id")!;
+    session.expires_at = new Date(Date.now() + 60_000);
+    const previousExpiry = session.expires_at.getTime();
+
+    const refresh = await app.inject({
+      method: "POST",
+      url: "/v1/auth/refresh",
+      headers: {
+        authorization: `Basic ${Buffer.from("client-id:client-secret").toString("base64")}`
+      },
+      payload: {
+        refresh_token: firstRefreshToken
+      }
+    });
+
+    expect(refresh.statusCode).toBe(200);
+    expect(refresh.headers["cache-control"]).toBe("no-store");
+    expect(refresh.json()).toMatchObject({
+      access_token: "access-token-value",
+      expires_in: 900,
+      session: { id: "session-id" },
+      user: { google_sub: "google-sub-1" },
+      grant: { permissions: ["crm:read"] }
+    });
+    expect(refresh.json().refresh_token).toMatch(/^rt_/);
+    expect(refresh.json().refresh_token).not.toBe(firstRefreshToken);
+    expect(repos.sessions.get("session-id")!.expires_at.getTime()).toBeGreaterThan(previousExpiry);
+    expect(repos.refreshTokens.size).toBe(2);
+    expect(repos.refreshTokens.get(hashOpaque(firstRefreshToken, config.toolClientSecretPepper))?.status).toBe("revoked");
+    expect(repos.audits).toContainEqual(
+      expect.objectContaining({
+        event_type: "token.refreshed",
+        outcome: "success",
+        tool_slug: "crm"
+      })
+    );
+
+    const replay = await app.inject({
+      method: "POST",
+      url: "/v1/auth/refresh",
+      headers: {
+        authorization: `Basic ${Buffer.from("client-id:client-secret").toString("base64")}`
+      },
+      payload: {
+        refresh_token: firstRefreshToken
+      }
+    });
+    expect(replay.statusCode).toBe(401);
+    expect(replay.json().error.code).toBe("AUTH_REFRESH_TOKEN_INVALID");
+    await app.close();
+  });
+
+  it("denies refresh after inactivity expiry or grant revocation", async () => {
+    const repos = new MemoryRepos(true);
+    await repos.createToolClient("client-secret");
+    const google = new FakeGoogle();
+    const app = await buildFlowApp(repos, google);
+    const exchange = await loginAndExchange(app, google, "expired-refresh-state-entropy");
+    const refreshToken = exchange.json().refresh_token as string;
+    repos.sessions.get("session-id")!.expires_at = new Date(Date.now() - 1);
+    repos.grants.get("grant-id")!.status = "revoked";
+
+    const refresh = await app.inject({
+      method: "POST",
+      url: "/v1/auth/refresh",
+      headers: {
+        authorization: `Basic ${Buffer.from("client-id:client-secret").toString("base64")}`
+      },
+      payload: {
+        refresh_token: refreshToken
+      }
+    });
+
+    expect(refresh.statusCode).toBe(401);
+    expect(refresh.json().error.code).toBe("AUTH_REFRESH_TOKEN_INVALID");
+    expect(repos.refreshTokens.size).toBe(1);
+    expect(repos.audits).toContainEqual(
+      expect.objectContaining({
+        event_type: "token.refresh.denied",
+        outcome: "denied",
+        reason_code: "AUTH_REFRESH_TOKEN_INVALID"
+      })
+    );
     await app.close();
   });
 

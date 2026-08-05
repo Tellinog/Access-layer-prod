@@ -58,5 +58,11 @@ The Admin UI root does not show unauthenticated dashboard copy. It redirects int
 - `Salva modifiche`
 - `Elimina`
 - `Ruota secret`
+- `Aggiungi tool`
+- `Concedi grant`
+- `Gestisci grant`
+- `Rilascia grant in blocco`
+- `Anteprima`
+- `Conferma rilascio`
 - `Client ID e client secret generati per il tool. Client secret mostrato una sola volta: copia entrambi ora e conservali in modo sicuro.`
 - `Compila slug, nome e almeno una Return URL.`

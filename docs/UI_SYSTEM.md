@@ -24,6 +24,8 @@ The same-service v1 Admin UI implements tool and user detail as lightweight in-p
 - Tables for tools, users, grants and logs.
 - Detail drawers or pages for edits.
 - Tool detail uses explicit `Modifica`, `Salva modifiche` and `Elimina` actions with inline feedback.
+- Tool detail includes a user-access table; platform admins see registered users with effective access, while tool admins remain scoped to visible grants.
+- User detail includes a tool/grant table and an `Aggiungi tool` action.
 
 ## Visual direction
 
@@ -86,14 +88,18 @@ Admin write workflows that collect multiple fields should be rendered as minimal
 
 Browser `prompt()` and `alert()` dialogs are not used for tool onboarding, grant creation, access-request decisions or tool-secret rotation.
 
+Grant forms use a single-select tool catalog and a labelled multiple-select permission list populated from the chosen tool. The permission list must remain keyboard navigable and permit an empty selection for role-only grants.
+
 ## Grant bulk import UI
 
-The Grants page includes operational CSV controls:
+The Grants page includes two bulk grant controls:
 
+- `Rilascia grant in blocco` accepts one email per line and chooses one tool, role, permissions and optional expiry from the UI;
+- `Importa CSV avanzato` supports mixed bulk operations through CSV;
 - `Template CSV` downloads the required import columns;
 - `Export grant` downloads current grant state;
 - `Export permessi` downloads registered tool permission keys;
-- `Bulk import` opens an inline textarea with `Preview` and `Commit import` actions.
+- each bulk flow exposes `Preview` before any commit action.
 
 Preview must show row-level `ok`, `warning` and `error` results without writing data. Commit must refuse to write when preview contains errors, then display the applied result summary.
 

@@ -8,6 +8,15 @@ V1 implementation scaffold complete, with local dependency, typecheck, build and
 
 This repository now contains the product/security/API/data specifications plus a Node.js/TypeScript Fastify implementation for the Access Layer Google SSO v1 service.
 
+## Latest Admin authorization usability update, 2026-08-05
+
+- Tool detail now includes a user-access table: platform admins can see every registered user, whether access to the selected tool is currently effective, and the related roles, permissions and grant states. Grants can be created or managed directly from that table.
+- User detail remains one row per person in the Users list and now shows all of that user's tool grants in a dedicated table, with a direct `Aggiungi tool` action.
+- Grant creation, editing, access-request approval and bulk release now use the visible tool catalog and the selected tool's registered permission keys instead of manual tool-slug and free-text permission entry.
+- The primary bulk release flow accepts one corporate email per line and creates the guarded CSV payload internally; Preview and error-blocked Commit semantics remain unchanged. Advanced CSV import remains available for mixed batch operations.
+- Tool-admin visibility was not broadened: the complete registered-user matrix remains available only to platform admins, while delegated admins retain assigned-tool grant scope.
+- Verification: `npm.cmd run lint` and `npm.cmd test -- tests/app.admin.test.ts` passed.
+
 ## Latest Coolify Docker build fix, 2026-07-24
 
 - Coolify deploys at commits `bb3cac7d68935bc4f8478196774cfcadaee443e1` and `81d95a87adb09343fdc1195efe7f9f61b8b66867` failed at `RUN npm run build`.

@@ -70,6 +70,8 @@ Covered v1 flows:
 
 One-time client secrets are shown in an inline result panel with a copy action and must not be shown through `alert()`.
 
+Grant forms must use a tool select populated from the visible tool catalog and a keyboard-accessible multi-select populated only with the selected tool's registered permission keys. Empty selection remains available for role-only grants.
+
 
 ## Admin login gate
 
@@ -83,12 +85,19 @@ After successful Google login and Access Layer authorization, the same root rout
 
 Tool detail starts in read-only mode. `Modifica` enables metadata, Return URL and permission-key fields. Permission-key help copy explains the hierarchical `namespace:action[:scope...]` format, for example `tool:read` or `petyr:read:all`. `Salva modifiche` shows inline success or failure feedback and includes backend correlation IDs when available. `Elimina` requires explicit confirmation and then returns to the Tools list with success feedback.
 
+Below the metadata, the detail contains the `Utenti e autorizzazioni` table. For platform admins it lists all registered users, whether access is currently effective, roles, permissions and grant states. The primary action is `Concedi grant` for a user without a grant and `Gestisci grant` for an existing grant. Delegated tool admins remain constrained by the visibility policy and see only grant targets in their assigned-tool scope.
+
+## Admin user detail UX
+
+The Users list has one row per registered user. The detail shows `Tool e autorizzazioni` as a table of that user's grants, with a clear `Aggiungi tool` action and a direct grant-management action on each row.
+
 ## Grant bulk import UX
 
-Bulk grant import is designed as a guarded admin operation:
+Bulk grant release is designed as a guarded admin operation:
 
-- admins download a template and permission catalog before editing data;
+- the standard flow accepts one email per line and lets admins choose a single tool and its registered permissions from the UI;
 - preview is mandatory in practice because it returns row-level validation before commit;
 - commit applies no changes when any row is invalid;
+- advanced CSV import remains available for mixed tool/role/action batches;
 - the CSV separator may be either a comma or a semicolon and is detected from the header row;
 - `pending_user_link` copy must clarify that approval already exists and the grant will activate automatically at first verified Google login.

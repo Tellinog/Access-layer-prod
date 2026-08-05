@@ -1,5 +1,39 @@
 # DEVLOG.md
 
+## 2026-08-05 - Relationship-oriented grant administration UI
+
+Changed by: Codex
+Related task: Improve the accessibility and usability of Tools, Users and Grants administration.
+
+### Changed
+
+- Added a platform-admin `Utenti e autorizzazioni` table to tool detail, with registered users, effective access, role/permission summary, grant state and direct grant actions.
+- Added a `Tool e autorizzazioni` table to user detail so the Users list stays person-oriented while exposing every grant for the selected user.
+- Replaced manual tool-slug fields in grant and access-request approval workflows with visible-tool dropdowns.
+- Replaced free-text permission fields in those workflows with labelled keyboard-accessible multiple-selects populated from registered permission keys.
+- Added `Rilascia grant in blocco`: one corporate email per line, one selected tool/role/permission set, mandatory preview and error-blocked confirmation. Preserved advanced mixed-operation CSV import separately.
+- Preserved all existing API validation, audit events, pending-email behavior and delegated tool-admin scope.
+
+### Docs/specs/schemas updated
+
+- Updated `CURRENT_STATE.md`, `DECISIONS.md`, `docs/ADMIN_GUIDE.md`, `docs/UX.md`, `docs/UI_SYSTEM.md`, `docs/COPY.md` and `docs/TESTING.md`.
+- No API, policy, schema, database or environment-variable change was required.
+
+### Tests/checks
+
+- `npm.cmd run lint` passed.
+- `npm.cmd test -- tests/app.admin.test.ts` passed: 1 file, 51 tests.
+- Added Admin UI rendering assertions for relationship tables, catalog-driven grant controls and one-email-per-line bulk release.
+
+### Decisions
+
+- Recorded D-030: relationship-oriented grant administration UI.
+
+### Follow-ups
+
+- Browser-smoke test the relationship tables and multiple-select controls with a live PostgreSQL-backed Admin session.
+- Confirm the required server-side pagination design before a user or tool-grant result can exceed the current Admin endpoint cap of 200 rows.
+
 ## 2026-07-24 - Fix Coolify Docker build after favicon asset pipeline
 
 Changed by: Codex

@@ -3186,6 +3186,11 @@ function adminHtml(config: Config): string {
     tbody tr:last-child td { border-bottom: 0; }
     .pager { display: flex; gap: 12px; align-items: center; justify-content: flex-end; margin-top: 16px; color: var(--text-soft); font-size: .9rem; }
     .empty-state { border: 1px dashed var(--border-strong); background: var(--bg-soft); color: var(--text-soft); padding: 28px; border-radius: 18px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .6); }
+    .table-section { margin-top: 32px; }
+    .table-section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin: 0 0 16px; }
+    .table-section-head h2 { margin: 0; font-size: 1.25rem; line-height: 1.35; }
+    .table-section-head p { margin: 4px 0 0; color: var(--text-soft); }
+    select[multiple] { min-height: 132px; padding: 8px; }
     pre { white-space: pre-wrap; background: var(--bg-soft); border: 1px solid var(--border); padding: 18px; border-radius: 14px; color: var(--text); }
     dl { display: grid; grid-template-columns: minmax(140px, 220px) 1fr; gap: 10px 20px; margin: 0 0 24px; padding: 24px; background: var(--card); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow); }
     dt { color: var(--text-soft); font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
@@ -3230,7 +3235,7 @@ function adminHtml(config: Config): string {
   </div>
   <script>
     const PAGE_SIZE = 25;
-    const state = { view: 'dashboard', me: null, tools: [], grants: [], pendingCount: 0, pages: {}, toolFilters: {}, userFilters: {}, grantFilters: {}, requestFilters: {}, auditFilters: {} };
+    const state = { view: 'dashboard', me: null, tools: [], toolCatalog: [], grants: [], pendingCount: 0, pages: {}, toolFilters: {}, userFilters: {}, grantFilters: {}, requestFilters: {}, auditFilters: {} };
     const content = document.getElementById('content');
     const title = document.getElementById('title');
     const me = document.getElementById('me');
@@ -3349,6 +3354,45 @@ function adminHtml(config: Config): string {
     }
     function listValueOf(id) {
       return parseList(document.getElementById(id).value);
+    }
+    function selectedValues(id) {
+      const select = document.getElementById(id);
+      return Array.from(select.selectedOptions).map(option => option.value).filter(Boolean);
+    }
+    function hasAdminPermission(permission) {
+      return Boolean(state.me && Array.isArray(state.me.permissions) && state.me.permissions.includes(permission));
+    }
+    async function loadToolCatalog() {
+      const data = await api(apiUrl('/admin/tools'));
+      state.toolCatalog = data.items || [];
+      return state.toolCatalog;
+    }
+    function toolOptions(selectedSlug, includeEmpty = true) {
+      const options = includeEmpty ? ['<option value="">Seleziona un tool</option>'] : [];
+      state.toolCatalog.forEach(tool => {
+        options.push('<option value="'+esc(tool.slug)+'"'+(tool.slug === selectedSlug ? ' selected' : '')+'>'+esc(tool.display_name)+' ('+esc(tool.slug)+')</option>');
+      });
+      return options.join('');
+    }
+    function permissionOptions(toolSlug, selectedPermissions) {
+      const tool = state.toolCatalog.find(item => item.slug === toolSlug);
+      const selected = new Set(selectedPermissions || []);
+      if (!tool || !(tool.permission_keys || []).length) {
+        return '<option value="" disabled>Nessun permesso registrato per questo tool</option>';
+      }
+      return tool.permission_keys.map(permission => '<option value="'+esc(permission)+'"'+(selected.has(permission) ? ' selected' : '')+'>'+esc(permission)+'</option>').join('');
+    }
+    function permissionSelectMarkup(id, toolSlug, selectedPermissions, describedBy) {
+      const tool = state.toolCatalog.find(item => item.slug === toolSlug);
+      const disabled = !tool || !(tool.permission_keys || []).length;
+      return '<select id="'+esc(id)+'" multiple size="5"'+(describedBy ? ' aria-describedby="'+esc(describedBy)+'"' : '')+(disabled ? ' disabled' : '')+'>'+permissionOptions(toolSlug, selectedPermissions)+'</select>';
+    }
+    function syncPermissionSelect(toolSelectId, permissionSelectId, selectedPermissions = []) {
+      const toolSlug = document.getElementById(toolSelectId).value;
+      const select = document.getElementById(permissionSelectId);
+      const tool = state.toolCatalog.find(item => item.slug === toolSlug);
+      select.innerHTML = permissionOptions(toolSlug, selectedPermissions);
+      select.disabled = !tool || !(tool.permission_keys || []).length;
     }
     function formError(id, error) {
       const target = document.getElementById(id);
@@ -3499,8 +3543,41 @@ function adminHtml(config: Config): string {
         }
       };
     }
-    function renderToolDetail(tool, editMode = false, message = '', messageType = 'success') {
+    async function renderToolDetail(tool, editMode = false, message = '', messageType = 'success') {
       title.textContent = 'Tool detail';
+      const grantsData = await api(apiUrl('/admin/grants') + queryString({ tool_slug: tool.slug }));
+      const grants = grantsData.items || [];
+      const canViewAllUsers = hasAdminPermission('admin:users:read');
+      let users = [];
+      if (canViewAllUsers) {
+        const usersData = await api(apiUrl('/admin/users'));
+        users = usersData.items || [];
+      }
+      const now = Date.now();
+      const visibleUsers = canViewAllUsers ? users : Array.from(new Map(grants.map(grant => {
+        const user = {
+          id: grant.user_id || grant.email_normalized || grant.user_email,
+          email: grant.user_email || grant.email_normalized || '',
+          display_name: '',
+          status: grant.user_id ? 'active' : 'pending_user_link'
+        };
+        return [user.id, user];
+      })).values());
+      const accessRows = visibleUsers.map(user => {
+        const userGrants = grants.filter(grant => grant.user_id === user.id || (!grant.user_id && grant.email_normalized === user.email_normalized));
+        const authorized = tool.status === 'active' && user.status === 'active' && userGrants.some(grant => grant.status === 'active' && (!grant.valid_from || Date.parse(grant.valid_from) <= now) && (!grant.valid_until || Date.parse(grant.valid_until) > now));
+        return {
+          user,
+          grants: userGrants,
+          email: user.email,
+          display_name: user.display_name || '',
+          user_status: user.status,
+          access: canViewAllUsers ? (authorized ? 'Autorizzato' : 'Non autorizzato') : 'Grant registrato',
+          roles: userGrants.map(grant => grant.role).filter(Boolean).join(', ') || '—',
+          permissions: [...new Set(userGrants.flatMap(grant => grant.permissions || []))].join(', ') || '—',
+          grant_statuses: userGrants.map(grant => grant.status).filter(Boolean).join(', ') || '—'
+        };
+      });
       const disabled = editMode ? '' : ' disabled';
       content.innerHTML = '<div class="toolbar"><button class="secondary" id="back-tools">Tools</button>' +
         (editMode ? '<button class="primary" id="save-tool">Salva modifiche</button><button class="secondary" id="cancel-tool-edit">Annulla modifica</button>' : '<button class="primary" id="edit-tool">Modifica</button>') +
@@ -3515,7 +3592,20 @@ function adminHtml(config: Config): string {
         '<label class="full-row">Client ID attivi<br><code class="secret-box">'+esc((tool.client_ids || []).join('\\n') || 'Nessun client attivo')+'</code></label>' +
         '<label class="full-row">Return URL<br><textarea id="tool-urls" rows="5"'+disabled+'>'+esc((tool.allowed_return_urls || []).join('\\n'))+'</textarea></label>' +
         '<label class="full-row">Permission keys<br><textarea id="tool-permissions" rows="5"'+disabled+'>'+esc((tool.permission_keys || []).join('\\n'))+'</textarea><span class="field-help">Una per riga o separate da virgola. Formato: segmenti gerarchici separati da due punti, es. tool:read o petyr:read:all. Solo minuscole, numeri e trattini.</span></label>' +
-        '</div></div>';
+        '</div></div>' +
+        '<section class="table-section" aria-labelledby="tool-access-heading"><div class="table-section-head"><div><h2 id="tool-access-heading">Utenti e autorizzazioni</h2><p>'+(canViewAllUsers ? 'Tutti gli utenti registrati su Access Layer; la colonna accesso considera stato utente, stato tool, grant e scadenza.' : 'Grant visibili per questo tool. La lista completa degli utenti è riservata ai platform admin.')+'</p></div><button class="primary" id="create-tool-grant">Concedi grant</button></div>' +
+        table(accessRows, [
+          {key:'email', label:'Utente'},
+          {key:'display_name', label:'Nome'},
+          {key:'user_status', label:'Stato utente'},
+          {key:'access', label:'Accesso', render:row=>'<span class="status">'+esc(row.access)+'</span>'},
+          {key:'roles', label:'Ruoli'},
+          {key:'permissions', label:'Permessi'},
+          {key:'grant_statuses', label:'Stato grant'},
+          {key:'email', label:'Azioni', render:row=>row.grants.length ? '<button class="secondary" data-tool-user-grants="'+esc(row.user.id)+'">Gestisci grant</button>' : '<button class="primary" data-tool-user-grant="'+esc(row.user.id)+'">Concedi grant</button>'}
+        ], {pageKey:'tool-access'}) +
+        '</section>';
+      bindPagination('tool-access', () => renderToolDetail(tool, editMode, message, messageType));
       document.getElementById('tool-status').value = tool.status;
       if (message) feedback('tool-detail-feedback', message, messageType);
       document.getElementById('back-tools').onclick = () => { state.view = 'tools'; render(); };
@@ -3565,6 +3655,34 @@ function adminHtml(config: Config): string {
         }
       };
       document.getElementById('rotate-tool').onclick = () => renderToolSecretRotationForm(tool);
+      document.getElementById('create-tool-grant').onclick = () => renderGrantCreateForm({ toolSlug: tool.slug, back: () => renderToolDetail(tool) });
+      content.querySelectorAll('[data-tool-user-grants]').forEach(button => button.onclick = () => {
+        const row = accessRows.find(item => item.user.id === button.dataset.toolUserGrants);
+        if (row) renderToolUserGrants(tool, row.user, row.grants);
+      });
+      content.querySelectorAll('[data-tool-user-grant]').forEach(button => button.onclick = () => {
+        const row = accessRows.find(item => item.user.id === button.dataset.toolUserGrant);
+        if (row) renderUserGrantCreateForm(row.user, { toolSlug: tool.slug, back: () => renderToolDetail(tool) });
+      });
+    }
+    function renderToolUserGrants(tool, user, grants) {
+      title.textContent = 'Grant utente';
+      content.innerHTML = '<div class="toolbar"><button class="secondary" id="back-tool-access">'+esc(tool.display_name)+'</button><button class="primary" id="add-tool-user-grant">Aggiungi grant</button></div>' +
+        '<dl><dt>Utente</dt><dd>'+esc(user.email || user.email_normalized || '')+'</dd><dt>Tool</dt><dd>'+esc(tool.display_name)+' ('+esc(tool.slug)+')</dd></dl>' +
+        table(grants, [
+          {key:'role', label:'Ruolo'},
+          {key:'permissions', label:'Permessi', render:grant=>esc((grant.permissions || []).join(', ') || '—')},
+          {key:'status', label:'Stato'},
+          {key:'valid_until', label:'Scadenza'},
+          {key:'id', label:'Azioni', render:grant=>'<button class="secondary" data-tool-grant-detail="'+esc(grant.id)+'">Dettaglio</button>'}
+        ], {pageKey:'tool-user-grants'});
+      bindPagination('tool-user-grants', () => renderToolUserGrants(tool, user, grants));
+      document.getElementById('back-tool-access').onclick = () => renderToolDetail(tool);
+      document.getElementById('add-tool-user-grant').onclick = () => renderUserGrantCreateForm(user, { toolSlug: tool.slug, back: () => renderToolDetail(tool) });
+      content.querySelectorAll('[data-tool-grant-detail]').forEach(button => button.onclick = () => {
+        const grant = grants.find(item => item.id === button.dataset.toolGrantDetail);
+        if (grant) renderGrantDetail(grant, () => renderToolDetail(tool));
+      });
     }
     function renderToolSecretRotationForm(tool) {
       title.textContent = 'Ruota secret tool';
@@ -3616,11 +3734,28 @@ function adminHtml(config: Config): string {
         if (user) renderUserDetail(user);
       });
     }
-    function renderUserDetail(user) {
+    async function renderUserDetail(user) {
       title.textContent = 'User detail';
-      content.innerHTML = '<div class="toolbar"><button class="secondary" id="back-users">Utenti</button><button class="primary" id="save-user">Salva</button><button class="primary" id="create-user-grant">Crea grant</button></div>' +
+      const [toolCatalog, grantsData] = await Promise.all([
+        loadToolCatalog(),
+        api(apiUrl('/admin/grants') + queryString({ email: user.email }))
+      ]);
+      state.toolCatalog = toolCatalog;
+      const grants = grantsData.items || [];
+      content.innerHTML = '<div class="toolbar"><button class="secondary" id="back-users">Utenti</button><button class="primary" id="save-user">Salva</button><button class="primary" id="create-user-grant">Aggiungi tool</button></div>' +
         '<dl><dt>Email</dt><dd>'+esc(user.email)+'</dd><dt>Google sub</dt><dd>'+esc(user.google_sub)+'</dd><dt>HD</dt><dd>'+esc(user.hd)+'</dd><dt>Nome</dt><dd>'+esc(user.display_name || '')+'</dd></dl>' +
-        '<label>Stato<br><select id="user-status"><option value="active">active</option><option value="suspended">suspended</option><option value="disabled">disabled</option></select></label>';
+        '<div class="form-card"><label>Stato<br><select id="user-status"><option value="active">active</option><option value="suspended">suspended</option><option value="disabled">disabled</option></select></label></div>' +
+        '<section class="table-section" aria-labelledby="user-tools-heading"><div class="table-section-head"><div><h2 id="user-tools-heading">Tool e autorizzazioni</h2><p>Un grant per riga: qui puoi vedere e modificare tutti gli accessi dell’utente.</p></div></div>' +
+        table(grants, [
+          {key:'tool_display_name', label:'Tool', render:grant=>esc(grant.tool_display_name || grant.tool_slug)},
+          {key:'role', label:'Ruolo'},
+          {key:'permissions', label:'Permessi', render:grant=>esc((grant.permissions || []).join(', ') || '—')},
+          {key:'status', label:'Stato'},
+          {key:'valid_until', label:'Scadenza'},
+          {key:'id', label:'Azioni', render:grant=>'<button class="secondary" data-user-grant-detail="'+esc(grant.id)+'">Gestisci grant</button>'}
+        ], {pageKey:'user-grants'}) +
+        '</section>';
+      bindPagination('user-grants', () => renderUserDetail(user));
       document.getElementById('user-status').value = user.status;
       document.getElementById('back-users').onclick = () => { state.view = 'users'; render(); };
       document.getElementById('save-user').onclick = async () => {
@@ -3631,22 +3766,32 @@ function adminHtml(config: Config): string {
         render();
       };
       document.getElementById('create-user-grant').onclick = () => renderUserGrantCreateForm(user);
+      content.querySelectorAll('[data-user-grant-detail]').forEach(button => button.onclick = () => {
+        const grant = grants.find(item => item.id === button.dataset.userGrantDetail);
+        if (grant) renderGrantDetail(grant, () => renderUserDetail(user));
+      });
     }
-    function renderUserGrantCreateForm(user) {
+    async function renderUserGrantCreateForm(user, options = {}) {
       title.textContent = 'Crea grant';
+      await loadToolCatalog();
+      const selectedToolSlug = options.toolSlug || '';
       content.innerHTML = '<form class="form-card" id="user-grant-create-form">' +
         '<h2>Crea grant per '+esc(user.email)+'</h2>' +
-        '<p class="field-help">Compila i dati del grant in un unico passaggio.</p>' +
+        '<p class="field-help">Scegli un tool e i relativi permessi registrati. I grant con permessi vuoti restano validi come grant basati sul solo ruolo.</p>' +
         '<div class="form-grid">' +
-        '<label>Tool slug<br><input id="user-grant-tool" required autocomplete="off"></label>' +
+        '<label>Tool<br><select id="user-grant-tool" required>'+toolOptions(selectedToolSlug)+'</select></label>' +
         '<label>Ruolo<br><input id="user-grant-role" required value="tool_user"></label>' +
-        '<label class="full-row">Permessi<br><textarea id="user-grant-permissions" rows="4"></textarea><span class="field-help">Uno per riga o separati da virgola.</span></label>' +
+        '<label class="full-row">Permessi<br>'+permissionSelectMarkup('user-grant-permissions', selectedToolSlug, [], 'user-grant-permissions-help')+'<span class="field-help" id="user-grant-permissions-help">Selezione multipla tra i permessi definiti dal tool.</span></label>' +
         '<label>Scadenza opzionale ISO-8601 UTC<br><input id="user-grant-valid-until" placeholder="2026-12-31T23:59:59Z"></label>' +
         '</div>' +
         '<p class="danger" id="user-grant-create-error" role="alert"></p>' +
         '<div class="form-actions"><button class="primary" type="submit">Salva grant</button><button class="secondary" id="user-grant-create-cancel" type="button">Annulla</button></div>' +
         '</form>';
-      document.getElementById('user-grant-create-cancel').onclick = () => renderUserDetail(user);
+      document.getElementById('user-grant-create-cancel').onclick = () => {
+        if (options.back) return options.back();
+        return renderUserDetail(user);
+      };
+      document.getElementById('user-grant-tool').onchange = () => syncPermissionSelect('user-grant-tool', 'user-grant-permissions');
       document.getElementById('user-grant-create-form').onsubmit = async event => {
         event.preventDefault();
         formError('user-grant-create-error');
@@ -3654,18 +3799,20 @@ function adminHtml(config: Config): string {
           tool_slug: valueOf('user-grant-tool'),
           user_id: user.id,
           role: valueOf('user-grant-role'),
-          permissions: listValueOf('user-grant-permissions'),
+          permissions: selectedValues('user-grant-permissions'),
           valid_until: valueOf('user-grant-valid-until') || null
         };
         if (!payload.tool_slug || !payload.role) {
-          formError('user-grant-create-error', 'Compila tool slug e ruolo.');
+          formError('user-grant-create-error', 'Seleziona tool e ruolo.');
           return;
         }
         try {
           await api(apiUrl('/admin/grants'), { method:'POST', body: JSON.stringify(payload) });
-          state.view = 'grants';
-          state.grantFilters = { email: user.email };
-          render();
+          if (options.back) {
+            options.back();
+          } else {
+            renderUserDetail(user);
+          }
         } catch (error) {
           formError('user-grant-create-error', error);
         }
@@ -3673,14 +3820,18 @@ function adminHtml(config: Config): string {
     }
     async function renderGrants() {
       const filters = state.grantFilters || {};
-      const data = await api(apiUrl('/admin/grants') + queryString(filters));
+      const [data, toolCatalog] = await Promise.all([
+        api(apiUrl('/admin/grants') + queryString(filters)),
+        loadToolCatalog()
+      ]);
+      state.toolCatalog = toolCatalog;
       state.grants = data.items;
       content.innerHTML = '<form class="toolbar" id="grant-filters">' +
-        '<label>Tool<br><input id="grant-filter-tool" name="tool_slug" value="'+esc(filters.tool_slug || '')+'"></label>' +
+        '<label>Tool<br><select id="grant-filter-tool" name="tool_slug">'+toolOptions(filters.tool_slug || '')+'</select></label>' +
         '<label>Email<br><input id="grant-filter-email" name="email" value="'+esc(filters.email || '')+'"></label>' +
         '<label>Stato<br><select id="grant-filter-status" name="status"><option value="">Tutti</option><option value="active">active</option><option value="revoked">revoked</option><option value="expired">expired</option><option value="pending_user_link">pending_user_link</option></select></label>' +
         '<button class="primary" type="submit">Filtra</button><button class="secondary" id="grant-clear" type="button">Pulisci</button><button class="primary" id="create-grant" type="button">Nuovo grant</button>' +
-        '<button class="secondary" id="bulk-grants" type="button">Bulk import</button><button class="secondary" id="grant-template" type="button">Template CSV</button><button class="secondary" id="grant-export" type="button">Export grant</button><button class="secondary" id="permissions-export" type="button">Export permessi</button></form>' +
+        '<button class="secondary" id="bulk-grants" type="button">Rilascia grant in blocco</button><button class="secondary" id="csv-grants" type="button">Importa CSV avanzato</button><button class="secondary" id="grant-template" type="button">Template CSV</button><button class="secondary" id="grant-export" type="button">Export grant</button><button class="secondary" id="permissions-export" type="button">Export permessi</button></form>' +
         table(data.items, [{key:'tool_slug', label:'Tool'}, {key:'user_email', label:'Utente'}, {key:'email_normalized', label:'Email pendente'}, {key:'role', label:'Ruolo'}, {key:'status', label:'Stato'}, {key:'permissions', label:'Permessi', render:r=>esc((r.permissions||[]).join(', '))}, {key:'valid_until', label:'Scadenza'}, {key:'id', label:'Azioni', render:r=>'<button class="secondary" data-grant-detail="'+esc(r.id)+'">Dettaglio</button>'}], {pageKey:'grants'});
       bindPagination('grants', renderGrants);
       document.getElementById('grant-filter-status').value = filters.status || '';
@@ -3701,6 +3852,7 @@ function adminHtml(config: Config): string {
       };
       document.getElementById('create-grant').onclick = () => renderGrantCreateForm();
       document.getElementById('bulk-grants').onclick = () => renderGrantBulkForm();
+      document.getElementById('csv-grants').onclick = () => renderGrantCsvImportForm();
       document.getElementById('grant-template').onclick = () => { location.href = apiUrl('/admin/grants/bulk/template'); };
       document.getElementById('grant-export').onclick = () => { location.href = apiUrl('/admin/grants/export'); };
       document.getElementById('permissions-export').onclick = () => { location.href = apiUrl('/admin/tools/permissions/export'); };
@@ -3709,23 +3861,30 @@ function adminHtml(config: Config): string {
         if (grant) renderGrantDetail(grant);
       });
     }
-    function renderGrantCreateForm() {
+    async function renderGrantCreateForm(options = {}) {
       title.textContent = 'Nuovo grant';
       const filters = state.grantFilters || {};
+      await loadToolCatalog();
+      const selectedToolSlug = options.toolSlug || filters.tool_slug || '';
       content.innerHTML = '<form class="form-card" id="grant-create-form">' +
         '<h2>Nuovo grant</h2>' +
-        '<p class="field-help">Crea un grant attivo per un utente noto o un grant pendente per email.</p>' +
+        '<p class="field-help">Crea un grant attivo per un utente noto o un grant pendente per email. Tool e permessi derivano dal catalogo registrato.</p>' +
         '<div class="form-grid">' +
-        '<label>Tool slug<br><input id="grant-create-tool" required autocomplete="off" value="'+esc(filters.tool_slug || '')+'"></label>' +
+        '<label>Tool<br><select id="grant-create-tool" required>'+toolOptions(selectedToolSlug)+'</select></label>' +
         '<label>Email utente<br><input id="grant-create-email" required type="email" value="'+esc(filters.email || '')+'"></label>' +
         '<label>Ruolo<br><input id="grant-create-role" required value="tool_user"></label>' +
         '<label>Scadenza opzionale ISO-8601 UTC<br><input id="grant-create-valid-until" placeholder="2026-12-31T23:59:59Z"></label>' +
-        '<label class="full-row">Permessi<br><textarea id="grant-create-permissions" rows="4"></textarea><span class="field-help">Uno per riga o separati da virgola.</span></label>' +
+        '<label class="full-row">Permessi<br>'+permissionSelectMarkup('grant-create-permissions', selectedToolSlug, [], 'grant-create-permissions-help')+'<span class="field-help" id="grant-create-permissions-help">Selezione multipla tra i permessi definiti dal tool.</span></label>' +
         '</div>' +
         '<p class="danger" id="grant-create-error" role="alert"></p>' +
         '<div class="form-actions"><button class="primary" type="submit">Salva grant</button><button class="secondary" id="grant-create-cancel" type="button">Annulla</button></div>' +
         '</form>';
-      document.getElementById('grant-create-cancel').onclick = () => { state.view = 'grants'; render(); };
+      document.getElementById('grant-create-cancel').onclick = () => {
+        if (options.back) return options.back();
+        state.view = 'grants';
+        return render();
+      };
+      document.getElementById('grant-create-tool').onchange = () => syncPermissionSelect('grant-create-tool', 'grant-create-permissions');
       document.getElementById('grant-create-form').onsubmit = async event => {
         event.preventDefault();
         formError('grant-create-error');
@@ -3733,15 +3892,19 @@ function adminHtml(config: Config): string {
           tool_slug: valueOf('grant-create-tool'),
           email: valueOf('grant-create-email'),
           role: valueOf('grant-create-role'),
-          permissions: listValueOf('grant-create-permissions'),
+          permissions: selectedValues('grant-create-permissions'),
           valid_until: valueOf('grant-create-valid-until') || null
         };
         if (!payload.tool_slug || !payload.email || !payload.role) {
-          formError('grant-create-error', 'Compila tool slug, email e ruolo.');
+          formError('grant-create-error', 'Seleziona tool, email e ruolo.');
           return;
         }
         try {
           await api(apiUrl('/admin/grants'), { method:'POST', body: JSON.stringify(payload) });
+          if (options.back) {
+            options.back();
+            return;
+          }
           state.view = 'grants';
           state.grantFilters = { tool_slug: payload.tool_slug, email: payload.email };
           render();
@@ -3750,28 +3913,88 @@ function adminHtml(config: Config): string {
         }
       };
     }
-    function renderGrantBulkForm() {
-      title.textContent = 'Bulk import grant';
+    async function renderGrantBulkForm() {
+      title.textContent = 'Rilascia grant in blocco';
+      await loadToolCatalog();
       content.innerHTML = '<form class="form-card" id="grant-bulk-form">' +
-        '<h2>Bulk import grant</h2>' +
-        '<p class="field-help">Incolla un CSV con colonne email, tool_slug, role, permissions, valid_until, action, note. Sono accettati i separatori virgola e punto e virgola. Preview non scrive dati; Commit applica solo se non ci sono errori.</p>' +
-        '<label class="full-row">CSV<br><textarea id="grant-bulk-content" rows="12" placeholder="email,tool_slug,role,permissions,valid_until,action,note"></textarea></label>' +
+        '<h2>Rilascia grant in blocco</h2>' +
+        '<p class="field-help">Inserisci un indirizzo email aziendale per riga, poi scegli tool e permessi. La preview resta obbligatoria: nessun grant viene scritto finché non confermi una preview senza errori.</p>' +
+        '<div class="form-grid">' +
+        '<label class="full-row">Email aziendali<br><textarea id="grant-bulk-emails" rows="12" required placeholder="mario.rossi@unguess.io\\nanna.bianchi@unguess.io"></textarea><span class="field-help">Una email per riga. Le email non ancora registrate diventano grant pendenti e si attivano al primo login verificato.</span></label>' +
+        '<label>Tool<br><select id="grant-bulk-tool" required>'+toolOptions('')+'</select></label>' +
+        '<label>Ruolo<br><input id="grant-bulk-role" required value="tool_user"></label>' +
+        '<label class="full-row">Permessi<br>'+permissionSelectMarkup('grant-bulk-permissions', '', [], 'grant-bulk-permissions-help')+'<span class="field-help" id="grant-bulk-permissions-help">Selezione multipla tra i permessi registrati per il tool scelto.</span></label>' +
+        '<label>Scadenza opzionale ISO-8601 UTC<br><input id="grant-bulk-valid-until" placeholder="2026-12-31T23:59:59Z"></label>' +
+        '</div>' +
         '<p class="danger" id="grant-bulk-error" role="alert"></p>' +
-        '<div class="form-actions"><button class="secondary" id="grant-bulk-preview" type="button">Preview</button><button class="primary" id="grant-bulk-commit" type="button">Commit import</button><button class="secondary" id="grant-bulk-cancel" type="button">Annulla</button></div>' +
-        '<pre id="grant-bulk-result" aria-live="polite"></pre>' +
+        '<div class="form-actions"><button class="secondary" id="grant-bulk-preview" type="button">Anteprima</button><button class="primary" id="grant-bulk-commit" type="button" disabled>Conferma rilascio</button><button class="secondary" id="grant-bulk-cancel" type="button">Annulla</button></div>' +
+        '<div id="grant-bulk-result" aria-live="polite"></div>' +
         '</form>';
-      const bulkPayload = () => ({ content: document.getElementById('grant-bulk-content').value });
-      const showBulkResult = result => { document.getElementById('grant-bulk-result').textContent = JSON.stringify(result, null, 2); };
+      let previewResult = null;
+      const csvCell = value => {
+        const raw = String(value || '');
+        return /[",\\n\\r]/.test(raw) ? '"' + raw.replace(/"/g, '""') + '"' : raw;
+      };
+      const bulkPayload = () => {
+        const emails = Array.from(new Set(valueOf('grant-bulk-emails').split(/\\r?\\n/).map(email => email.trim()).filter(Boolean)));
+        const toolSlug = valueOf('grant-bulk-tool');
+        const role = valueOf('grant-bulk-role');
+        const permissions = selectedValues('grant-bulk-permissions').join(';');
+        const validUntil = valueOf('grant-bulk-valid-until');
+        if (!emails.length || !toolSlug || !role) return null;
+        const headers = ['email', 'tool_slug', 'role', 'permissions', 'valid_until', 'action', 'note'];
+        const rows = emails.map(email => [email, toolSlug, role, permissions, validUntil, 'upsert', '']);
+        return { content: headers.join(',') + '\\n' + rows.map(row => row.map(csvCell).join(',')).join('\\n') + '\\n' };
+      };
+      const showBulkResult = result => {
+        previewResult = result;
+        const summary = result.summary || {};
+        document.getElementById('grant-bulk-result').innerHTML = '<p class="'+(summary.error ? 'danger' : 'success')+'" role="status">Righe: '+esc(summary.total_rows || 0)+' · valide: '+esc(summary.ok || 0)+' · avvisi: '+esc(summary.warning || 0)+' · errori: '+esc(summary.error || 0)+'</p>' +
+          table(result.rows || [], [
+            {key:'row', label:'Riga'},
+            {key:'email', label:'Email'},
+            {key:'tool_slug', label:'Tool'},
+            {key:'result', label:'Esito'},
+            {key:'resolved_user', label:'Utente'},
+            {key:'status_after', label:'Stato grant'},
+            {key:'reason', label:'Dettaglio'}
+          ], {pageKey:'grant-bulk-result'});
+        bindPagination('grant-bulk-result', () => showBulkResult(result));
+        document.getElementById('grant-bulk-commit').disabled = Boolean(summary.error);
+      };
+      const invalidatePreview = () => {
+        previewResult = null;
+        document.getElementById('grant-bulk-commit').disabled = true;
+        document.getElementById('grant-bulk-result').innerHTML = '';
+      };
       document.getElementById('grant-bulk-cancel').onclick = () => { state.view = 'grants'; render(); };
+      document.getElementById('grant-bulk-tool').onchange = () => {
+        syncPermissionSelect('grant-bulk-tool', 'grant-bulk-permissions');
+        invalidatePreview();
+      };
+      ['grant-bulk-emails', 'grant-bulk-role', 'grant-bulk-valid-until', 'grant-bulk-permissions'].forEach(id => {
+        document.getElementById(id).onchange = invalidatePreview;
+        document.getElementById(id).oninput = invalidatePreview;
+      });
       document.getElementById('grant-bulk-preview').onclick = async () => {
         formError('grant-bulk-error');
-        try { showBulkResult(await api(apiUrl('/admin/grants/bulk/preview'), { method:'POST', body: JSON.stringify(bulkPayload()) })); }
+        const payload = bulkPayload();
+        if (!payload) {
+          formError('grant-bulk-error', 'Inserisci almeno una email e seleziona tool e ruolo.');
+          return;
+        }
+        try { showBulkResult(await api(apiUrl('/admin/grants/bulk/preview'), { method:'POST', body: JSON.stringify(payload) })); }
         catch (error) { formError('grant-bulk-error', error); }
       };
       document.getElementById('grant-bulk-commit').onclick = async () => {
         formError('grant-bulk-error');
+        const payload = bulkPayload();
+        if (!payload || !previewResult) {
+          formError('grant-bulk-error', 'Esegui prima l’anteprima del contenuto corrente.');
+          return;
+        }
         try {
-          const result = await api(apiUrl('/admin/grants/bulk/commit'), { method:'POST', body: JSON.stringify(bulkPayload()) });
+          const result = await api(apiUrl('/admin/grants/bulk/commit'), { method:'POST', body: JSON.stringify(payload) });
           showBulkResult(result);
           state.pages.grants = 0;
         } catch (error) {
@@ -3780,39 +4003,80 @@ function adminHtml(config: Config): string {
         }
       };
     }
-    function renderGrantDetail(grant) {
+    function renderGrantCsvImportForm() {
+      title.textContent = 'Importa CSV grant';
+      content.innerHTML = '<form class="form-card" id="grant-csv-form">' +
+        '<h2>Importa CSV avanzato</h2>' +
+        '<p class="field-help">Per assegnazioni con tool, ruoli o azioni differenti sulla stessa importazione. Le colonne richieste sono email, tool_slug, role, permissions, valid_until, action, note. Sono accettati i separatori virgola e punto e virgola.</p>' +
+        '<label class="full-row">CSV<br><textarea id="grant-csv-content" rows="12" placeholder="email,tool_slug,role,permissions,valid_until,action,note"></textarea></label>' +
+        '<p class="danger" id="grant-csv-error" role="alert"></p>' +
+        '<div class="form-actions"><button class="secondary" id="grant-csv-preview" type="button">Anteprima</button><button class="primary" id="grant-csv-commit" type="button">Commit import</button><button class="secondary" id="grant-csv-cancel" type="button">Annulla</button></div>' +
+        '<pre id="grant-csv-result" aria-live="polite"></pre>' +
+        '</form>';
+      const bulkPayload = () => ({ content: document.getElementById('grant-csv-content').value });
+      const showBulkResult = result => { document.getElementById('grant-csv-result').textContent = JSON.stringify(result, null, 2); };
+      document.getElementById('grant-csv-cancel').onclick = () => { state.view = 'grants'; render(); };
+      document.getElementById('grant-csv-preview').onclick = async () => {
+        formError('grant-csv-error');
+        try { showBulkResult(await api(apiUrl('/admin/grants/bulk/preview'), { method:'POST', body: JSON.stringify(bulkPayload()) })); }
+        catch (error) { formError('grant-csv-error', error); }
+      };
+      document.getElementById('grant-csv-commit').onclick = async () => {
+        formError('grant-csv-error');
+        try {
+          const result = await api(apiUrl('/admin/grants/bulk/commit'), { method:'POST', body: JSON.stringify(bulkPayload()) });
+          showBulkResult(result);
+          state.pages.grants = 0;
+        } catch (error) {
+          formError('grant-csv-error', error);
+          if (error.details) showBulkResult(error.details);
+        }
+      };
+    }
+    async function renderGrantDetail(grant, back) {
       title.textContent = 'Grant detail';
+      await loadToolCatalog();
       content.innerHTML = '<div class="toolbar"><button class="secondary" id="back-grants">Grant</button><button class="primary" id="save-grant">Salva</button><button class="secondary" id="revoke-grant">Revoca</button></div>' +
         '<dl><dt>Tool</dt><dd>'+esc(grant.tool_slug)+'</dd><dt>Utente</dt><dd>'+esc(grant.user_email || grant.email_normalized || '')+'</dd></dl>' +
         '<label>Ruolo<br><input id="grant-role" value="'+esc(grant.role)+'"></label><br><br>' +
-        '<label>Permessi<br><textarea id="grant-permissions" rows="4">'+esc((grant.permissions || []).join('\\n'))+'</textarea></label><br><br>' +
+        '<label>Permessi<br>'+permissionSelectMarkup('grant-permissions', grant.tool_slug, grant.permissions || [], 'grant-permissions-help')+'<span class="field-help" id="grant-permissions-help">Selezione multipla tra i permessi definiti dal tool.</span></label><br><br>' +
         '<label>Stato<br><select id="grant-status"><option value="active">active</option><option value="revoked">revoked</option><option value="expired">expired</option><option value="pending_user_link">pending_user_link</option></select></label><br><br>' +
         '<label>Scadenza<br><input id="grant-valid-until" placeholder="2026-12-31T23:59:59Z" value="'+esc(grant.valid_until || '')+'"></label>';
       document.getElementById('grant-status').value = grant.status;
-      document.getElementById('back-grants').onclick = () => { state.view = 'grants'; render(); };
+      document.getElementById('back-grants').onclick = () => {
+        if (back) return back();
+        state.view = 'grants';
+        return render();
+      };
       document.getElementById('save-grant').onclick = async () => {
         await api(apiUrl('/admin/grants/') + grant.id, { method:'PATCH', body: JSON.stringify({
           role: document.getElementById('grant-role').value,
-          permissions: document.getElementById('grant-permissions').value.split('\\n').map(s=>s.trim()).filter(Boolean),
+          permissions: selectedValues('grant-permissions'),
           status: document.getElementById('grant-status').value,
           valid_until: document.getElementById('grant-valid-until').value.trim() || null
         }) });
+        if (back) return back();
         state.view = 'grants';
         render();
       };
       document.getElementById('revoke-grant').onclick = async () => {
         if (!confirm("Confermi la revoca dell'accesso? Le sessioni attive potrebbero essere terminate.")) return;
         await api(apiUrl('/admin/grants/') + grant.id, { method:'PATCH', body: JSON.stringify({ status: 'revoked' }) });
+        if (back) return back();
         state.view = 'grants';
         render();
       };
     }
     async function renderRequests() {
       const filters = state.requestFilters || {};
-      const data = await api(apiUrl('/admin/access-requests') + queryString(filters));
+      const [data, toolCatalog] = await Promise.all([
+        api(apiUrl('/admin/access-requests') + queryString(filters)),
+        loadToolCatalog()
+      ]);
+      state.toolCatalog = toolCatalog;
       content.innerHTML = '<form class="toolbar" id="request-filters">' +
         '<label>Stato<br><select id="request-filter-status" name="status"><option value="">Tutti</option><option value="pending">pending</option><option value="approved">approved</option><option value="rejected">rejected</option><option value="closed">closed</option><option value="expired">expired</option></select></label>' +
-        '<label>Tool<br><input id="request-filter-tool" name="tool_slug" value="'+esc(filters.tool_slug || '')+'"></label>' +
+        '<label>Tool<br><select id="request-filter-tool" name="tool_slug">'+toolOptions(filters.tool_slug || '')+'</select></label>' +
         '<label>Email<br><input id="request-filter-email" name="email" value="'+esc(filters.email || '')+'"></label>' +
         '<button class="primary" type="submit">Filtra</button><button class="secondary" id="request-clear" type="button">Pulisci</button></form>' +
         table(data.items, [
@@ -3849,15 +4113,16 @@ function adminHtml(config: Config): string {
         if (request) renderAccessRequestDecisionForm(request, 'close');
       });
     }
-    function renderAccessRequestApproveForm(request) {
+    async function renderAccessRequestApproveForm(request) {
       title.textContent = 'Approva richiesta';
+      await loadToolCatalog();
       content.innerHTML = '<form class="form-card" id="request-approve-form">' +
         '<h2>Approva richiesta accesso</h2>' +
         '<dl><dt>Tool</dt><dd>'+esc(request.tool_slug)+'</dd><dt>Email</dt><dd>'+esc(request.email)+'</dd><dt>Nome</dt><dd>'+esc(request.display_name || '')+'</dd></dl>' +
         '<div class="form-grid">' +
         '<label>Ruolo<br><input id="request-approve-role" required value="tool_user"></label>' +
         '<label>Scadenza opzionale ISO-8601 UTC<br><input id="request-approve-valid-until" placeholder="2026-12-31T23:59:59Z"></label>' +
-        '<label class="full-row">Permessi<br><textarea id="request-approve-permissions" rows="4"></textarea><span class="field-help">Uno per riga o separati da virgola.</span></label>' +
+        '<label class="full-row">Permessi<br>'+permissionSelectMarkup('request-approve-permissions', request.tool_slug, [], 'request-approve-permissions-help')+'<span class="field-help" id="request-approve-permissions-help">Selezione multipla tra i permessi definiti dal tool.</span></label>' +
         '<label class="full-row">Nota opzionale<br><textarea id="request-approve-note" rows="3"></textarea></label>' +
         '</div>' +
         '<p class="danger" id="request-approve-error" role="alert"></p>' +
@@ -3869,7 +4134,7 @@ function adminHtml(config: Config): string {
         formError('request-approve-error');
         const payload = {
           role: valueOf('request-approve-role'),
-          permissions: listValueOf('request-approve-permissions'),
+          permissions: selectedValues('request-approve-permissions'),
           valid_until: valueOf('request-approve-valid-until') || null,
           note: valueOf('request-approve-note') || null
         };

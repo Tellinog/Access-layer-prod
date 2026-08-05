@@ -53,8 +53,8 @@ Il tool riservato `access-admin` non puo essere eliminato.
 Opzione A - utente gia noto:
 
 1. Cercare utente per email o Google sub.
-2. Selezionare tool.
-3. Assegnare ruolo e permessi.
+2. Aprire il dettaglio dell'utente: la tabella `Tool e autorizzazioni` mostra un grant per riga, con ruolo, permessi, stato e scadenza.
+3. Usare `Aggiungi tool`, scegliere il tool dal menu a tendina e selezionare uno o piu permessi tra le permission key registrate per quel tool.
 4. Salvare.
 
 Opzione B - utente non ancora entrato:
@@ -66,16 +66,25 @@ Opzione B - utente non ancora entrato:
 
 Le email per grant pendenti devono essere ben formate e usare un dominio presente in `GOOGLE_ALLOWED_HD`.
 
+## Viste per tool e utente
+
+- Nel dettaglio di un tool, un `platform_admin` vede una riga per ogni utente gia registrato su Access Layer, con accesso effettivo, ruoli, permission key e stato dei grant. Da qui puo concedere un grant a chi non e autorizzato o gestire quelli esistenti. L'implementazione v1 usa l'attuale limite di 200 righe delle API Admin; pianificare paginazione server-side prima di superarlo.
+- Nel dettaglio di un utente, la tabella `Tool e autorizzazioni` raccoglie tutti i grant dell'utente. L'elenco Utenti resta quindi una riga per persona, non una riga per combinazione utente/tool.
+- Un `tool_admin` resta limitato ai tool assegnati: nel dettaglio tool vede i grant visibili per il proprio perimetro, ma non l'elenco completo degli utenti non autorizzati.
+- I menu dei tool mostrano il catalogo attualmente visibile all'admin; i selettori dei permessi espongono solo le permission key registrate per il tool scelto. Un grant role-only con `permissions=[]` resta valido.
+
 ## Bulk import/export grant
 
-Usare la sezione `Grant > Bulk import` quando occorre pre-caricare o revocare molte autorizzazioni.
+Usare `Grant > Rilascia grant in blocco` per assegnare lo stesso grant a molte email: inserire una email aziendale per riga, scegliere tool, ruolo, permission key e scadenza opzionale dall'interfaccia, poi eseguire Preview e confermare.
+
+Usare `Grant > Importa CSV avanzato` quando la stessa importazione deve contenere tool, ruoli, azioni o permission key differenti tra righe.
 
 Flusso consigliato:
 
 1. Scaricare `Template CSV`.
 2. Scaricare `Export permessi` per verificare `tool_slug` e permission key disponibili.
 3. Compilare il CSV con colonne `email,tool_slug,role,permissions,valid_until,action,note`. Sono accettati sia la virgola (`,`) sia il punto e virgola (`;`) come separatore.
-4. Incollare il CSV in `Bulk import` e lanciare `Preview`.
+4. Incollare il CSV in `Importa CSV avanzato` e lanciare `Preview`.
 5. Correggere tutte le righe `error`.
 6. Lanciare `Commit import` solo quando la preview non contiene errori.
 

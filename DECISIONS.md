@@ -287,3 +287,17 @@ Unconditional background refresh is forbidden because an open but inactive page 
 Operational consequence: tool backends must store refresh tokens only server-side, serialize concurrent refreshes for the same session, replace the rotated token atomically and treat `AUTH_REFRESH_TOKEN_INVALID` as a terminal local-session condition. The same-service Admin UI uses a protected HttpOnly refresh cookie and retries an Admin API request once after a successful activity-driven refresh.
 
 Rationale: short-lived JWTs retain a small exposure window while active users are not interrupted every 15 minutes. Rotation prevents routine reuse of a refresh credential and online revalidation preserves immediate user/grant/session revocation.
+
+## D-030 - Relationship-oriented grant administration UI
+
+Status: accepted
+
+Confirmed: 2026-08-05
+
+Decision: the Admin UI presents authorization through the user-tool relationship. A platform-admin tool detail shows registered users and their effective access state; a user detail shows that user's grants per tool. Grant forms select from the visible tool catalog and from permission keys registered for the selected tool rather than accepting a manually typed tool slug or free-text permission list.
+
+The standard bulk-release form accepts one company email per line with one selected tool/role/permission set and converts that input to the existing guarded bulk-preview/commit payload. The advanced CSV import remains for mixed operations.
+
+Rationale: access administration is primarily an entitlement-management task. Exposing the relationship in both directions reduces lookup and transcription errors while preserving the backend's existing validation, audit events, pending-email grants and atomic commit behavior.
+
+Operational consequence: this is an Admin UI behavior change only. No API, grant model, permission policy or delegated tool-admin visibility is expanded; platform admins alone may see a complete registered-user access matrix.

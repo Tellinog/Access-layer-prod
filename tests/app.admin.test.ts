@@ -2002,7 +2002,7 @@ describe("admin access request routes", () => {
     expect(html).toContain('id="user-grant-create-form"');
     expect(html).toContain('id="user-tools-heading"');
     expect(html).toContain("Tool e autorizzazioni");
-    expect(html).toContain("permissionSelectMarkup('user-grant-permissions'");
+    expect(html).toContain("permissionPickerMarkup('user-grant-permissions'");
     expect(html).toContain('id="user-grant-valid-until"');
     expect(html).toContain("Salva grant");
     expect(html).toContain("Confermi la revoca dell'accesso?");
@@ -2031,7 +2031,7 @@ describe("admin access request routes", () => {
     expect(html).toContain("apiUrl('/admin/grants/')");
     expect(html).toContain('id="grant-create-form"');
     expect(html).toContain('id="grant-create-tool"');
-    expect(html).toContain("permissionSelectMarkup('grant-create-permissions'");
+    expect(html).toContain("permissionPickerMarkup('grant-create-permissions'");
     expect(html).toContain('id="grant-create-valid-until"');
     expect(html).toContain('id="bulk-grants"');
     expect(html).toContain('id="csv-grants"');
@@ -2043,8 +2043,11 @@ describe("admin access request routes", () => {
     expect(html).toContain('id="grant-bulk-form"');
     expect(html).toContain('id="grant-bulk-emails"');
     expect(html).toContain('id="grant-bulk-tool"');
-    expect(html).toContain("permissionSelectMarkup('grant-bulk-permissions'");
+    expect(html).toContain("permissionPickerMarkup('grant-bulk-permissions'");
     expect(html).toContain("Rilascia grant in blocco");
+    expect(html).toContain('type="checkbox"');
+    expect(html).toContain('class="permission-picker"');
+    expect(html).toContain('.content { width: 100%;');
     expect(html).toContain("Confermi la revoca dell'accesso?");
     await app.close();
   });

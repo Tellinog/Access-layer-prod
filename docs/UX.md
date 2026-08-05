@@ -70,7 +70,9 @@ Covered v1 flows:
 
 One-time client secrets are shown in an inline result panel with a copy action and must not be shown through `alert()`.
 
-Grant forms must use a tool select populated from the visible tool catalog and a keyboard-accessible multi-select populated only with the selected tool's registered permission keys. Empty selection remains available for role-only grants.
+Grant forms must use a tool select populated from the visible tool catalog and a keyboard-accessible expandable permission list with checkboxes, populated only with the selected tool's registered permission keys. The closed control reports the selection count; an empty selection remains available for role-only grants.
+
+Desktop admin views use the full available main-content width. Forms distribute fields across responsive columns instead of being constrained to a narrow centered card; compact screens retain the single-column layout.
 
 
 ## Admin login gate

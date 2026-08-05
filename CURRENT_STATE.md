@@ -12,10 +12,11 @@ This repository now contains the product/security/API/data specifications plus a
 
 - Tool detail now includes a user-access table: platform admins can see every registered user, whether access to the selected tool is currently effective, and the related roles, permissions and grant states. Grants can be created or managed directly from that table.
 - User detail remains one row per person in the Users list and now shows all of that user's tool grants in a dedicated table, with a direct `Aggiungi tool` action.
-- Grant creation, editing, access-request approval and bulk release now use the visible tool catalog and the selected tool's registered permission keys instead of manual tool-slug and free-text permission entry.
+- Grant creation, editing, access-request approval and bulk release now use the visible tool catalog and the selected tool's registered permission keys instead of manual tool-slug and free-text permission entry. Permission keys are selected through an expandable checkbox list with a visible selection count.
+- Desktop Admin UI views now use the full available main-content width and responsive multi-column forms; compact screens retain the single-column layout.
 - The primary bulk release flow accepts one corporate email per line and creates the guarded CSV payload internally; Preview and error-blocked Commit semantics remain unchanged. Advanced CSV import remains available for mixed batch operations.
 - Tool-admin visibility was not broadened: the complete registered-user matrix remains available only to platform admins, while delegated admins retain assigned-tool grant scope.
-- Verification: `npm.cmd run lint` and `npm.cmd test -- tests/app.admin.test.ts` passed.
+- Verification: `npm.cmd run lint`, `npm.cmd run build` and `npm.cmd test` passed (10 test files, 100 tests).
 
 ## Latest Coolify Docker build fix, 2026-07-24
 

@@ -10,8 +10,9 @@ Related task: Improve the accessibility and usability of Tools, Users and Grants
 - Added a platform-admin `Utenti e autorizzazioni` table to tool detail, with registered users, effective access, role/permission summary, grant state and direct grant actions.
 - Added a `Tool e autorizzazioni` table to user detail so the Users list stays person-oriented while exposing every grant for the selected user.
 - Replaced manual tool-slug fields in grant and access-request approval workflows with visible-tool dropdowns.
-- Replaced free-text permission fields in those workflows with labelled keyboard-accessible multiple-selects populated from registered permission keys.
+- Replaced free-text permission fields in those workflows with labelled keyboard-accessible expandable checkbox lists populated from registered permission keys; each closed picker reports the selected-count summary.
 - Added `Rilascia grant in blocco`: one corporate email per line, one selected tool/role/permission set, mandatory preview and error-blocked confirmation. Preserved advanced mixed-operation CSV import separately.
+- Expanded desktop content and form cards to use the full available main width, with responsive field columns and the existing compact single-column breakpoint.
 - Preserved all existing API validation, audit events, pending-email behavior and delegated tool-admin scope.
 
 ### Docs/specs/schemas updated
@@ -22,7 +23,8 @@ Related task: Improve the accessibility and usability of Tools, Users and Grants
 ### Tests/checks
 
 - `npm.cmd run lint` passed.
-- `npm.cmd test -- tests/app.admin.test.ts` passed: 1 file, 51 tests.
+- `npm.cmd run build` passed.
+- `npm.cmd test` passed: 10 test files, 100 tests.
 - Added Admin UI rendering assertions for relationship tables, catalog-driven grant controls and one-email-per-line bulk release.
 
 ### Decisions

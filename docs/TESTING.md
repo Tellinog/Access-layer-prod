@@ -62,7 +62,7 @@ The v1 implementation includes Vitest tests for:
 - Admin UI known-user grant creation controls from user detail through an inline form.
 - Admin UI audit log filter controls and correlation copy affordance.
 - Admin UI grant filters, inline create controls, detail edit controls and revocation confirmation.
-- Admin UI tool/user relationship views, registered tool selectors, permission-key multi-selects and one-email-per-line bulk grant preview controls.
+- Admin UI tool/user relationship views, registered tool selectors, checkbox permission pickers, full-width desktop layout and one-email-per-line bulk grant preview controls.
 - Admin UI access-request filters, first/last-attempt columns and inline approval/reject/close forms.
 - Admin UI shared table pagination controls and empty-state affordance.
 - Admin UI non-sensitive OAuth/runtime settings summary without secret disclosure.

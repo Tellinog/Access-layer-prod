@@ -26,6 +26,7 @@ The same-service v1 Admin UI implements tool and user detail as lightweight in-p
 - Tool detail uses explicit `Modifica`, `Salva modifiche` and `Elimina` actions with inline feedback.
 - Tool detail includes a user-access table; platform admins see registered users with effective access, while tool admins remain scoped to visible grants.
 - User detail includes a tool/grant table and an `Aggiungi tool` action.
+- Desktop views use the full available content width; form fields flow into responsive columns and collapse to one column only on compact screens.
 
 ## Visual direction
 
@@ -62,6 +63,7 @@ Every table needs:
 - Labels for every input.
 - Visible focus.
 - Do not rely only on color for statuses.
+- Permission selection uses an expandable checkbox list with a text summary of the selected count; it remains usable by keyboard and supports no selection for role-only grants.
 
 ## Status labels
 
@@ -88,7 +90,7 @@ Admin write workflows that collect multiple fields should be rendered as minimal
 
 Browser `prompt()` and `alert()` dialogs are not used for tool onboarding, grant creation, access-request decisions or tool-secret rotation.
 
-Grant forms use a single-select tool catalog and a labelled multiple-select permission list populated from the chosen tool. The permission list must remain keyboard navigable and permit an empty selection for role-only grants.
+Grant forms use a single-select tool catalog and a labelled expandable permission list with checkboxes populated from the chosen tool. The list must remain keyboard navigable, show the selected-count summary and permit an empty selection for role-only grants.
 
 ## Grant bulk import UI
 

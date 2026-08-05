@@ -294,7 +294,7 @@ Status: accepted
 
 Confirmed: 2026-08-05
 
-Decision: the Admin UI presents authorization through the user-tool relationship. A platform-admin tool detail shows registered users and their effective access state; a user detail shows that user's grants per tool. Grant forms select from the visible tool catalog and from permission keys registered for the selected tool rather than accepting a manually typed tool slug or free-text permission list.
+Decision: the Admin UI presents authorization through the user-tool relationship. A platform-admin tool detail shows registered users and their effective access state; a user detail shows that user's grants per tool. Grant forms select from the visible tool catalog and from permission keys registered for the selected tool through an expandable checkbox list rather than accepting a manually typed tool slug or free-text permission list. Desktop views use the full available main-content width with responsive form columns.
 
 The standard bulk-release form accepts one company email per line with one selected tool/role/permission set and converts that input to the existing guarded bulk-preview/commit payload. The advanced CSV import remains for mixed operations.
 

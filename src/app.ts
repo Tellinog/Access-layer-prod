@@ -3150,15 +3150,16 @@ function adminHtml(config: Config): string {
     #title { color: var(--text); font-size: 2rem; line-height: 1.22; font-weight: 800; letter-spacing: 0; }
     .badge { border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-size: .78rem; line-height: 1.2; color: var(--primary); background: var(--primary-soft); font-weight: 700; white-space: nowrap; }
     nav .badge { color: var(--primary-dark); background: var(--accent); border-color: transparent; padding: 2px 8px; }
-    .content { width: min(100%, 1440px); margin: 0 auto; padding: 40px 48px 64px; }
+    .content { width: 100%; margin: 0; padding: 32px 48px 64px; }
     .toolbar { display: flex; gap: 12px; align-items: end; margin: 0 0 24px; flex-wrap: wrap; }
     form.toolbar { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 20px; box-shadow: var(--shadow); }
-    .dashboard-kpis { display: grid; grid-template-columns: repeat(3, minmax(180px, 1fr)); gap: 16px; margin: 0 0 24px; }
+    form.toolbar > label { flex: 1 1 220px; }
+    .dashboard-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin: 0 0 24px; }
     .dashboard-kpis .badge { display: flex; min-height: 112px; align-items: flex-end; justify-content: flex-start; padding: 24px; border-radius: 18px; color: var(--text); background: var(--card); border: 1px solid var(--border); box-shadow: var(--shadow); font-size: 1rem; }
-    .form-card { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 28px; max-width: 980px; box-shadow: var(--shadow); }
+    .form-card { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 28px; max-width: none; box-shadow: var(--shadow); }
     .form-card + .form-card { margin-top: 24px; }
     .form-card h2 { margin: 0 0 8px; color: var(--text); font-size: 1.55rem; line-height: 1.25; font-weight: 750; letter-spacing: 0; }
-    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(240px, 1fr)); gap: 20px 24px; margin-top: 24px; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px 24px; margin-top: 24px; }
     label, .form-grid label, .full-row { display: block; color: var(--text); font-size: .9rem; font-weight: 650; }
     .full-row { grid-column: 1 / -1; }
     .form-card input, .form-card select, .form-card textarea { width: 100%; margin-top: 8px; }
@@ -3190,7 +3191,17 @@ function adminHtml(config: Config): string {
     .table-section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin: 0 0 16px; }
     .table-section-head h2 { margin: 0; font-size: 1.25rem; line-height: 1.35; }
     .table-section-head p { margin: 4px 0 0; color: var(--text-soft); }
-    select[multiple] { min-height: 132px; padding: 8px; }
+    .permission-picker { position: relative; display: block; width: 100%; margin-top: 8px; }
+    .permission-field > span:first-child { display: block; color: var(--text); font-size: .9rem; font-weight: 650; }
+    .permission-picker summary { min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--border-strong); border-radius: 12px; padding: 11px 13px; color: var(--text); background: #fff; cursor: pointer; font-weight: 500; list-style: none; }
+    .permission-picker summary::-webkit-details-marker { display: none; }
+    .permission-picker summary::after { content: "⌄"; color: var(--primary); font-size: 1.1rem; font-weight: 800; }
+    .permission-picker[open] summary { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(0, 75, 99, .12); }
+    .permission-picker-panel { display: grid; gap: 8px; max-height: 260px; overflow: auto; margin-top: 8px; padding: 12px; border: 1px solid var(--border-strong); border-radius: 12px; background: var(--bg-soft); }
+    .permission-option { display: flex !important; align-items: center; gap: 10px; min-height: 40px; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px; background: #fff; font-weight: 500 !important; cursor: pointer; }
+    .permission-option:hover { border-color: rgba(0, 75, 99, .28); background: var(--primary-soft); }
+    .permission-option input { width: 18px !important; min-height: 18px !important; margin: 0 !important; accent-color: var(--primary); }
+    .permission-picker-empty { margin: 0; color: var(--text-soft); font-weight: 400; }
     pre { white-space: pre-wrap; background: var(--bg-soft); border: 1px solid var(--border); padding: 18px; border-radius: 14px; color: var(--text); }
     dl { display: grid; grid-template-columns: minmax(140px, 220px) 1fr; gap: 10px 20px; margin: 0 0 24px; padding: 24px; background: var(--card); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow); }
     dt { color: var(--text-soft); font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
@@ -3356,8 +3367,7 @@ function adminHtml(config: Config): string {
       return parseList(document.getElementById(id).value);
     }
     function selectedValues(id) {
-      const select = document.getElementById(id);
-      return Array.from(select.selectedOptions).map(option => option.value).filter(Boolean);
+      return Array.from(document.querySelectorAll('[data-permission-picker="'+id+'"]:checked')).map(input => input.value).filter(Boolean);
     }
     function hasAdminPermission(permission) {
       return Boolean(state.me && Array.isArray(state.me.permissions) && state.me.permissions.includes(permission));
@@ -3374,25 +3384,38 @@ function adminHtml(config: Config): string {
       });
       return options.join('');
     }
-    function permissionOptions(toolSlug, selectedPermissions) {
+    function permissionCheckboxes(id, toolSlug, selectedPermissions) {
       const tool = state.toolCatalog.find(item => item.slug === toolSlug);
       const selected = new Set(selectedPermissions || []);
       if (!tool || !(tool.permission_keys || []).length) {
-        return '<option value="" disabled>Nessun permesso registrato per questo tool</option>';
+        return '<p class="permission-picker-empty">Nessun permesso registrato: il grant sarà basato solo sul ruolo.</p>';
       }
-      return tool.permission_keys.map(permission => '<option value="'+esc(permission)+'"'+(selected.has(permission) ? ' selected' : '')+'>'+esc(permission)+'</option>').join('');
+      return tool.permission_keys.map(permission => '<label class="permission-option"><input type="checkbox" value="'+esc(permission)+'" data-permission-picker="'+esc(id)+'"'+(selected.has(permission) ? ' checked' : '')+'> <span>'+esc(permission)+'</span></label>').join('');
     }
-    function permissionSelectMarkup(id, toolSlug, selectedPermissions, describedBy) {
+    function permissionPickerSummary(toolSlug, selectedPermissions) {
       const tool = state.toolCatalog.find(item => item.slug === toolSlug);
-      const disabled = !tool || !(tool.permission_keys || []).length;
-      return '<select id="'+esc(id)+'" multiple size="5"'+(describedBy ? ' aria-describedby="'+esc(describedBy)+'"' : '')+(disabled ? ' disabled' : '')+'>'+permissionOptions(toolSlug, selectedPermissions)+'</select>';
+      if (!tool || !(tool.permission_keys || []).length) return 'Nessun permesso disponibile (solo ruolo)';
+      const count = (selectedPermissions || []).length;
+      return count ? count + (count === 1 ? ' permesso selezionato' : ' permessi selezionati') : 'Seleziona i permessi';
     }
-    function syncPermissionSelect(toolSelectId, permissionSelectId, selectedPermissions = []) {
+    function permissionPickerMarkup(id, toolSlug, selectedPermissions, describedBy) {
+      return '<details class="permission-picker" id="'+esc(id)+'-picker" data-tool-slug="'+esc(toolSlug)+'"><summary aria-label="Permessi"'+(describedBy ? ' aria-describedby="'+esc(describedBy)+'"' : '')+'><span id="'+esc(id)+'-summary">'+esc(permissionPickerSummary(toolSlug, selectedPermissions))+'</span></summary><div class="permission-picker-panel">'+permissionCheckboxes(id, toolSlug, selectedPermissions)+'</div></details>';
+    }
+    function bindPermissionPicker(id, onChange) {
+      document.querySelectorAll('[data-permission-picker="'+id+'"]').forEach(input => input.onchange = () => {
+        const summary = document.getElementById(id + '-summary');
+        const picker = document.getElementById(id + '-picker');
+        if (summary) summary.textContent = permissionPickerSummary(picker ? picker.dataset.toolSlug : '', selectedValues(id));
+        if (onChange) onChange();
+      });
+    }
+    function syncPermissionPicker(toolSelectId, permissionPickerId, selectedPermissions = [], onChange) {
       const toolSlug = document.getElementById(toolSelectId).value;
-      const select = document.getElementById(permissionSelectId);
-      const tool = state.toolCatalog.find(item => item.slug === toolSlug);
-      select.innerHTML = permissionOptions(toolSlug, selectedPermissions);
-      select.disabled = !tool || !(tool.permission_keys || []).length;
+      const picker = document.getElementById(permissionPickerId + '-picker');
+      if (!picker) return;
+      const summary = picker.querySelector('summary');
+      picker.outerHTML = permissionPickerMarkup(permissionPickerId, toolSlug, selectedPermissions, summary ? summary.getAttribute('aria-describedby') : '');
+      bindPermissionPicker(permissionPickerId, onChange);
     }
     function formError(id, error) {
       const target = document.getElementById(id);
@@ -3781,7 +3804,7 @@ function adminHtml(config: Config): string {
         '<div class="form-grid">' +
         '<label>Tool<br><select id="user-grant-tool" required>'+toolOptions(selectedToolSlug)+'</select></label>' +
         '<label>Ruolo<br><input id="user-grant-role" required value="tool_user"></label>' +
-        '<label class="full-row">Permessi<br>'+permissionSelectMarkup('user-grant-permissions', selectedToolSlug, [], 'user-grant-permissions-help')+'<span class="field-help" id="user-grant-permissions-help">Selezione multipla tra i permessi definiti dal tool.</span></label>' +
+        '<div class="full-row permission-field"><span>Permessi</span>'+permissionPickerMarkup('user-grant-permissions', selectedToolSlug, [], 'user-grant-permissions-help')+'<span class="field-help" id="user-grant-permissions-help">Apri l’elenco e seleziona i permessi con le checkbox.</span></div>' +
         '<label>Scadenza opzionale ISO-8601 UTC<br><input id="user-grant-valid-until" placeholder="2026-12-31T23:59:59Z"></label>' +
         '</div>' +
         '<p class="danger" id="user-grant-create-error" role="alert"></p>' +
@@ -3791,7 +3814,8 @@ function adminHtml(config: Config): string {
         if (options.back) return options.back();
         return renderUserDetail(user);
       };
-      document.getElementById('user-grant-tool').onchange = () => syncPermissionSelect('user-grant-tool', 'user-grant-permissions');
+      bindPermissionPicker('user-grant-permissions');
+      document.getElementById('user-grant-tool').onchange = () => syncPermissionPicker('user-grant-tool', 'user-grant-permissions');
       document.getElementById('user-grant-create-form').onsubmit = async event => {
         event.preventDefault();
         formError('user-grant-create-error');
@@ -3874,7 +3898,7 @@ function adminHtml(config: Config): string {
         '<label>Email utente<br><input id="grant-create-email" required type="email" value="'+esc(filters.email || '')+'"></label>' +
         '<label>Ruolo<br><input id="grant-create-role" required value="tool_user"></label>' +
         '<label>Scadenza opzionale ISO-8601 UTC<br><input id="grant-create-valid-until" placeholder="2026-12-31T23:59:59Z"></label>' +
-        '<label class="full-row">Permessi<br>'+permissionSelectMarkup('grant-create-permissions', selectedToolSlug, [], 'grant-create-permissions-help')+'<span class="field-help" id="grant-create-permissions-help">Selezione multipla tra i permessi definiti dal tool.</span></label>' +
+        '<div class="full-row permission-field"><span>Permessi</span>'+permissionPickerMarkup('grant-create-permissions', selectedToolSlug, [], 'grant-create-permissions-help')+'<span class="field-help" id="grant-create-permissions-help">Apri l’elenco e seleziona i permessi con le checkbox.</span></div>' +
         '</div>' +
         '<p class="danger" id="grant-create-error" role="alert"></p>' +
         '<div class="form-actions"><button class="primary" type="submit">Salva grant</button><button class="secondary" id="grant-create-cancel" type="button">Annulla</button></div>' +
@@ -3884,7 +3908,8 @@ function adminHtml(config: Config): string {
         state.view = 'grants';
         return render();
       };
-      document.getElementById('grant-create-tool').onchange = () => syncPermissionSelect('grant-create-tool', 'grant-create-permissions');
+      bindPermissionPicker('grant-create-permissions');
+      document.getElementById('grant-create-tool').onchange = () => syncPermissionPicker('grant-create-tool', 'grant-create-permissions');
       document.getElementById('grant-create-form').onsubmit = async event => {
         event.preventDefault();
         formError('grant-create-error');
@@ -3923,7 +3948,7 @@ function adminHtml(config: Config): string {
         '<label class="full-row">Email aziendali<br><textarea id="grant-bulk-emails" rows="12" required placeholder="mario.rossi@unguess.io\\nanna.bianchi@unguess.io"></textarea><span class="field-help">Una email per riga. Le email non ancora registrate diventano grant pendenti e si attivano al primo login verificato.</span></label>' +
         '<label>Tool<br><select id="grant-bulk-tool" required>'+toolOptions('')+'</select></label>' +
         '<label>Ruolo<br><input id="grant-bulk-role" required value="tool_user"></label>' +
-        '<label class="full-row">Permessi<br>'+permissionSelectMarkup('grant-bulk-permissions', '', [], 'grant-bulk-permissions-help')+'<span class="field-help" id="grant-bulk-permissions-help">Selezione multipla tra i permessi registrati per il tool scelto.</span></label>' +
+        '<div class="full-row permission-field"><span>Permessi</span>'+permissionPickerMarkup('grant-bulk-permissions', '', [], 'grant-bulk-permissions-help')+'<span class="field-help" id="grant-bulk-permissions-help">Apri l’elenco e seleziona i permessi con le checkbox.</span></div>' +
         '<label>Scadenza opzionale ISO-8601 UTC<br><input id="grant-bulk-valid-until" placeholder="2026-12-31T23:59:59Z"></label>' +
         '</div>' +
         '<p class="danger" id="grant-bulk-error" role="alert"></p>' +
@@ -3967,12 +3992,13 @@ function adminHtml(config: Config): string {
         document.getElementById('grant-bulk-commit').disabled = true;
         document.getElementById('grant-bulk-result').innerHTML = '';
       };
+      bindPermissionPicker('grant-bulk-permissions', invalidatePreview);
       document.getElementById('grant-bulk-cancel').onclick = () => { state.view = 'grants'; render(); };
       document.getElementById('grant-bulk-tool').onchange = () => {
-        syncPermissionSelect('grant-bulk-tool', 'grant-bulk-permissions');
+        syncPermissionPicker('grant-bulk-tool', 'grant-bulk-permissions', [], invalidatePreview);
         invalidatePreview();
       };
-      ['grant-bulk-emails', 'grant-bulk-role', 'grant-bulk-valid-until', 'grant-bulk-permissions'].forEach(id => {
+      ['grant-bulk-emails', 'grant-bulk-role', 'grant-bulk-valid-until'].forEach(id => {
         document.getElementById(id).onchange = invalidatePreview;
         document.getElementById(id).oninput = invalidatePreview;
       });
@@ -4039,10 +4065,11 @@ function adminHtml(config: Config): string {
       content.innerHTML = '<div class="toolbar"><button class="secondary" id="back-grants">Grant</button><button class="primary" id="save-grant">Salva</button><button class="secondary" id="revoke-grant">Revoca</button></div>' +
         '<dl><dt>Tool</dt><dd>'+esc(grant.tool_slug)+'</dd><dt>Utente</dt><dd>'+esc(grant.user_email || grant.email_normalized || '')+'</dd></dl>' +
         '<label>Ruolo<br><input id="grant-role" value="'+esc(grant.role)+'"></label><br><br>' +
-        '<label>Permessi<br>'+permissionSelectMarkup('grant-permissions', grant.tool_slug, grant.permissions || [], 'grant-permissions-help')+'<span class="field-help" id="grant-permissions-help">Selezione multipla tra i permessi definiti dal tool.</span></label><br><br>' +
+        '<div class="permission-field"><span>Permessi</span>'+permissionPickerMarkup('grant-permissions', grant.tool_slug, grant.permissions || [], 'grant-permissions-help')+'<span class="field-help" id="grant-permissions-help">Apri l’elenco e seleziona i permessi con le checkbox.</span></div><br><br>' +
         '<label>Stato<br><select id="grant-status"><option value="active">active</option><option value="revoked">revoked</option><option value="expired">expired</option><option value="pending_user_link">pending_user_link</option></select></label><br><br>' +
         '<label>Scadenza<br><input id="grant-valid-until" placeholder="2026-12-31T23:59:59Z" value="'+esc(grant.valid_until || '')+'"></label>';
       document.getElementById('grant-status').value = grant.status;
+      bindPermissionPicker('grant-permissions');
       document.getElementById('back-grants').onclick = () => {
         if (back) return back();
         state.view = 'grants';
@@ -4122,12 +4149,13 @@ function adminHtml(config: Config): string {
         '<div class="form-grid">' +
         '<label>Ruolo<br><input id="request-approve-role" required value="tool_user"></label>' +
         '<label>Scadenza opzionale ISO-8601 UTC<br><input id="request-approve-valid-until" placeholder="2026-12-31T23:59:59Z"></label>' +
-        '<label class="full-row">Permessi<br>'+permissionSelectMarkup('request-approve-permissions', request.tool_slug, [], 'request-approve-permissions-help')+'<span class="field-help" id="request-approve-permissions-help">Selezione multipla tra i permessi definiti dal tool.</span></label>' +
+        '<div class="full-row permission-field"><span>Permessi</span>'+permissionPickerMarkup('request-approve-permissions', request.tool_slug, [], 'request-approve-permissions-help')+'<span class="field-help" id="request-approve-permissions-help">Apri l’elenco e seleziona i permessi con le checkbox.</span></div>' +
         '<label class="full-row">Nota opzionale<br><textarea id="request-approve-note" rows="3"></textarea></label>' +
         '</div>' +
         '<p class="danger" id="request-approve-error" role="alert"></p>' +
         '<div class="form-actions"><button class="primary" type="submit">Approva e salva grant</button><button class="secondary" id="request-approve-cancel" type="button">Annulla</button></div>' +
         '</form>';
+      bindPermissionPicker('request-approve-permissions');
       document.getElementById('request-approve-cancel').onclick = () => { state.view = 'requests'; render(); };
       document.getElementById('request-approve-form').onsubmit = async event => {
         event.preventDefault();

@@ -54,7 +54,7 @@ Opzione A - utente gia noto:
 
 1. Cercare utente per email o Google sub.
 2. Aprire il dettaglio dell'utente: la tabella `Tool e autorizzazioni` mostra un grant per riga, con ruolo, permessi, stato e scadenza.
-3. Usare `Aggiungi tool`, scegliere il tool dal menu a tendina e selezionare uno o piu permessi tra le permission key registrate per quel tool.
+3. Usare `Aggiungi tool`, scegliere il tool dal menu a tendina e aprire l'elenco dei permessi: le checkbox mostrano solo le permission key registrate per quel tool.
 4. Salvare.
 
 Opzione B - utente non ancora entrato:
@@ -71,7 +71,7 @@ Le email per grant pendenti devono essere ben formate e usare un dominio present
 - Nel dettaglio di un tool, un `platform_admin` vede una riga per ogni utente gia registrato su Access Layer, con accesso effettivo, ruoli, permission key e stato dei grant. Da qui puo concedere un grant a chi non e autorizzato o gestire quelli esistenti. L'implementazione v1 usa l'attuale limite di 200 righe delle API Admin; pianificare paginazione server-side prima di superarlo.
 - Nel dettaglio di un utente, la tabella `Tool e autorizzazioni` raccoglie tutti i grant dell'utente. L'elenco Utenti resta quindi una riga per persona, non una riga per combinazione utente/tool.
 - Un `tool_admin` resta limitato ai tool assegnati: nel dettaglio tool vede i grant visibili per il proprio perimetro, ma non l'elenco completo degli utenti non autorizzati.
-- I menu dei tool mostrano il catalogo attualmente visibile all'admin; i selettori dei permessi espongono solo le permission key registrate per il tool scelto. Un grant role-only con `permissions=[]` resta valido.
+- I menu dei tool mostrano il catalogo attualmente visibile all'admin; l'elenco espandibile dei permessi usa checkbox e mostra solo le permission key registrate per il tool scelto. Un grant role-only con `permissions=[]` resta valido.
 
 ## Bulk import/export grant
 

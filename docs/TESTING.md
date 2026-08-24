@@ -1,5 +1,11 @@
 # TESTING.md
 
+## Step 1.5 production-continuity evidence checks
+
+`scripts/validate_production_continuity.py` validates `operations/production-continuity.evidence.yml` against its v1 JSON Schema, rejects secret-bearing fields/values, and separately evaluates readiness. Exit codes are `0` (`READY`), `2` (`VALID_BUT_NOT_READY`) and `1` (`INVALID`). The committed bundle is expected to return exit `2` until live operator evidence and a later isolated restore exist.
+
+Python tests cover the committed incomplete state, false `READY` claims, secret rejection without value echoing, and a fully synthetic ready bundle. Vitest covers sensitive environment presence-only output, public-JWK fingerprint safety and PostgreSQL helper fail-closed source constraints. No test in Step 1.5 connects to production or runs a restore/upgrade.
+
 ## Test strategy
 
 Testing must cover authentication, authorization, denial paths, token lifecycle, admin changes and audit logging.

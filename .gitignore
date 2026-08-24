@@ -36,3 +36,9 @@ Thumbs.db
 tmp/
 .cache/
 .local/
+
+# Operator-collected continuity evidence is sensitive operational metadata.
+# Only the redacted, versioned template is committed.
+operations/*.local.yml
+operations/*.local.yaml
+operations/evidence-artifacts/

@@ -2,16 +2,27 @@
 
 ## Status
 
-`DOCUMENTED_NOT_RUN`. Step 1 did not receive two real Access Layer versions or immutable deployable images and therefore cannot claim session or refresh survival.
+`DOCUMENTED_NOT_RUN`. Step 1.5 did not receive two real Access Layer versions or immutable deployable images, a verified production backup, or an isolated restored database and therefore cannot claim session or refresh survival.
+
+## Step 1.5 evidence gate
+
+Before selecting N or executing this harness, an authorised operator must complete `operations/production-continuity.evidence.yml` according to `operations/PRODUCTION_CONTINUITY_COLLECTION.md` and obtain a `READY` result from:
+
+```sh
+python scripts/validate_production_continuity.py <reviewed-redacted-evidence.yml>
+```
+
+The gate supplies the observed live topology, immutable N identity, real PostgreSQL storage mapping, backup/restore proof, schema and migration metadata, continuity-sensitive environment presence, public JWT `kid`/fingerprint, deployment settings, owners, and registry record. Repository expectations cannot substitute for observed fields. The validator does not start the harness or update platform manifests.
 
 ## Preconditions
 
-1. Identify immutable version N and N+1 image digests built from reviewed commits.
-2. Restore a sanitized production-shaped PostgreSQL backup into an isolated test environment.
-3. Use the same JWT signing key, `JWT_PUBLIC_KEY_ID`, `SESSION_SECRET`, token pepper, encryption configuration and schema state for the controlled transition.
-4. Verify the Compose/Coolify volume mapping and take a restorable backup before any upgrade exercise.
-5. Register a synthetic tool/client and synthetic Workspace identity; never copy live credentials or tokens.
-6. Capture config, migration and image digests in the test report.
+1. Require a reviewed production-continuity evidence bundle with status `READY`; preserve its hash in the test report.
+2. Identify immutable version N and N+1 image digests built from reviewed commits. N must match the reviewed live identity where observable.
+3. Restore the evidence bundle's identified, verified PostgreSQL backup into an isolated test environment.
+4. Use the same JWT signing key, `JWT_PUBLIC_KEY_ID`, `SESSION_SECRET`, token pepper, encryption configuration and schema state for the controlled transition.
+5. Verify the Compose/Coolify volume mapping and take a restorable backup before any upgrade exercise.
+6. Register a synthetic tool/client and synthetic Workspace identity; never copy live credentials or tokens.
+7. Capture evidence-bundle, config, migration and image digests in the test report.
 
 ## Harness sequence
 

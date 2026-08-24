@@ -781,3 +781,29 @@ Related task: Step 1 only — template adoption and legacy compatibility freeze.
 - Non-strict platform check passed: 24 checks, eight explicit warnings.
 - Python template/conformance suite passed: 34 tests, two pristine-template bootstrap tests skipped after adoption.
 - Strict platform release check was run and failed only on the six documented ownership/deployment/backup/registry/volume release gates in `STEP_1_HANDOFF.md`.
+
+## 2026-08-24 - Step 1.5 workspace hygiene and continuity evidence preparation
+
+Changed by: Codex
+Related task: Step 1.5 only — deterministic line endings and production-continuity evidence preparation.
+
+### Changed
+
+- Added deterministic Git line-ending rules and safely renormalized tracked files; no existing tracked file required a content rewrite.
+- Added the v1 production-continuity evidence schema and an intentionally `NOT_READY` redacted bundle.
+- Added a fail-closed, read-only evidence validator and tests for incomplete, invalid/unsafe and synthetic-ready cases.
+- Added read-only helpers for allowlisted runtime/environment-presence facts, public JWKS fingerprints, and PostgreSQL schema/migration metadata.
+- Added the manual Coolify/storage/backup collection runbook and connected the future N→N+1 plan to the evidence gate.
+- Recorded the evidence-gate decision and preserved all live-fact blockers.
+
+### Behavior
+
+- Production runtime behavior changed: no.
+- Database migrations or data changes: no.
+- Compose, Coolify or production configuration changes: no.
+- Secrets or environment values rotated: no.
+- Deployment or package publication: no.
+
+### Checks
+
+- Final command results are recorded in `STEP_1_5_HANDOFF.md`.

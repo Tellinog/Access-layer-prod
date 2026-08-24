@@ -5,6 +5,7 @@
 - Confirm who receives bootstrap platform admin access after first deploy.
 - 2026-08-24: `docker-compose.yaml` mounts `access_layer_postgres_data_v2` but declares `access_layer_postgres_data`. Do not rename either value or deploy until the live Coolify volume mapping is identified and a verified backup/restore point exists.
 - 2026-08-24: production deployment remains blocked until exact Coolify server/project/resource/destination identifiers and the central registry record are verified.
+- 2026-08-24 Step 1.5: `operations/production-continuity.evidence.yml` is intentionally `NOT_READY`; the actual PostgreSQL storage identity, verified backup, and isolated restore result remain unproven. Do not deploy, rename volumes, or begin N→N+1 execution.
 
 ## RESOLVED
 
@@ -29,6 +30,8 @@
 - 2026-08-24: confirm Nancy's production callback and live registration; only its local callback was present in the supplied evidence.
 - 2026-08-24: approve measurable availability, latency, correctness, error-budget and alert-window SLO targets; repository evidence does not define them.
 - 2026-08-24: export the live tool, callback and permission catalogue before asserting that the repository-only capability inventory is operationally complete.
+- 2026-08-24 Step 1.5: provide the exact Coolify server/project/environment/resource/destination identifiers, current live domain, deployed revision/image identity, replica/deploy/auto-deploy facts and named continuity operator.
+- 2026-08-24 Step 1.5: identify the authoritative central deployment registry location and the Access Layer record identifier/evidence reference.
 
 ## ASSUMPTION_TO_VALIDATE
 
@@ -47,6 +50,7 @@
 - 2026-08-24: the named central deployment registry ID is `unguess-coolify-deployments`; its authoritative location and record ownership remain unverified.
 - 2026-08-24: Nancy, Test Generator and Goodman in-memory refresh locks are sufficient only for their observed single-replica assumptions; multi-replica safety is not proven.
 - 2026-08-24: Petyr's supplied registration and code are deployed as inspected. Evidence contains a superseded Access Layer origin and a permission used in code but absent from the supplied tool registration.
+- 2026-08-24 Step 1.5: repository expectations (app `8080`, PostgreSQL `5432` private, no public host-port mapping, target domain) match the live Coolify topology. They remain unverified observations.
 
 ## DEFERRED_SCOPE
 
@@ -63,6 +67,7 @@
 - MCP exposure and stable platform capability/OAuth-scope mapping.
 - Garden UI migration and English-first UI translation/redesign.
 - N→N+1 survival execution until two real immutable versions/images and an isolated production-shaped database are available.
+- Production-like backup restore and N→N+1 execution; Step 1.5 prepares evidence only and does not run either operation.
 
 ## RESOLVED_2026_06_17
 

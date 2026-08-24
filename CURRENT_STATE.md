@@ -4,6 +4,15 @@
 
 V1 implementation scaffold complete, with local dependency, typecheck, build and automated test verification complete. Environment-backed integration verification remains pending.
 
+## Step 1.5 workspace hygiene and continuity evidence preparation, 2026-08-24
+
+- Repository line endings are deterministic: text is LF by default, Windows command scripts remain CRLF, and common binary assets are marked binary. Renormalization produced no tracked content changes beyond `.gitattributes`.
+- A versioned production-continuity evidence schema, intentionally incomplete `NOT_READY` bundle, fail-closed validator, read-only metadata helpers and manual Coolify/terminal collection checklist are present.
+- The evidence model separates the unobserved live/current domain from the documented intended target `https://access-layer.unguess-internal.net`, and separates all observed runtime fields from repository expectations.
+- No live facts were inferred or copied into `project.platform.yaml` or `deployment.registration.yaml`. Coolify identifiers, owners, central registry proof, backup schedule/retention, real volume identity and isolated restore result remain unresolved.
+- The Compose mismatch remains unchanged: PostgreSQL references `access_layer_postgres_data_v2`, while the top-level volume declaration is `access_layer_postgres_data`. Deployment remains blocked.
+- The N→N+1 harness consumes a future `READY` evidence bundle but remains `DOCUMENTED_NOT_RUN`; no restore, upgrade, OAuth/OIDC, runtime, database, secret, deployment or production-configuration action occurred.
+
 ## Current status
 
 This repository now contains the product/security/API/data specifications plus a Node.js/TypeScript Fastify implementation for the Access Layer Google SSO v1 service.

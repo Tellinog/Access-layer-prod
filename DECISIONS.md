@@ -321,3 +321,15 @@ Confirmed: 2026-08-24
 Decision: the repository-observed v1 endpoints, callback, JWT/JWKS, session, refresh, grant, cookie, error and database contracts are frozen in `specs/legacy-contract-baseline.v1.json`. Step 1 makes no runtime or database change. The Compose reference `access_layer_postgres_data_v2` and declaration `access_layer_postgres_data` must remain untouched, and deployment is prohibited until the live Coolify mapping and a verified backup are available.
 
 Rationale: preserving active sessions, refresh tokens, grant semantics and PostgreSQL continuity is more important than normalizing configuration whose live binding is unknown.
+
+## D-033 - Require a redacted production-continuity evidence gate
+
+Status: accepted
+
+Confirmed: 2026-08-24
+
+Decision: production continuity facts are captured in a versioned, schema-validated evidence bundle that distinguishes observed live state from repository expectations. The committed Step 1.5 bundle remains `NOT_READY`. It may become `READY` only when the validator confirms all Coolify, domain, runtime, storage, backup/restore, database metadata, environment-presence, public-key, registry, ownership and approval evidence. Validation is read-only and never propagates values into platform manifests or production.
+
+Sensitive environment variables are recorded only as presence booleans. Public JWT `kid` and public-key SHA-256 fingerprints are allowed; secrets, private keys, connection strings, cookies, tokens and personal rows are forbidden. The Compose volume mismatch remains untouched.
+
+Rationale: later runtime work needs reproducible continuity proof without turning an evidence file or collection command into a secret-export path, and without mistaking declared configuration for live state.

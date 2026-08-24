@@ -1,5 +1,9 @@
 # SECURITY.md
 
+## Production continuity evidence safety
+
+Continuity evidence may contain operational identifiers and public JWT key metadata, but never tokens, cookies, authorization codes, client secrets, private keys, passwords, database connection strings, session secrets, peppers, backup encryption keys or personal rows. Continuity-sensitive environment variables are represented only by presence booleans. Operator artifacts stay outside the repository or in ignored local evidence paths; committed evidence must be redacted and reviewed.
+
 ## Authentication
 
 Access Layer authenticates users through Google OpenID Connect.

@@ -1,5 +1,11 @@
 # DEPLOYMENT.md
 
+## Step 1.5 continuity gate
+
+Deployment remains prohibited while `operations/production-continuity.evidence.yml` is `NOT_READY`. Follow `operations/PRODUCTION_CONTINUITY_COLLECTION.md` to obtain live Coolify topology, exact PostgreSQL storage mapping, backup/restore, ownership and registry evidence. The validator is read-only and must not be used to populate deployment manifests automatically.
+
+Do not rename `access_layer_postgres_data_v2` or `access_layer_postgres_data`, create a replacement production volume, alter Coolify configuration, or deploy as part of evidence collection.
+
 ## Environments
 
 | Environment | Purpose | URL pattern |

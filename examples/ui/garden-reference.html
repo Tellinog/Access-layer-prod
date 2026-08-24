@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UNGUESS Garden UI reference</title>
+  <link rel="stylesheet" href="../../assets/brand/garden.css">
+  <style>
+    .reference-actions { display: flex; flex-wrap: wrap; gap: var(--garden-space-3); }
+    .reference-section { margin-top: var(--garden-space-10); }
+    .reference-stack { display: grid; gap: var(--garden-space-4); }
+    .reference-metric { font-size: 2rem; line-height: 1.1; color: var(--garden-navy); font-weight: 700; }
+    .reference-note { color: var(--garden-text-secondary); max-width: 70ch; }
+    .reference-nav-link { color: var(--garden-background); }
+  </style>
+</head>
+<body>
+  <div class="garden-shell">
+    <header class="garden-header">
+      <div class="garden-header__inner">
+        <strong>UNGUESS Garden</strong>
+        <nav aria-label="Reference navigation">
+          <a class="reference-nav-link" href="#components">Components</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="garden-main">
+      <section class="garden-hero" aria-labelledby="hero-title">
+        <div class="garden-hero__content">
+          <span class="garden-badge garden-badge--info">Design contract v1</span>
+          <h1 id="hero-title">A consistent, accessible foundation for internal tools</h1>
+          <p>Use English-first copy, Garden tokens and explicit AI, access and monitoring states. White text remains on the dark side of the approved gradient.</p>
+          <div class="reference-actions">
+            <button class="garden-button garden-button--on-dark" type="button">Open project</button>
+            <button class="garden-button garden-button--secondary" type="button">View documentation</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="components" class="reference-section" aria-labelledby="components-title">
+        <h2 id="components-title">Core components</h2>
+        <p class="reference-note">This file is a static implementation reference, not a production component library. Adopt the tokens and interaction rules in the project's chosen framework.</p>
+
+        <div class="garden-grid">
+          <article class="garden-card reference-stack">
+            <h3>Actions</h3>
+            <div class="reference-actions">
+              <button class="garden-button garden-button--primary" type="button">Primary action</button>
+              <button class="garden-button garden-button--secondary" type="button">Secondary</button>
+              <button class="garden-button garden-button--primary" type="button" disabled>Unavailable</button>
+            </div>
+          </article>
+
+          <article class="garden-card reference-stack">
+            <h3>Form control</h3>
+            <div class="garden-field">
+              <label class="garden-label" for="project-name">Project name</label>
+              <input class="garden-input" id="project-name" name="project-name" value="Template Project" aria-describedby="project-name-help">
+              <span class="garden-help" id="project-name-help">Use an English product name and a stable kebab-case slug.</span>
+            </div>
+          </article>
+
+          <article class="garden-card reference-stack">
+            <h3>Service health</h3>
+            <span class="garden-badge garden-badge--success">Operational</span>
+            <div class="reference-metric" aria-label="99.95 per cent availability">99.95%</div>
+            <p class="reference-note">Synthetic availability and product adoption are separate measurements.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="reference-section" aria-labelledby="ai-title">
+        <h2 id="ai-title">AI transparency and oversight</h2>
+        <div class="garden-alert garden-alert--ai" role="status">
+          <span class="garden-alert__title">AI-assisted draft</span>
+          Review claims, figures and supporting sources before approval. This draft cannot be published or delivered externally until an authorised person approves it.
+        </div>
+        <div class="reference-actions" style="margin-top:var(--garden-space-4)">
+          <button class="garden-button garden-button--primary" type="button">Approve draft</button>
+          <button class="garden-button garden-button--secondary" type="button">Request changes</button>
+          <button class="garden-button garden-button--danger" type="button">Reject draft</button>
+        </div>
+      </section>
+
+      <section class="reference-section" aria-labelledby="table-title">
+        <h2 id="table-title">Capability status</h2>
+        <div class="garden-table-wrap">
+          <table class="garden-table">
+            <thead>
+              <tr>
+                <th scope="col">Capability</th>
+                <th scope="col">Channel</th>
+                <th scope="col">Access</th>
+                <th scope="col">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>template-project:example:read</code></td>
+                <td>Web, API, MCP</td>
+                <td>Legacy + OAuth dual run</td>
+                <td><span class="garden-badge garden-badge--success">Ready</span></td>
+              </tr>
+              <tr>
+                <td><code>template-project:example:generate</code></td>
+                <td>API, MCP</td>
+                <td>Approval required</td>
+                <td><span class="garden-badge garden-badge--warning">Example only</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,23 @@
+schema_version: 1
+project_slug: access-layer
+implementation_status: not_integrated
+step_1_rule: No telemetry SDK or Platform SDK dependency adoption is permitted.
+current_observability:
+  structured_application_logs: true
+  database_audit_log: true
+  correlation_ids: true
+  health_endpoint: /health
+  opentelemetry: false
+  otlp_export: false
+  tool_observatory_registration: false
+  synthetic_monitor_registration: false
+target_architecture:
+  instrumentation_source: unguess-platform-sdk
+  technical_destination: unguess-observability-stack
+  management_product: tool-observatory
+  adoption_status: deferred_scope
+privacy:
+  raw_tokens_forbidden: true
+  raw_secrets_forbidden: true
+  user_identity_metric_labels_forbidden: true
+  audit_fields_contract: ../schemas/events.schema.json

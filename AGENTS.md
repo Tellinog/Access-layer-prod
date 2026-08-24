@@ -21,17 +21,21 @@ If something is not documented, ambiguous or contradictory:
 Before working on any task, read these files in this order:
 
 1. `AGENTS.md`
-2. `ACCESS_LAYER_INTEGRATION_URL_SPEC.md`
-3. `CURRENT_STATE.md`
-4. `BACKLOG.md`
-5. `DECISIONS.md`
-6. `README.md`
-7. `docs/SCOPE.md`
-8. `docs/DOMAIN.md`
-9. `docs/ARCHITECTURE.md`
-10. `docs/SECURITY.md`
-11. `docs/API.md`
-12. `docs/TESTING.md`
+2. `project.platform.yaml`
+3. `deployment.registration.yaml`
+4. `ACCESS_LAYER_INTEGRATION_URL_SPEC.md`
+5. `CURRENT_STATE.md`
+6. `BACKLOG.md`
+7. `DECISIONS.md`
+8. `README.md`
+9. `docs/PLATFORM_CONTRACT.md`
+10. `docs/LEGACY_COMPATIBILITY.md`
+11. `docs/SCOPE.md`
+12. `docs/DOMAIN.md`
+13. `docs/ARCHITECTURE.md`
+14. `docs/SECURITY.md`
+15. `docs/API.md`
+16. `docs/TESTING.md`
 
 Then read task-specific documents:
 
@@ -42,18 +46,22 @@ Then read task-specific documents:
 - Logging/audit work: `docs/LOGGING.md`, `docs/ANALYTICS.md`, `schemas/events.schema.json`, `examples/events/`
 - Deployment/devops work: `DEPLOY.md`, `docs/DEPLOYMENT.md`, `.env.example`, `scripts/`
 - Implementation planning: `docs/IMPLEMENTATION_PLAN.md`, `prompts/CODEX_SHORT_PROMPT.md`
+- Platform/template adoption: `PLATFORM_ADOPTION_REPORT.md`, `STEP_1_HANDOFF.md`, `specs/legacy-contract-baseline.v1.json`
+- Deployment changes: also read `project.platform.yaml`, `deployment.registration.yaml`, `docs/COOLIFY_DEPLOYMENT.md`, `docs/RUNBOOK.md`
+- Compatibility work: `LEGACY_COMPATIBILITY_MATRIX.md`, `CONSUMER_COMPATIBILITY_MATRIX.md`, `N_TO_N_PLUS_1_SURVIVAL_PLAN.md`
 
 ## Source of truth hierarchy
 
 When sources conflict, use this hierarchy:
 
-1. `specs/` for machine-readable rules and policies
-2. `schemas/` for formal data/API/event/config shapes
-3. `docs/` for human-readable product, domain, UX, architecture and operational rules
-4. `DECISIONS.md` for accepted decisions and rationale
-5. `CURRENT_STATE.md` for current status and known constraints
-6. `BACKLOG.md` for open questions and unresolved items
-7. code comments and implementation details only after the above
+1. `project.platform.yaml` and `deployment.registration.yaml` for platform/deployment classification
+2. `specs/` for machine-readable rules, policies and the frozen compatibility baseline
+3. `schemas/` for formal data/API/event/config shapes
+4. `docs/` and the Step 1 reports for human-readable product, domain, UX, architecture and operational rules
+5. `DECISIONS.md` for accepted decisions and rationale
+6. `CURRENT_STATE.md` for current status and known constraints
+7. `BACKLOG.md` for open questions and unresolved items
+8. code comments and implementation details only after the above
 
 If there is a conflict between these sources, stop on the conflicting part and add an item to `BACKLOG.md`.
 
@@ -84,6 +92,17 @@ Do not log secrets, authorization codes, ID tokens, access tokens, refresh token
 All required environment variables must be documented in `.env.example` and `docs/DEPLOYMENT.md` or `DEPLOY.md`.
 
 Never hardcode secrets.
+
+## Template v2.1 legacy-migration rules
+
+- This repository is a `platform_service` in `legacy-migration` mode.
+- Preserve the machine-readable v1 baseline in `specs/legacy-contract-baseline.v1.json`; a change to a frozen endpoint, payload, claim, status, TTL, cookie, permission, error or database contract requires explicit approval and a new compatibility decision.
+- OAuth/OIDC, MCP, Garden UI conversion, English-first UI conversion, OpenTelemetry, Tool Observatory and Platform SDK files describe target/reference states unless `CURRENT_STATE.md` explicitly marks an implementation complete.
+- Do not infer that copied template assets are runtime-adopted.
+- Coolify deployments must have no public host-port mapping. PostgreSQL must remain private.
+- Do not deploy or rename either Compose volume reference while the `access_layer_postgres_data_v2` versus `access_layer_postgres_data` continuity blocker is open.
+- Do not claim N→N+1 session or refresh survival without two immutable real versions/images and the evidence required by `N_TO_N_PLUS_1_SURVIVAL_PLAN.md`.
+- Garden and English-first rules apply to future UI work; the existing UI is frozen in Step 1 and must not be silently translated or redesigned.
 
 ## Definition of Done
 

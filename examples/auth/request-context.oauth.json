@@ -1,0 +1,23 @@
+{
+  "auth_profile": "unguess-oauth-oidc-v1",
+  "principal_type": "human",
+  "principal_id": "usr_example_001",
+  "delegated_subject": null,
+  "actor_id": "service:agent-gateway",
+  "client_id": "agent-gateway",
+  "project_slug": "template-project",
+  "resource_id": "https://template-project.unguess-internal.net/api",
+  "capability_id": "template-project:example:read",
+  "permissions": [],
+  "scopes": [
+    "template-project:example:read"
+  ],
+  "invocation_channel": "mcp",
+  "access_session_id": "oauth_session_example_001",
+  "authorization_grant_id": null,
+  "token_id": "jti_oauth_example_001",
+  "correlation_id": "corr_context_oauth_001",
+  "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+  "environment": "staging",
+  "request_started_at": "2026-08-17T10:00:00Z"
+}

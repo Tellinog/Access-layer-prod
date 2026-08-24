@@ -76,3 +76,6 @@ Default retention:
 - one-time codes: delete after expiration + 24 hours;
 - revoked sessions: keep 90 days unless compliance requires longer;
 - users: keep while account or logs require linkage, then pseudonymize if needed.
+# Step 1 continuity note
+
+The production Compose file currently mounts `access_layer_postgres_data_v2` but declares `access_layer_postgres_data`. This mismatch is frozen as a continuity blocker. Do not rename either side, migrate data or deploy until the live Coolify mapping and a verified backup/restore point are available. The machine database baseline is `../specs/legacy-contract-baseline.v1.json`.

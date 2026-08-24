@@ -1,0 +1,25 @@
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "resultType": "complete",
+    "_meta": {
+      "io.modelcontextprotocol/serverInfo": {
+        "name": "template-project",
+        "version": "0.1.0"
+      }
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Example example-001 is active."
+      }
+    ],
+    "structuredContent": {
+      "id": "example-001",
+      "name": "Example resource",
+      "status": "active"
+    },
+    "isError": false
+  }
+}

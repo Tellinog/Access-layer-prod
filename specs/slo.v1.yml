@@ -1,0 +1,17 @@
+schema_version: 1
+project_slug: access-layer
+tier: standard
+status: objectives_unapproved
+measurement_window_days: 28
+current_evidence:
+  health_endpoint: /health
+  structured_logs: true
+  audit_log: true
+  opentelemetry: false
+  external_synthetic_monitor: unverified
+objectives: []
+error_budget:
+  policy: unresolved-see-backlog
+  owner: unresolved-see-backlog
+alerting:
+  burn_rate_windows: unresolved-see-backlog

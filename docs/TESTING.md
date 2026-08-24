@@ -235,3 +235,6 @@ Automated Admin UI/API tests must cover:
 - deleting the reserved `access-admin` tool is denied.
 
 Verification for the 2026-06-22 update: `npm run lint`, `npm run build` and `npm test` passed locally with 9 files and 92 tests.
+# Step 1 conformance
+
+`tests/legacy-contract-baseline.test.ts` verifies normalized source hashes, every observed `/v1/*` method/path, error/status mappings, migration hashes, the known Compose volume mismatch, absence of OAuth/OIDC runtime additions and synthetic golden shapes. Template conformance tests under `tests/platform-conformance/` validate the additive platform records. The future live-version procedure is `../N_TO_N_PLUS_1_SURVIVAL_PLAN.md`; it is not a passing test until two immutable images are exercised.

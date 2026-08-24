@@ -1,0 +1,15 @@
+schema_version: 1
+project_slug: access-layer
+current_state:
+  profile: legacy_unguess_admin_ui
+  embedded_css: true
+  garden_runtime_integration: false
+target_state:
+  profile: unguess-garden-v1
+  accessibility_target: wcag-2.2-aa
+  token_source: ../assets/brand/garden.tokens.json
+  reduced_motion_required: true
+adoption:
+  status: deferred_scope
+  reason: Step 1 forbids UI translation or redesign; copied Garden assets are reference-only.
+  runtime_change: false

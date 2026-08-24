@@ -1,0 +1,13 @@
+{
+  "slug": "template-project",
+  "display_name": "Template Project",
+  "description": "Project created from Agent Ready Project Template v2.1.",
+  "owner_email": "project-owner@example.invalid",
+  "allowed_return_urls": [
+    "https://template-project.unguess-internal.net/auth/callback"
+  ],
+  "permission_keys": [
+    "template-project:example:read",
+    "template-project:admin:manage"
+  ]
+}

@@ -1,0 +1,247 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://platform.unguess-internal.net/schemas/ai-events.schema.json",
+  "title": "UNGUESS AI governance event",
+  "type": "object",
+  "required": [
+    "specversion",
+    "id",
+    "type",
+    "source",
+    "time",
+    "subject",
+    "data"
+  ],
+  "properties": {
+    "specversion": {
+      "const": "1.0"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 8
+    },
+    "type": {
+      "enum": [
+        "ai.capability.started",
+        "ai.capability.completed",
+        "ai.capability.failed",
+        "ai.output.approved",
+        "ai.output.rejected",
+        "ai.output.edited",
+        "ai.policy.denied",
+        "ai.provider.fallback",
+        "ai.model.changed",
+        "ai.incident.created"
+      ]
+    },
+    "source": {
+      "type": "string",
+      "minLength": 2
+    },
+    "time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "subject": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]+(?::[a-z][a-z0-9-]+){1,}$"
+    },
+    "datacontenttype": {
+      "const": "application/json"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "event_version",
+        "project_slug",
+        "environment",
+        "release",
+        "capability_id",
+        "use_case_id",
+        "profile",
+        "provider",
+        "model_id",
+        "prompt_version",
+        "outcome",
+        "invocation_channel",
+        "correlation_id"
+      ],
+      "properties": {
+        "event_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "project_slug": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{1,62}$"
+        },
+        "environment": {
+          "type": "string",
+          "minLength": 2
+        },
+        "release": {
+          "type": "string",
+          "minLength": 1
+        },
+        "capability_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]+(?::[a-z][a-z0-9-]+){1,}$"
+        },
+        "use_case_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9.-]{2,100}$"
+        },
+        "profile": {
+          "enum": [
+            "assistive_generation",
+            "decision_support",
+            "autonomous_action",
+            "high_risk_candidate"
+          ]
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 2
+        },
+        "underlying_provider": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prompt_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcome": {
+          "enum": [
+            "started",
+            "success",
+            "failure",
+            "denied",
+            "fallback",
+            "approved",
+            "rejected",
+            "edited",
+            "incident"
+          ]
+        },
+        "review_status": {
+          "enum": [
+            "not_applicable",
+            "pending",
+            "approved",
+            "rejected",
+            "edited"
+          ]
+        },
+        "invocation_channel": {
+          "enum": [
+            "web",
+            "api",
+            "mcp",
+            "worker"
+          ]
+        },
+        "actor_type": {
+          "enum": [
+            "human",
+            "service",
+            "synthetic"
+          ]
+        },
+        "actor_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Pseudonymous identifier only."
+        },
+        "correlation_id": {
+          "type": "string",
+          "minLength": 8
+        },
+        "trace_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{32}$"
+        },
+        "duration_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "input_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "output_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cost": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "currency": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Z]{3}$"
+        },
+        "reason_code": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Z][A-Z0-9_]{2,80}$"
+        },
+        "evaluation_flags": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{1,63}$"
+          }
+        }
+      },
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "access_token",
+            "refresh_token",
+            "authorization_code",
+            "client_secret",
+            "cookie",
+            "prompt",
+            "raw_prompt",
+            "raw_output",
+            "document_content",
+            "email",
+            "google_sub"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

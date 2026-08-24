@@ -1,5 +1,7 @@
 # Access Layer Google SSO
 
+> Platform status (2026-08-24): Template v2.1 is adopted in `legacy-migration` mode. Read `PLATFORM_ADOPTION_REPORT.md` and `STEP_1_HANDOFF.md`. Deployment is blocked by the unresolved PostgreSQL volume mapping; do not deploy until `BACKLOG.md` records resolution.
+
 Layer di accesso condiviso per tool web interni aziendali.
 
 Il servizio centralizza autenticazione, autorizzazione e audit trail per tutti i tool interni. Gli utenti accedono con account Google aziendale; il layer verifica che l'identita appartenga al dominio Google Workspace aziendale, controlla se l'utente e autorizzato al tool richiesto, registra il tentativo di accesso e rilascia al tool una identita verificata.

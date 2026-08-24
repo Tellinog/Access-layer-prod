@@ -137,3 +137,6 @@ Then test:
 - a new tool can be created and its secret copied;
 - a company user without grant creates an access request;
 - an external Google account is denied without creating an approvable access request.
+# Step 1 deployment block
+
+Do not deploy this revision while the PostgreSQL Compose volume reference/declaration mismatch is unresolved. Verify the live Coolify volume mapping and a restorable backup before changing either volume name. See `PLATFORM_ADOPTION_REPORT.md` and `BACKLOG.md`.

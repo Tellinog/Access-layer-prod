@@ -1,0 +1,192 @@
+schema_version: 1
+suite: platform-conformance
+status: normative
+cases:
+- id: PLATFORM-001
+  area: manifest
+  priority: p0
+  title: Project manifest validates against the platform schema
+  expected: project.platform.yaml has no schema violations.
+- id: PLATFORM-002
+  area: capability
+  priority: p0
+  title: Capability identifiers are aligned
+  expected: capability_id, legacy permission and OAuth scope are identical colon-separated
+    values, with explicit OpenAPI and MCP mappings.
+- id: PLATFORM-003
+  area: authorization
+  priority: p0
+  title: Undeclared capability is denied
+  expected: The project denies a capability absent from the manifest even when a gateway
+    forwards the request.
+- id: PLATFORM-004
+  area: authorization
+  priority: p0
+  title: Wrong OAuth audience is rejected
+  expected: A valid token issued for another resource receives 401 and is not introspected
+    as an authorization substitute.
+- id: PLATFORM-005
+  area: authorization
+  priority: p0
+  title: Insufficient OAuth scope is rejected
+  expected: The request receives 403 with a useful WWW-Authenticate challenge and
+    no business operation is executed.
+- id: PLATFORM-006
+  area: request_context
+  priority: p0
+  title: Legacy and OAuth adapters invoke the same application service
+  expected: Equivalent authorised principals receive equivalent business results without
+    transport-specific business logic.
+- id: PLATFORM-006A
+  area: authorization
+  priority: p0
+  title: Authentication coexistence is not credential fallback
+  expected: A request with invalid OAuth credentials is rejected without trying the
+    legacy profile, and a request carrying both credential profiles is rejected as
+    ambiguous.
+- id: PLATFORM-007
+  area: api
+  priority: p0
+  title: OpenAPI request and response schemas are enforced
+  expected: Invalid inputs are rejected and successful structured responses conform
+    to the declared schema.
+- id: PLATFORM-008
+  area: mcp
+  priority: p0
+  title: MCP tools are filtered by current authorization
+  expected: A client cannot list or call a tool without its required scope; the project
+    also enforces authorization after the gateway.
+- id: PLATFORM-009
+  area: mcp
+  priority: p0
+  title: Every MCP request contains required per-request metadata
+  expected: Protocol version, client information and client capabilities are carried
+    in params._meta and resultType is present in responses.
+- id: PLATFORM-010
+  area: mcp
+  priority: p0
+  title: MCP HTTP origin and bearer handling are safe
+  expected: Disallowed Origin values are rejected, access tokens are accepted only
+    in Authorization headers and no token passthrough occurs.
+- id: PLATFORM-011
+  area: telemetry
+  priority: p0
+  title: Telemetry outage does not fail the business request
+  expected: Collector and event-ingestion failures are bounded, observable and non-blocking.
+- id: PLATFORM-012
+  area: telemetry
+  priority: p0
+  title: User identity is absent from metric labels
+  expected: No email, provider subject, principal ID, session ID, prompt or raw payload
+    appears in technical metric labels.
+- id: PLATFORM-013
+  area: observability
+  priority: p1
+  title: Trace context propagates across gateway and project
+  expected: The same trace can correlate Agent Gateway, project service and approved
+    downstream calls.
+- id: PLATFORM-014
+  area: analytics
+  priority: p1
+  title: Capability outcome event is emitted once
+  expected: A versioned, deduplicable success/failure/denied event is emitted without
+    raw user content.
+- id: PLATFORM-015
+  area: monitoring
+  priority: p0
+  title: Liveness and readiness have distinct semantics
+  expected: Liveness reports the process state; readiness returns unavailable when
+    a critical dependency prevents safe traffic.
+- id: PLATFORM-016
+  area: language
+  priority: p0
+  title: Product and technical contracts are English-first
+  expected: UI, API, MCP, operational copy and documentation use English, while user
+    content retains its original language.
+- id: PLATFORM-017
+  area: accessibility
+  priority: p0
+  title: Garden controls meet the accessibility baseline
+  expected: Keyboard operation, focus visibility, reduced motion, labels, status semantics
+    and contrast pass the approved WCAG 2.2 AA checks.
+- id: PLATFORM-018
+  area: ai_governance
+  priority: p0
+  title: Undeclared AI use is blocked
+  expected: AI dependencies or provider calls with ai.enabled=false fail conformance
+    and cannot be enabled only through an environment variable.
+- id: PLATFORM-019
+  area: ai_governance
+  priority: p0
+  title: Unknown provider governance blocks production AI
+  expected: Unknown retention, training use, data region, DPA or subprocessor status
+    prevents production activation.
+- id: PLATFORM-020
+  area: ai_oversight
+  priority: p0
+  title: AI-assisted external effect requires human approval
+  expected: The AI output remains a draft and API/MCP cannot bypass the same approval
+    boundary enforced by the web UI.
+- id: PLATFORM-021
+  area: ai_data
+  priority: p0
+  title: Prohibited data is not sent to the model provider
+  expected: Credentials, auth tokens, special-category data and AI-prohibited classes
+    are rejected before provider invocation.
+- id: PLATFORM-022
+  area: rollback
+  priority: p0
+  title: New platform feature flags can be disabled independently
+  expected: OAuth, MCP, service principals, token exchange, AI and telemetry exporters
+    can be disabled without changing the legacy web path.
+- id: PLATFORM-023
+  area: deployment
+  priority: p0
+  title: Runtime project is independently deployable on Coolify
+  expected: The repository declares one Coolify resource by default, a valid build
+    strategy, services, health and rollback without requiring another product repository
+    to be deployed in the same resource.
+- id: PLATFORM-024
+  area: routing
+  priority: p0
+  title: Public domain routes to the declared internal container port
+  expected: The communicated HTTPS hostname and path reach the declared service on
+    its internal container port, and the service listens on 0.0.0.0.
+- id: PLATFORM-025
+  area: ports
+  priority: p0
+  title: Container ports are reusable across Coolify resources
+  expected: Two distinct resources can register the same internal container port without
+    a collision when their domains and Coolify resources are distinct.
+- id: PLATFORM-026
+  area: ports
+  priority: p0
+  title: Unapproved host-port publication is rejected
+  expected: A direct host-port mapping without reason, approver, firewall scope, expiry
+    and central uniqueness fails conformance.
+- id: PLATFORM-027
+  area: registry
+  priority: p0
+  title: Central deployment collisions are rejected
+  expected: Duplicate registration IDs, Coolify resources, exact hostname/path routes
+    and overlapping published host-port bindings fail the registry check.
+- id: PLATFORM-028
+  area: state
+  priority: p0
+  title: State survives a Coolify rebuild and rollback
+  expected: Declared persistent data remains available after redeploy; backups and
+    restore evidence exist where required; the previous application version remains
+    compatible during the rollback window.
+- id: PLATFORM-029
+  area: observability
+  priority: p0
+  title: Per-tool instrumentation uses central observability services
+  expected: The tool exports bounded technical telemetry to the UNGUESS Observability
+    Stack and product events to Tool Observatory without deploying a separate full
+    observability stack inside the tool.
+- id: PLATFORM-030
+  area: sdk
+  priority: p0
+  title: SDK library has no Coolify runtime
+  expected: An sdk_library has no domain, service, container port, database or Coolify
+    resource and is consumed only as a versioned dependency.

@@ -17,3 +17,10 @@ philosophy:
   - no secrets in code or logs
 notes:
   - Added explicit Access Requests workflow for admin notification/approval queue.
+adopted_template:
+  name: Agent Ready Project Template
+  version: 2.1.0
+  mode: legacy-migration
+  adopted_at: 2026-08-24
+  report: PLATFORM_ADOPTION_REPORT.md
+  compatibility_baseline: specs/legacy-contract-baseline.v1.json

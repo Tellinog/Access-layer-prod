@@ -99,3 +99,6 @@ Rollback must preserve audit logs and grants.
 The repeated local Docker requests to `/access-control/health` are expected. They come from the `app.healthcheck` definition in `docker-compose.yml`, not from the browser UI.
 
 The service keeps these checks enabled so Docker/Coolify can identify unhealthy containers, but the health routes use silent request logging to avoid normal log noise.
+# Step 1 deployment block
+
+Do not deploy the Step 1 compatibility-freeze commit. `docker-compose.yaml` mounts `access_layer_postgres_data_v2`, but the top-level volume declaration is `access_layer_postgres_data`. Neither side may be renamed until the live Coolify mapping is identified and a verified backup/restore point exists. The intended topology remains one Coolify Compose service, public app container port 8080 through HTTPS routing, private PostgreSQL and no public host-port mapping.

@@ -8,6 +8,9 @@ prod.env
 
 # Dependencies
 node_modules/
+.platform-deps/
+__pycache__/
+*.pyc
 vendor/
 .venv/
 venv/

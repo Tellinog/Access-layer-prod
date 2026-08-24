@@ -87,3 +87,6 @@ Do not expose production until tests in `docs/TESTING.md` pass for:
 - invalid tool client secret denied;
 - token introspection success and revocation behavior;
 - audit events generated for every path above.
+# Step 1 deployment block
+
+Deployment is prohibited while the Compose PostgreSQL volume reference/declaration mismatch remains unresolved. See `PLATFORM_ADOPTION_REPORT.md` and `BACKLOG.md`. Do not normalize the volume names without live Coolify mapping evidence and a verified backup.

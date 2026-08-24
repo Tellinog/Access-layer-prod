@@ -1,0 +1,59 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "resultType": "complete",
+    "_meta": {
+      "io.modelcontextprotocol/serverInfo": {
+        "name": "template-project",
+        "version": "0.1.0"
+      }
+    },
+    "tools": [
+      {
+        "name": "example_read",
+        "title": "Read example",
+        "description": "Read one example resource. Requires template-project:example:read and has no side effects.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "required": [
+            "example_id"
+          ],
+          "properties": {
+            "example_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "required": [
+            "id",
+            "name",
+            "status"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "status": {
+              "enum": [
+                "active",
+                "inactive"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    ]
+  }
+}

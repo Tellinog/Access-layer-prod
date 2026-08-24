@@ -1,0 +1,66 @@
+version: 1
+status: frozen_step_1
+strategy: legacy_only_no_runtime_change
+machine_baseline: ./legacy-contract-baseline.v1.json
+step_1:
+  oauth_oidc_added: false
+  database_migration_added: false
+  platform_sdk_adopted: false
+  deployment_performed: false
+
+invariants:
+  - id: LEGACY-001
+    priority: p0
+    rule: Existing consumers require no code or configuration change for the OAuth/OIDC additive release.
+  - id: LEGACY-002
+    priority: p0
+    rule: Legacy endpoint paths and HTTP methods remain unchanged.
+  - id: LEGACY-003
+    priority: p0
+    rule: Legacy request and response field names and semantics remain unchanged.
+  - id: LEGACY-004
+    priority: p0
+    rule: Legacy JWT issuer, audience, tool_slug, session and permissions claims remain compatible.
+  - id: LEGACY-005
+    priority: p0
+    rule: Existing callbacks remain exact-match allowlisted and valid.
+  - id: LEGACY-006
+    priority: p0
+    rule: Active legacy sessions and refresh tokens survive an upgrade.
+  - id: LEGACY-007
+    priority: p0
+    rule: Existing users, tools, grants and permissions remain authoritative during transition.
+  - id: LEGACY-008
+    priority: p0
+    rule: Signing and encryption material required for existing state is retained through its validity window.
+  - id: LEGACY-009
+    priority: p0
+    rule: Any separately approved future OAuth tables and fields must be additive during the rollback window; none exist in Step 1.
+  - id: LEGACY-010
+    priority: p0
+    rule: OAuth, OIDC and MCP can be disabled independently without affecting legacy traffic.
+  - id: LEGACY-011
+    priority: p0
+    rule: Each consumer migrates independently.
+  - id: LEGACY-012
+    priority: p0
+    rule: Legacy retirement requires measured zero use and explicit approval.
+
+frozen_endpoints:
+  - /v1/auth/start
+  - /v1/auth/google/callback
+  - /v1/auth/exchange
+  - /v1/auth/refresh
+  - /v1/auth/introspect
+  - /v1/auth/logout
+  - /v1/.well-known/jwks.json
+
+required_test_families:
+  - pre_upgrade_session_on_post_upgrade_release
+  - pre_upgrade_refresh_on_post_upgrade_release
+  - pre_upgrade_token_introspection
+  - same_permission_outcome
+  - logout_and_revocation
+  - oauth_feature_flag_disable
+  - database_rollback_compatibility
+  - current_consumer_golden_contracts

@@ -1,0 +1,15 @@
+{
+  "event_id": "evt_synthetic_health_001",
+  "event_type": "health.checked",
+  "created_at": "2026-08-24T10:15:00Z",
+  "outcome": "success",
+  "correlation_id": "corr_synthetic_health_001",
+  "tool_slug": null,
+  "actor_google_sub": null,
+  "actor_email": null,
+  "actor_hd": null,
+  "request_ip_hash": null,
+  "user_agent_hash": null,
+  "reason_code": null,
+  "metadata": {"synthetic": true, "runtime_integration": false}
+}

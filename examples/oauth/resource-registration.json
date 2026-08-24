@@ -1,0 +1,12 @@
+{
+  "resource_id": "https://template-project.unguess-internal.net/api",
+  "display_name": "Template Project API",
+  "owner_team": "platform-owner",
+  "scopes": [
+    "template-project:example:read",
+    "template-project:admin:manage"
+  ],
+  "audience_policy": "exact_single_resource",
+  "protected_resource_metadata_url": "https://template-project.unguess-internal.net/.well-known/oauth-protected-resource",
+  "status": "draft"
+}

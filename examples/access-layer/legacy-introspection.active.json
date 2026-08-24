@@ -1,0 +1,18 @@
+{
+  "active": true,
+  "issuer": "https://access-layer.unguess-internal.net",
+  "audience": "template-project",
+  "expires_at": "2026-08-17T10:15:00Z",
+  "session_id": "ses_example_001",
+  "user": {
+    "id": "usr_example_001",
+    "google_sub": "110000000000000000000",
+    "email": "person@example.invalid",
+    "email_verified": true,
+    "hd": "example.invalid",
+    "display_name": "Example Person"
+  },
+  "permissions": [
+    "template-project:example:read"
+  ]
+}

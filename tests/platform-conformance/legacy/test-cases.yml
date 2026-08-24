@@ -1,0 +1,89 @@
+schema_version: 1
+suite: access-layer-legacy-compatibility
+status: documented_not_run
+purpose: Define future proof of zero forced migration and no loss of existing access or functionality across two real versions.
+execution:
+  passed: false
+  reason: Two immutable real Access Layer versions/images were not supplied in Step 1.
+  harness: ../../../N_TO_N_PLUS_1_SURVIVAL_PLAN.md
+consumer_matrix_required:
+  - Nancy
+  - Test Generator
+  - Petyr
+  - Goodman
+  - UNGUESS Internal Network
+cases:
+  - id: LEGACY-E2E-001
+    priority: p0
+    title: Existing consumer requires no release
+    setup: Deploy Access Layer vNext with OAuth/OIDC disabled and no consumer code or configuration change.
+    expected: Login, callback, exchange, local session creation, authorised operation, refresh, introspection and logout remain successful.
+  - id: LEGACY-E2E-002
+    priority: p0
+    title: Pre-upgrade Access Layer session survives deployment
+    setup: Create a valid legacy session and local tool session on Access Layer N, then deploy N+1.
+    expected: The user continues without re-authentication or a new grant.
+  - id: LEGACY-E2E-003
+    priority: p0
+    title: Pre-upgrade refresh token rotates on N+1
+    setup: Issue an active refresh token before the upgrade and use it during real authenticated activity after the upgrade.
+    expected: Rotation succeeds once, the replacement is returned and the submitted token cannot be reused.
+  - id: LEGACY-E2E-004
+    priority: p0
+    title: Pre-upgrade access token introspects on N+1
+    setup: Issue a valid legacy JWT before deployment.
+    expected: Introspection returns the same active state, audience, session, identity and permissions semantics.
+  - id: LEGACY-E2E-005
+    priority: p0
+    title: Legacy JWT claims remain compatible
+    expected: Existing issuer, audience/tool, session and permissions validation in every consumer continues without parser changes.
+  - id: LEGACY-E2E-006
+    priority: p0
+    title: Existing callback allowlist remains exact and effective
+    expected: Existing valid callbacks succeed; lookalike, suffix and unregistered callbacks remain denied.
+  - id: LEGACY-E2E-007
+    priority: p0
+    title: Existing entitlement decision remains identical
+    expected: Active, expired, revoked, pending and absent grants produce the same allow/deny outcome before and after the release.
+  - id: LEGACY-E2E-008
+    priority: p0
+    title: OAuth canary does not alter legacy traffic
+    setup: Enable OAuth only for one preregistered staging client/resource pair.
+    expected: Legacy success/error rates, payloads, token lifetimes and session behavior remain within the approved no-regression threshold.
+  - id: LEGACY-E2E-009
+    priority: p0
+    title: OAuth/OIDC feature flags restore old traffic path
+    setup: Disable every new authorization-server feature after a canary.
+    expected: The service behaves as the legacy release without data restore or consumer changes.
+  - id: LEGACY-E2E-010
+    priority: p0
+    title: Database rollback remains possible
+    setup: Apply additive schema migration, exercise legacy and canary OAuth paths, then roll application code back within the rollback window.
+    expected: N-1 can read all legacy records and continue serving existing sessions; new tables do not break it.
+  - id: LEGACY-E2E-011
+    priority: p0
+    title: Signing key overlap preserves valid legacy tokens
+    expected: Legacy validation keys remain published until every still-valid legacy token and cache window has expired.
+  - id: LEGACY-E2E-012
+    priority: p0
+    title: Refresh concurrency behavior is unchanged
+    expected: Concurrent requests produce one successful rotation path and do not create multiple live replacement token chains.
+  - id: LEGACY-E2E-013
+    priority: p0
+    title: Consumer-specific golden payloads remain byte/semantic compatible
+    expected: Recorded requests, status codes, field names, nullability and error codes match the approved golden contracts.
+  - id: LEGACY-E2E-014
+    priority: p0
+    title: User, tool and grant counts are preserved
+    expected: No account, tool registration, permission, grant, session or active refresh-token family is deleted or silently transformed.
+  - id: LEGACY-E2E-015
+    priority: p0
+    title: Independent project migration
+    expected: Enabling the OAuth adapter for one project has no configuration or runtime requirement for any other project.
+release_evidence:
+  - compatibility result for every consumer and supported version
+  - active session and refresh-token counts before and after deployment
+  - login, exchange, refresh, introspection, authorization and logout rates
+  - database migration and rollback rehearsal
+  - feature-flag and canary timeline
+  - named platform and security approvals

@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://platform.unguess-internal.net/schemas/legacy-access-layer-exchange.schema.json",
+  "title": "Frozen Access Layer legacy exchange/refresh response",
+  "description": "Compatibility schema derived from the currently deployed Access Layer contract. Do not change for the additive OAuth/OIDC release.",
+  "type": "object",
+  "required": [
+    "access_token",
+    "token_type",
+    "expires_in",
+    "session",
+    "user",
+    "tool",
+    "grant",
+    "correlation_id"
+  ],
+  "properties": {
+    "access_token": {
+      "type": "string",
+      "minLength": 1
+    },
+    "token_type": {
+      "const": "Bearer"
+    },
+    "expires_in": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "refresh_token": {
+      "type": "string",
+      "minLength": 1
+    },
+    "session": {
+      "type": "object",
+      "required": [
+        "id",
+        "issued_at",
+        "expires_at"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "issued_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false
+    },
+    "user": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "google_sub": {
+          "type": "string",
+          "minLength": 1
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "email_verified": {
+          "type": "boolean"
+        },
+        "hd": {
+          "type": "string"
+        },
+        "display_name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "tool": {
+      "type": "object",
+      "required": [
+        "slug",
+        "display_name"
+      ],
+      "properties": {
+        "slug": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{1,62}$"
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "grant": {
+      "type": "object",
+      "required": [
+        "role",
+        "permissions"
+      ],
+      "properties": {
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "permissions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+(?::[a-z0-9-]+)+$"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "correlation_id": {
+      "type": "string",
+      "minLength": 8
+    }
+  },
+  "additionalProperties": false
+}

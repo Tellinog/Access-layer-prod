@@ -1,0 +1,228 @@
+schema_version: 2
+template_mode: true
+project:
+  slug: greenfield-tool
+  name: Greenfield Tool
+  kind: tool
+  description: Example greenfield tool starting with the OAuth/OIDC target profile.
+  owner_team: example-team
+  technical_owner: example-technical-owner
+  product_owner: example-product-owner
+  data_classification: internal
+platform_requirements:
+  access_layer_required: true
+  api_required: true
+  mcp_ready_required: true
+  telemetry_required: true
+  observatory_registration_required: true
+  english_first_required: true
+  ai_assessment_required: true
+  garden_ui_required: true
+  deployment_contract_required: true
+  coolify_runtime_required: true
+deployment:
+  applicable: true
+  platform: coolify
+  registration: ./deployment.registration.yaml
+  environment: production
+  configuration_status: pending
+  unit_policy: one-coolify-resource-per-project
+  coolify:
+    server_name: example-server
+    project_name: internal-tools
+    environment_name: production
+    resource_name: greenfield-tool-production
+    resource_type: application
+    build_strategy: docker_compose
+    destination_name: coolify
+    connect_to_predefined_network: false
+    raw_compose_deployment: false
+  services:
+  - service_name: web
+    role: web
+    exposure: public
+    protocol: http
+    container_port: 3000
+    bind_address: 0.0.0.0
+    health:
+      mode: http
+      liveness_path: /health/live
+      readiness_path: /health/ready
+    stateful: false
+  public_routes:
+  - route_id: primary-web
+    hostname: greenfield-tool.example.invalid
+    scheme: https
+    path: /
+    target_service: web
+    target_container_port: 3000
+    canonical: true
+    shared_hostname: false
+  network:
+    default_isolation: resource-specific-network
+    cross_resource_strategy: none
+    allowed_external_resources: []
+  port_policy:
+    container_ports_may_repeat_across_coolify_resources: true
+    host_ports_forbidden_by_default: true
+    published_host_ports: []
+  persistent_storage:
+    required: false
+    volumes: []
+  database:
+    required: false
+    service_name: null
+    public_exposure: forbidden
+    backup_required: false
+  backups:
+    required: false
+    policy: not_applicable
+    schedule: null
+    retention_days: null
+    restore_test_frequency: not_applicable
+  rollback:
+    supported: true
+    application_strategy: previous-coolify-deployment
+    database_migration_strategy: expand-migrate-verify-contract
+    backward_compatible_window_required: true
+    runbook: ./docs/RUNBOOK.md
+  registry:
+    status: pending_registration
+    central_registry_id: unguess-coolify-deployments
+    registration_id: greenfield-tool:production
+    validation_required_in_ci: true
+    last_verified_at: null
+interfaces:
+  web:
+    enabled: true
+    default_auth_profile: unguess-oauth-oidc-v1
+  api:
+    enabled: true
+    base_path: /api/v1
+    openapi: ./schemas/openapi.yaml
+    resource_id: https://greenfield-tool.example.invalid/api
+  mcp:
+    enabled: true
+    deployment_mode: gateway
+    resource_id: https://agents.unguess-internal.net/mcp
+    capability_manifest: ./specs/capabilities.v1.yml
+    rollout_state: disabled_until_registered
+authentication:
+  authority: access-layer
+  target_profile: unguess-oauth-oidc-v1
+  compatibility_mode: oauth-only
+  accepted_profiles:
+  - unguess-oauth-oidc-v1
+  legacy:
+    enabled: false
+    contract: ./schemas/access-layer-legacy-v1.openapi.yaml
+    preserve_existing_consumers: true
+    forced_migration: false
+    preserve_active_sessions: true
+    preserve_refresh_tokens: true
+    preserve_token_claims: true
+    preserve_endpoints_and_payloads: true
+    rollback_without_data_loss: true
+    permission_alias_registry: ./specs/permissions.v1.yml
+  oauth:
+    enabled: true
+    issuer: https://access-layer.unguess-internal.net
+    resource_id: https://greenfield-tool.example.invalid/api
+    audience: https://greenfield-tool.example.invalid/api
+    access_token_profile: rfc9068
+    pkce_method: S256
+    protected_resource_metadata: ./examples/oauth/oauth-protected-resource-metadata.json
+    service_principals: planned
+    token_exchange: planned
+  introspection:
+    policy: risk_based
+    cached_max_age_seconds: 60
+    force_for_risk:
+    - high
+    - critical
+    - administrative
+request_context:
+  schema: ./schemas/request-context.schema.json
+  required_for_all_interfaces: true
+capabilities:
+- capability_id: greenfield-tool:example:read
+  operation_id: getExample
+  mcp_name: example_read
+  kind: resource
+  exposure:
+  - api
+  - mcp
+  permission: greenfield-tool:example:read
+  oauth_scope: greenfield-tool:example:read
+  risk: low
+  read_only: true
+  destructive: false
+  idempotency: optional
+  human_confirmation: never
+  timeout_ms: 10000
+  input_schema: null
+  output_schema: '#/components/schemas/ExampleResponse'
+  telemetry_feature: example_read
+  ai_use_case: null
+language:
+  ui_locale: en-GB
+  documentation_locale: en
+  api_locale: en
+  fallback_locale: en-GB
+  preserve_user_content_language: true
+  automatic_translation: false
+  generated_output_default_locale: en-GB
+  generated_output_locale_selectable: true
+ui:
+  applicable: true
+  design_system: unguess-garden-v1
+  tokens: ./assets/brand/garden.tokens.json
+  raw_colors_forbidden: true
+  accessibility_target: wcag-2.2-aa
+  reduced_motion_required: true
+ai:
+  enabled: false
+  profile: no_ai
+  assessment: ./docs/compliance/AI_ACT_ASSESSMENT.md
+  system_spec: ./specs/ai-system.v1.yml
+  use_cases: ./specs/ai-use-cases.v1.yml
+  provider_registry: ./specs/ai-providers.v1.yml
+  data_boundary: ./specs/ai-data-boundary.v1.yml
+  human_oversight: ./specs/ai-human-oversight.v1.yml
+  evaluation: ./specs/ai-evaluation.v1.yml
+telemetry:
+  enabled: true
+  service_name: greenfield-tool
+  technical_standard: opentelemetry
+  collector_protocol: otlp
+  non_blocking: true
+  product_event_schema: ./schemas/events.schema.json
+  prohibit_user_identity_in_metric_labels: true
+  invocation_channels:
+  - web
+  - api
+  - mcp
+  - worker
+  synthetic_checks:
+  - check_id: greenfield-tool-readiness
+    type: readiness
+    endpoint: /health/ready
+    interval_seconds: 300
+    timeout_seconds: 5
+    weight: critical
+  instrumentation_source: unguess-platform-sdk
+  technical_destination: unguess-observability-stack
+  product_event_destination: tool-observatory
+observatory:
+  registration_required: true
+  export_formats:
+  - csv
+  - json
+  - parquet
+  iframe_embedding:
+    allowed: true
+    read_only: true
+    exact_frame_ancestors_required: true
+slo:
+  tier: standard
+  specification: ./specs/slo.v1.yml

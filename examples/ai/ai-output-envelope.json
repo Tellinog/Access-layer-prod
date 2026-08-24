@@ -1,0 +1,34 @@
+{
+  "result": {
+    "title": "Example draft",
+    "sections": [
+      {
+        "heading": "Summary",
+        "body": "Review this draft before publication."
+      }
+    ]
+  },
+  "ai_provenance": {
+    "ai_assisted": true,
+    "use_case_id": "template-project.example-draft",
+    "provider": "approved-router",
+    "underlying_provider": "approved-model-provider",
+    "model_id": "provider/pinned-model-version",
+    "prompt_version": "example-draft-v1",
+    "generated_at": "2026-08-17T10:00:00Z",
+    "review_status": "pending",
+    "reviewed_at": null,
+    "reviewed_by": null,
+    "source_refs": [
+      "approved-source:example-001"
+    ],
+    "warnings": [
+      "AI-assisted draft. Verify claims and sources before approval."
+    ],
+    "data_classes": [
+      "internal_approved"
+    ],
+    "correlation_id": "corr_ai_example_001",
+    "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736"
+  }
+}

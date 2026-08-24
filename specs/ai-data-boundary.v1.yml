@@ -1,0 +1,32 @@
+schema_version: 1
+default_external_policy: deny
+data_classes:
+  public:
+    external_ai: allowed_with_approved_provider
+  internal:
+    external_ai: denied_until_use_case_approved
+  internal_approved:
+    external_ai: allowed_for_declared_use_case
+  confidential:
+    external_ai: denied_until_explicit_approval
+  personal:
+    external_ai: denied_by_default
+  sensitive:
+    external_ai: forbidden
+  ai_prohibited:
+    external_ai: forbidden
+always_prohibited:
+  - credentials
+  - access_tokens
+  - refresh_tokens
+  - cookies
+  - signing_keys
+  - client_secrets
+  - unrestricted_logs
+  - special_category_data_without_explicit_legal_and_security_approval
+controls:
+  minimise_payload: true
+  pseudonymise_when_possible: true
+  log_payloads: false
+  preserve_source_language: true
+  record_data_categories_not_content: true

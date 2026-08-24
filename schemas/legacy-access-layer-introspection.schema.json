@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://platform.unguess-internal.net/schemas/legacy-access-layer-introspection.schema.json",
+  "title": "Frozen Access Layer legacy introspection response",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "active",
+        "issuer",
+        "audience",
+        "expires_at",
+        "session_id",
+        "user",
+        "permissions"
+      ],
+      "properties": {
+        "active": {
+          "const": true
+        },
+        "issuer": {
+          "type": "string",
+          "format": "uri"
+        },
+        "audience": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "user": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "google_sub": {
+              "type": "string",
+              "minLength": 1
+            },
+            "email": {
+              "type": "string",
+              "format": "email"
+            },
+            "email_verified": {
+              "type": "boolean"
+            },
+            "hd": {
+              "type": "string"
+            },
+            "display_name": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "permissions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+(?::[a-z0-9-]+)+$"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "active"
+      ],
+      "properties": {
+        "active": {
+          "const": false
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    }
+  ]
+}

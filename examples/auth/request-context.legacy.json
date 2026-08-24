@@ -1,0 +1,23 @@
+{
+  "auth_profile": "access-layer-legacy-v1",
+  "principal_type": "human",
+  "principal_id": "usr_example_001",
+  "delegated_subject": null,
+  "actor_id": null,
+  "client_id": null,
+  "project_slug": "template-project",
+  "resource_id": "https://template-project.unguess-internal.net/api",
+  "capability_id": "template-project:example:read",
+  "permissions": [
+    "template-project:example:read"
+  ],
+  "scopes": [],
+  "invocation_channel": "web",
+  "access_session_id": "ses_example_001",
+  "authorization_grant_id": null,
+  "token_id": null,
+  "correlation_id": "corr_context_legacy_001",
+  "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+  "environment": "staging",
+  "request_started_at": "2026-08-17T10:00:00Z"
+}

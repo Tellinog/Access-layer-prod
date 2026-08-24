@@ -1,0 +1,21 @@
+{
+  "client_id": "template-project-web",
+  "client_name": "Template Project Web BFF",
+  "client_type": "confidential",
+  "grant_types": [
+    "authorization_code",
+    "refresh_token"
+  ],
+  "redirect_uris": [
+    "https://template-project.unguess-internal.net/oauth/callback"
+  ],
+  "token_endpoint_auth_method": "client_secret_basic",
+  "allowed_resources": [
+    "https://template-project.unguess-internal.net/api"
+  ],
+  "allowed_scopes": [
+    "template-project:example:read"
+  ],
+  "owner_team": "platform-owner",
+  "status": "draft"
+}

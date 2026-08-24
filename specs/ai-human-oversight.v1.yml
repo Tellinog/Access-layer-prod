@@ -1,0 +1,20 @@
+schema_version: 1
+defaults:
+  ai_output_status: draft
+  reviewer_can_edit: true
+  reviewer_can_reject: true
+  reviewer_can_regenerate: true
+  reviewer_can_undo: true
+  approval_required_before:
+    - publication
+    - external_delivery
+    - irreversible_write
+    - security_or_permission_change
+  ai_may_not:
+    - approve_its_own_output
+    - bypass_project_authorisation
+    - publish_without_required_approval
+    - alter_official_deterministic_values
+    - change_security_configuration
+    - delete_data_without_separate_confirmed_capability
+use_cases: []

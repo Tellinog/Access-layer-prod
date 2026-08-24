@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://platform.unguess-internal.net/schemas/oauth-access-token-claims.schema.json",
+  "title": "UNGUESS OAuth JWT access-token claims",
+  "type": "object",
+  "required": [
+    "iss",
+    "sub",
+    "aud",
+    "client_id",
+    "scope",
+    "iat",
+    "exp",
+    "jti"
+  ],
+  "properties": {
+    "iss": {
+      "type": "string",
+      "format": "uri"
+    },
+    "sub": {
+      "type": "string",
+      "minLength": 1
+    },
+    "aud": {
+      "type": "string",
+      "format": "uri"
+    },
+    "client_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scope": {
+      "type": "string",
+      "pattern": "^[a-z0-9:-]+(?: [a-z0-9:-]+)*$"
+    },
+    "iat": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "nbf": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "exp": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "jti": {
+      "type": "string",
+      "minLength": 8
+    },
+    "sid": {
+      "type": "string"
+    },
+    "principal_type": {
+      "enum": [
+        "human",
+        "service"
+      ]
+    },
+    "act": {
+      "type": "object",
+      "required": [
+        "sub"
+      ],
+      "properties": {
+        "sub": {
+          "type": "string",
+          "minLength": 1
+        },
+        "client_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "authorization_details": {
+      "type": "array"
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,28 @@
+schema_version: 1
+enabled: false
+profile: no_ai
+assessment_status: repository_evidence_recorded_human_approval_pending
+intended_purpose: Deterministic internal authentication, authorization, session, grant administration and audit service.
+operator_role:
+  provider: not_applicable_while_ai_disabled
+  deployer: not_applicable_while_ai_disabled
+affected_persons:
+- Internal users authenticating to registered tools
+- Administrators managing tool access
+risk_screening:
+  prohibited_practice: no_ai_runtime_observed
+  annex_iii_candidate: no_ai_runtime_observed
+  direct_human_interaction: deterministic_ui_only
+  synthetic_content: none
+  personal_data: processed_by_service_but_not_by_ai
+  special_category_data: not_in_documented_scope
+production_gate:
+  ai_must_remain_disabled: true
+  new_ai_use_requires_separate_approval: true
+  require_named_owners: true
+  require_approved_provider: true
+  require_data_boundary: true
+  require_human_oversight: true
+  require_transparency_assessment: true
+  require_evaluation: true
+  unknown_provider_status_blocks: true

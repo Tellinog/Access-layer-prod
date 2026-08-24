@@ -1,0 +1,42 @@
+schema_version: 1
+registration_id: access-layer:production
+project_slug: access-layer
+project_kind: platform_service
+owner_team: unresolved-see-backlog
+environment: production
+coolify:
+  server_name: unresolved-see-backlog
+  project_name: unresolved-see-backlog
+  environment_name: production
+  resource_name: access-layer-production
+  resource_type: service
+  build_strategy: docker_compose
+  destination_name: unresolved-see-backlog
+routes:
+- route_id: access-layer-production
+  hostname: access-layer.unguess-internal.net
+  scheme: https
+  path: /
+  target_service: app
+  target_container_port: 8080
+  canonical: true
+  shared_hostname: false
+services:
+- service_name: app
+  role: api
+  exposure: public
+  protocol: http
+  container_port: 8080
+- service_name: postgres
+  role: database
+  exposure: private
+  protocol: tcp
+  container_port: 5432
+published_host_ports: []
+state:
+  persistent_storage_required: true
+  database_required: true
+  backup_required: true
+registry:
+  status: pending_registration
+  last_verified_at: null

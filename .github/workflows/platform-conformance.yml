@@ -1,0 +1,48 @@
+name: Platform conformance
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  platform-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # A bootstrapped runtime repository must make the Git-versioned central
+      # registry available in the workspace and set this repository variable to
+      # its path. The pristine template can run without it because template_mode
+      # is true. SDK libraries are registry-exempt.
+      PLATFORM_DEPLOYMENT_REGISTRY_PATH: ${{ vars.PLATFORM_DEPLOYMENT_REGISTRY_PATH }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install checker dependencies
+        run: python -m pip install -r requirements-platform.txt
+      - name: Validate adopted platform baseline
+        run: python scripts/platform_check.py --report artifacts/platform-check.json
+      - name: Evaluate strict release gates
+        continue-on-error: true
+        shell: bash
+        run: |
+          args=(--strict --report artifacts/platform-check.strict.json)
+          if [[ -n "${PLATFORM_DEPLOYMENT_REGISTRY_PATH:-}" ]]; then
+            args+=(--registry "$PLATFORM_DEPLOYMENT_REGISTRY_PATH")
+          fi
+          python scripts/platform_check.py "${args[@]}"
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -p 'test_*.py'
+      - name: Upload conformance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: platform-conformance
+          path: artifacts/platform-check*.json
+          if-no-files-found: warn

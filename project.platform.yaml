@@ -1,0 +1,226 @@
+schema_version: 2
+template_mode: false
+project:
+  slug: access-layer
+  name: Access Layer
+  kind: platform_service
+  mode: legacy-migration
+  description: Legacy Google SSO, session, grant and tool-access authority for internal UNGUESS applications.
+  owner_team: unresolved-see-backlog
+  technical_owner: unresolved-see-backlog
+  product_owner: unresolved-see-backlog
+  data_classification: personal
+platform_requirements:
+  access_layer_required: false
+  api_required: true
+  mcp_ready_required: false
+  telemetry_required: true
+  observatory_registration_required: true
+  english_first_required: true
+  ai_assessment_required: true
+  garden_ui_required: true
+  deployment_contract_required: true
+  coolify_runtime_required: true
+deployment:
+  applicable: true
+  platform: coolify
+  registration: ./deployment.registration.yaml
+  environment: production
+  configuration_status: pending
+  unit_policy: one-coolify-resource-per-project
+  coolify:
+    server_name: unresolved-see-backlog
+    project_name: unresolved-see-backlog
+    environment_name: production
+    resource_name: access-layer-production
+    resource_type: service
+    build_strategy: docker_compose
+    destination_name: unresolved-see-backlog
+    connect_to_predefined_network: false
+    raw_compose_deployment: false
+  services:
+  - service_name: app
+    role: api
+    exposure: public
+    protocol: http
+    container_port: 8080
+    bind_address: 0.0.0.0
+    health:
+      mode: http
+      liveness_path: /health
+      readiness_path: /health
+    stateful: false
+  - service_name: postgres
+    role: database
+    exposure: private
+    protocol: tcp
+    container_port: 5432
+    bind_address: null
+    health:
+      mode: command
+      liveness_path: null
+      readiness_path: null
+    stateful: true
+  public_routes:
+  - route_id: access-layer-production
+    hostname: access-layer.unguess-internal.net
+    scheme: https
+    path: /
+    target_service: app
+    target_container_port: 8080
+    canonical: true
+    shared_hostname: false
+  network:
+    default_isolation: resource-specific-network
+    cross_resource_strategy: none
+    allowed_external_resources: []
+  port_policy:
+    container_ports_may_repeat_across_coolify_resources: true
+    host_ports_forbidden_by_default: true
+    published_host_ports: []
+  persistent_storage:
+    required: true
+    volumes:
+    - volume_id: postgres-live-volume-unresolved
+      target_path: /var/lib/postgresql/data
+      source_type: named_volume
+      backup_required: true
+    - volume_id: jwt-key-files
+      target_path: /run/secrets
+      source_type: bind_mount
+      backup_required: true
+  database:
+    required: true
+    service_name: postgres
+    public_exposure: forbidden
+    backup_required: true
+  backups:
+    required: true
+    policy: pending
+    schedule: null
+    retention_days: null
+    restore_test_frequency: pending
+  rollback:
+    supported: true
+    application_strategy: previous-coolify-deployment
+    database_migration_strategy: expand-migrate-verify-contract
+    backward_compatible_window_required: true
+    runbook: ./docs/RUNBOOK.md
+  registry:
+    status: pending_registration
+    central_registry_id: unguess-coolify-deployments
+    registration_id: access-layer:production
+    validation_required_in_ci: true
+    last_verified_at: null
+interfaces:
+  web:
+    enabled: true
+    default_auth_profile: access-layer-legacy-v1
+  api:
+    enabled: true
+    base_path: /v1
+    openapi: ./schemas/openapi.yaml
+    resource_id: https://access-layer.unguess-internal.net/v1
+  mcp:
+    enabled: false
+    deployment_mode: disabled
+    resource_id: https://access-layer.unguess-internal.net/v1
+    capability_manifest: ./specs/capabilities.v1.yml
+    rollout_state: disabled
+authentication:
+  authority: access-layer
+  target_profile: unguess-oauth-oidc-v1
+  compatibility_mode: legacy-only
+  accepted_profiles:
+  - access-layer-legacy-v1
+  legacy:
+    enabled: true
+    contract: ./specs/legacy-contract-baseline.v1.json
+    preserve_existing_consumers: true
+    forced_migration: false
+    preserve_active_sessions: true
+    preserve_refresh_tokens: true
+    preserve_token_claims: true
+    preserve_endpoints_and_payloads: true
+    rollback_without_data_loss: true
+    permission_alias_registry: ./specs/permissions.v1.yml
+  oauth:
+    enabled: false
+    issuer: https://access-layer.unguess-internal.net
+    resource_id: https://access-layer.unguess-internal.net/v1
+    audience: https://access-layer.unguess-internal.net/v1
+    access_token_profile: rfc9068
+    pkce_method: S256
+    protected_resource_metadata: ./examples/oauth/oauth-protected-resource-metadata.json
+    service_principals: disabled
+    token_exchange: disabled
+  introspection:
+    policy: risk_based
+    cached_max_age_seconds: 0
+    force_for_risk:
+    - high
+    - critical
+    - administrative
+request_context:
+  schema: ./schemas/request-context.schema.json
+  required_for_all_interfaces: true
+capabilities: []
+language:
+  ui_locale: en-GB
+  documentation_locale: en
+  api_locale: en
+  fallback_locale: en-GB
+  preserve_user_content_language: true
+  automatic_translation: false
+  generated_output_default_locale: en-GB
+  generated_output_locale_selectable: false
+ui:
+  applicable: true
+  design_system: unguess-garden-v1
+  tokens: ./assets/brand/garden.tokens.json
+  raw_colors_forbidden: true
+  accessibility_target: wcag-2.2-aa
+  reduced_motion_required: true
+ai:
+  enabled: false
+  profile: no_ai
+  assessment: ./docs/compliance/AI_ACT_ASSESSMENT.md
+  system_spec: ./specs/ai-system.v1.yml
+  use_cases: ./specs/ai-use-cases.v1.yml
+  provider_registry: ./specs/ai-providers.v1.yml
+  data_boundary: ./specs/ai-data-boundary.v1.yml
+  human_oversight: ./specs/ai-human-oversight.v1.yml
+  evaluation: ./specs/ai-evaluation.v1.yml
+telemetry:
+  enabled: false
+  service_name: access-layer
+  technical_standard: opentelemetry
+  collector_protocol: otlp
+  non_blocking: true
+  product_event_schema: ./schemas/events.schema.json
+  prohibit_user_identity_in_metric_labels: true
+  invocation_channels:
+  - web
+  - api
+  synthetic_checks:
+  - check_id: access-layer-health
+    type: readiness
+    endpoint: /health
+    interval_seconds: 300
+    timeout_seconds: 5
+    weight: critical
+  instrumentation_source: unguess-platform-sdk
+  technical_destination: unguess-observability-stack
+  product_event_destination: tool-observatory
+observatory:
+  registration_required: true
+  export_formats:
+  - csv
+  - json
+  iframe_embedding:
+    allowed: false
+    read_only: true
+    exact_frame_ancestors_required: true
+slo:
+  tier: standard
+  specification: ./specs/slo.v1.yml

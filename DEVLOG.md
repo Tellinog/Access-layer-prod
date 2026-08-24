@@ -752,3 +752,32 @@ Related task: Add operational bulk import/export for users/grants while preservi
 
 ### Follow-ups
 - Browser-smoke the inline bulk import form against a real PostgreSQL-backed environment and verify downloaded CSV files in Chrome/Edge.
+
+## 2026-08-24 - Template v2.1 adoption and legacy compatibility freeze
+
+Changed by: Codex
+Related task: Step 1 only — template adoption and legacy compatibility freeze.
+
+### Changed
+
+- Added Template v2.1 platform documentation, schemas, examples and conformance scaffolding without replacing existing files.
+- Added project/deployment manifests for a Coolify `platform_service`, app port 8080, private PostgreSQL and no published host ports.
+- Added a machine-readable legacy contract baseline, synthetic golden fixtures, a capability inventory, consumer compatibility matrix and N→N+1 harness plan.
+- Added explicit no-AI, no-SDK, no-telemetry and no-OAuth implementation status records.
+- Preserved the known Compose volume-name mismatch and recorded it as a deployment blocker.
+
+### Behavior
+
+- Production runtime behavior changed: no.
+- Database migrations added: no.
+- Dependencies added: no.
+- Deployment performed: no.
+
+### Checks
+
+- `npm.cmd run lint` passed.
+- `npm.cmd run build` passed.
+- `npm.cmd test` passed: 11 files, 106 tests.
+- Non-strict platform check passed: 24 checks, eight explicit warnings.
+- Python template/conformance suite passed: 34 tests, two pristine-template bootstrap tests skipped after adoption.
+- Strict platform release check was run and failed only on the six documented ownership/deployment/backup/registry/volume release gates in `STEP_1_HANDOFF.md`.

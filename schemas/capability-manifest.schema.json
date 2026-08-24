@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.unguess-internal.net/capability-manifest/v1.json",
+  "title": "Capability manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "project_slug",
+    "capabilities"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "project_slug": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,62}$"
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 0,
+      "items": {
+        "$ref": "#/$defs/capability"
+      }
+    }
+  },
+  "$defs": {
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability_id",
+        "display_name",
+        "description",
+        "kind",
+        "operation_id",
+        "exposure",
+        "resource",
+        "permission",
+        "oauth_scope",
+        "risk",
+        "read_only",
+        "destructive",
+        "idempotency",
+        "human_confirmation",
+        "timeout_ms",
+        "telemetry_feature",
+        "owner_team",
+        "lifecycle"
+      ],
+      "properties": {
+        "capability_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]+(?::[a-z][a-z0-9-]+){1,}$"
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "description": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 1000
+        },
+        "kind": {
+          "enum": [
+            "resource",
+            "tool",
+            "prompt",
+            "job"
+          ]
+        },
+        "operation_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9]{1,79}$"
+        },
+        "exposure": {
+          "type": "object",
+          "properties": {
+            "web": {
+              "type": [
+                "boolean",
+                "string"
+              ]
+            },
+            "api": {
+              "type": [
+                "boolean",
+                "string"
+              ]
+            },
+            "mcp": {
+              "type": [
+                "boolean",
+                "string"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "resource": {
+          "type": "string",
+          "format": "uri"
+        },
+        "permission": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]+(?::[a-z][a-z0-9-]+){1,}$"
+        },
+        "oauth_scope": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]+(?::[a-z][a-z0-9-]+){1,}$"
+        },
+        "risk": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "read_only": {
+          "type": "boolean"
+        },
+        "destructive": {
+          "type": "boolean"
+        },
+        "idempotency": {
+          "enum": [
+            "optional",
+            "required",
+            "not_applicable"
+          ]
+        },
+        "human_confirmation": {
+          "enum": [
+            "never",
+            "conditional",
+            "required",
+            "always"
+          ]
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 100
+        },
+        "telemetry_feature": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{1,63}$"
+        },
+        "owner_team": {
+          "type": "string",
+          "minLength": 2
+        },
+        "lifecycle": {
+          "enum": [
+            "template_example",
+            "experimental",
+            "active",
+            "deprecated",
+            "retired"
+          ]
+        },
+        "mcp_name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-z][a-z0-9_]{1,63}$"
+        },
+        "input_schema": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "output_schema": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ai_use_case": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}

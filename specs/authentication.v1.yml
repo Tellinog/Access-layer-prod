@@ -1,0 +1,62 @@
+schema_version: 1
+authority: access-layer
+target_profile: unguess-oauth-oidc-v1
+compatibility_mode: legacy-only
+current_runtime_profile: access-layer-legacy-v1
+legacy_profile:
+  id: access-layer-legacy-v1
+  frozen: true
+  enabled: true
+  endpoints:
+    start: /v1/auth/start
+    callback: /v1/auth/google/callback
+    exchange: /v1/auth/exchange
+    refresh: /v1/auth/refresh
+    introspect: /v1/auth/introspect
+    logout: /v1/auth/logout
+    jwks: /v1/.well-known/jwks.json
+  invariants:
+    - preserve_endpoints
+    - preserve_payloads
+    - preserve_claims
+    - preserve_session_lifecycle
+    - preserve_active_sessions
+    - preserve_refresh_tokens
+    - preserve_grants
+    - preserve_callback_allowlist
+    - no_forced_migration
+oauth_profile:
+  id: unguess-oauth-oidc-v1
+  enabled: false
+  implementation_status: deferred_scope_no_endpoints_or_tables
+  issuer: https://access-layer.unguess-internal.net
+  authorization_endpoint: /oauth/authorize
+  token_endpoint: /oauth/token
+  revocation_endpoint: /oauth/revoke
+  introspection_endpoint: /oauth/introspect
+  jwks_uri: /oauth/jwks
+  grants:
+    p0:
+      - authorization_code
+      - refresh_token
+    p1:
+      - client_credentials
+      - urn:ietf:params:oauth:grant-type:token-exchange
+  pkce:
+    required: true
+    methods:
+      - S256
+  resource_indicator_required: true
+  one_audience_per_token: true
+  jwt_access_token_profile: rfc9068
+  forbidden:
+    - implicit_grant
+    - password_grant
+    - wildcard_redirect_uri
+    - pkce_plain
+    - bearer_token_in_query
+request_context:
+  schema: ../schemas/request-context.schema.json
+  adapters:
+    - legacy
+    - oauth

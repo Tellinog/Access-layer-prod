@@ -106,3 +106,6 @@ The Grants page includes two bulk grant controls:
 Preview must show row-level `ok`, `warning` and `error` results without writing data. Commit must refuse to write when preview contains errors, then display the applied result summary.
 
 The input accepts both comma- and semicolon-delimited CSV files, detecting the delimiter from the required header row.
+# Garden adoption status
+
+Garden assets added by Template v2.1 are reference-only. The current embedded Admin UI styles and copy remain unchanged in Step 1. Runtime Garden integration is deferred; see `../specs/design-system.v1.yml`.

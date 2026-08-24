@@ -1,0 +1,47 @@
+schema_version: 1
+profile_id: unguess-oauth-oidc-v1
+proposal: B
+status: target
+legacy_compatibility:
+  required: true
+  forced_migration: false
+  preserve:
+    - endpoints
+    - payloads
+    - claims
+    - sessions
+    - refresh_tokens
+    - grants
+    - callback_allowlists
+    - client_credentials
+  deployment_model: side_by_side
+protocol:
+  discovery:
+    - rfc8414
+    - oidc_discovery_when_enabled
+    - rfc9728_at_resource_servers
+  grants:
+    p0:
+      - authorization_code_with_pkce
+      - refresh_token
+    p1:
+      - client_credentials
+      - token_exchange
+  token_profile: rfc9068
+  resource_indicators: required
+  audience_policy: one_resource_per_access_token
+  public_clients: supported
+  confidential_clients: supported
+security:
+  redirect_match: exact
+  pkce: S256
+  refresh_rotation: required
+  refresh_family_replay_detection: required
+  signing_key_overlap_rotation: required
+  token_in_query: forbidden
+  token_forwarding_to_other_resource: forbidden
+rollout:
+  first_consumer: agent_gateway_recommended
+  feature_flagged: true
+  per_consumer_migration: true
+  rollback_without_data_loss: true

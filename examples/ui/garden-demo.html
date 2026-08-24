@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UNGUESS Garden template demo</title>
+  <link rel="stylesheet" href="../../assets/brand/garden.css">
+  <style>
+    main { max-width: 960px; margin: 0 auto; padding: 32px 16px; }
+    .stack { display: grid; gap: 24px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+  </style>
+</head>
+<body>
+  <header class="garden-hero">
+    <h1>Agent-ready project</h1>
+    <p>English-first, access-controlled, observable and AI-governed.</p>
+    <button class="garden-button garden-button--inverse" type="button">Open project</button>
+  </header>
+  <main class="stack">
+    <section class="garden-card" aria-labelledby="actions-title">
+      <h2 id="actions-title">Actions</h2>
+      <div class="actions">
+        <button class="garden-button garden-button--primary" type="button">Primary action</button>
+        <button class="garden-button garden-button--secondary" type="button">Secondary action</button>
+      </div>
+    </section>
+    <aside class="garden-ai-notice" aria-labelledby="ai-title">
+      <strong id="ai-title">AI-assisted output</strong>
+      <p class="garden-muted">Review the content and supporting sources before publishing.</p>
+    </aside>
+  </main>
+</body>
+</html>

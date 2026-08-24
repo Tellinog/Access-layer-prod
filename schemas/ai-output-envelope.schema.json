@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://platform.unguess-internal.net/schemas/ai-output-envelope.schema.json",
+  "title": "AI-assisted output envelope",
+  "type": "object",
+  "required": [
+    "result",
+    "ai_provenance"
+  ],
+  "properties": {
+    "result": {},
+    "ai_provenance": {
+      "type": "object",
+      "required": [
+        "ai_assisted",
+        "use_case_id",
+        "provider",
+        "model_id",
+        "prompt_version",
+        "generated_at",
+        "review_status",
+        "source_refs",
+        "warnings",
+        "correlation_id"
+      ],
+      "properties": {
+        "ai_assisted": {
+          "const": true
+        },
+        "use_case_id": {
+          "type": "string",
+          "minLength": 3
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 2
+        },
+        "underlying_provider": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prompt_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "review_status": {
+          "enum": [
+            "pending",
+            "approved",
+            "rejected",
+            "edited"
+          ]
+        },
+        "reviewed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "reviewed_by": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Pseudonymous or internal audit identifier; do not expose personal data in public output."
+        },
+        "source_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "data_classes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "public",
+              "internal_approved",
+              "confidential_approved",
+              "personal_approved"
+            ]
+          }
+        },
+        "correlation_id": {
+          "type": "string",
+          "minLength": 8
+        },
+        "trace_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{32}$"
+        }
+      },
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "prompt",
+            "raw_prompt",
+            "raw_output",
+            "chain_of_thought",
+            "api_key",
+            "access_token",
+            "refresh_token"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

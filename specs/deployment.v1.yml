@@ -1,0 +1,80 @@
+schema_version: 1
+project_record:
+  slug: access-layer
+  kind: platform_service
+  mode: legacy-migration
+  platform: coolify
+  canonical_hostname: access-layer.unguess-internal.net
+  app_container_port: 8080
+  postgres_public_exposure: forbidden
+  published_host_ports: []
+  deployment_status: blocked
+  continuity_blocker: access_layer_postgres_data_v2 mount reference does not match access_layer_postgres_data declaration
+profile: unguess-coolify-deployment-v1
+project_kinds:
+  tool:
+    description: User- or agent-facing product with its own Coolify runtime resource.
+    coolify_runtime_required: true
+    public_route_default: required
+  platform_service:
+    description: Shared runtime service consumed by tools or agents.
+    coolify_runtime_required: true
+    public_route_default: conditional
+  infrastructure_stack:
+    description: Central operational stack such as telemetry collection or storage.
+    coolify_runtime_required: true
+    public_route_default: not_required
+  sdk_library:
+    description: Versioned build-time/runtime dependency imported by projects; never a standalone Coolify resource.
+    coolify_runtime_required: false
+    public_route_default: forbidden
+resource_policy:
+  default_unit: one-coolify-resource-per-project
+  multi_container_resource_allowed: true
+  runtime_platform: coolify
+  compose_source_of_truth: repository_when_docker_compose_is_used
+routing:
+  https_required_for_public_routes: true
+  exact_hostname_registration_required: true
+  route_target_is_service_plus_container_port: true
+  container_port_may_repeat_across_resources: true
+  canonical_route_required_for_tools: true
+ports:
+  host_ports_forbidden_by_default: true
+  approved_exception_requires:
+    - reason
+    - approved_by
+    - firewall_scope
+    - expires_at
+    - central_registry_uniqueness
+  container_ports_are_not_globally_reserved: true
+networking:
+  default: resource_isolated
+  cross_resource_connectivity: explicit_only
+  predefined_network_requires_documented_dependency: true
+  database_public_exposure: forbidden
+health:
+  liveness_required_for_public_runtime_services: true
+  readiness_required_for_public_runtime_services: true
+  checks_use_internal_container_port: true
+storage:
+  persistent_state_must_be_declared: true
+  persistent_volumes_require_explicit_backup_decision: true
+  volumes_marked_for_backup_require_backup_policy: true
+  database_requires_backup_and_restore_test: true
+rollback:
+  required: true
+  database_strategy: expand_migrate_verify_contract
+  previous_runtime_must_remain_compatible_during_rollback_window: true
+registry:
+  local_registration_file: ./deployment.registration.yaml
+  central_registry_is_git_versioned: true
+  central_registry_is_not_a_runtime_tool: true
+  eventual_observatory_ingestion_allowed: true
+  uniqueness_keys:
+    - registration_id
+    - server_name_and_resource_name
+    - hostname_and_path_with_shared_path_overlap_rules
+    - overlapping_server_bind_protocol_and_host_port
+  excluded_from_global_uniqueness:
+    - container_port

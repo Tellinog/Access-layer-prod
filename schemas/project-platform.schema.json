@@ -1,0 +1,1554 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://platform.unguess-internal.net/schemas/project-platform.schema.json",
+  "title": "UNGUESS project platform manifest",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "template_mode",
+    "project",
+    "platform_requirements",
+    "deployment",
+    "interfaces",
+    "authentication",
+    "request_context",
+    "capabilities",
+    "language",
+    "ui",
+    "ai",
+    "telemetry",
+    "observatory",
+    "slo"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 2
+    },
+    "template_mode": {
+      "type": "boolean"
+    },
+    "project": {
+      "type": "object",
+      "required": [
+        "slug",
+        "name",
+        "kind",
+        "description",
+        "owner_team",
+        "technical_owner",
+        "product_owner",
+        "data_classification"
+      ],
+      "properties": {
+        "slug": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{1,62}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 2
+        },
+        "description": {
+          "type": "string",
+          "minLength": 10
+        },
+        "owner_team": {
+          "type": "string",
+          "minLength": 2
+        },
+        "technical_owner": {
+          "type": "string",
+          "minLength": 2
+        },
+        "product_owner": {
+          "type": "string",
+          "minLength": 2
+        },
+        "data_classification": {
+          "enum": [
+            "public",
+            "internal",
+            "confidential",
+            "personal",
+            "sensitive"
+          ]
+        },
+        "kind": {
+          "enum": [
+            "tool",
+            "platform_service",
+            "infrastructure_stack",
+            "sdk_library"
+          ]
+        },
+        "mode": {
+          "const": "legacy-migration"
+        }
+      },
+      "additionalProperties": false
+    },
+    "platform_requirements": {
+      "type": "object",
+      "required": [
+        "access_layer_required",
+        "api_required",
+        "mcp_ready_required",
+        "telemetry_required",
+        "observatory_registration_required",
+        "english_first_required",
+        "ai_assessment_required",
+        "garden_ui_required",
+        "deployment_contract_required",
+        "coolify_runtime_required"
+      ],
+      "properties": {
+        "access_layer_required": {
+          "type": "boolean"
+        },
+        "api_required": {
+          "type": "boolean"
+        },
+        "mcp_ready_required": {
+          "type": "boolean"
+        },
+        "telemetry_required": {
+          "type": "boolean"
+        },
+        "observatory_registration_required": {
+          "type": "boolean"
+        },
+        "english_first_required": {
+          "type": "boolean"
+        },
+        "ai_assessment_required": {
+          "type": "boolean"
+        },
+        "garden_ui_required": {
+          "type": "boolean"
+        },
+        "deployment_contract_required": {
+          "type": "boolean"
+        },
+        "coolify_runtime_required": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "interfaces": {
+      "type": "object",
+      "required": [
+        "web",
+        "api",
+        "mcp"
+      ],
+      "properties": {
+        "web": {
+          "type": "object",
+          "required": [
+            "enabled",
+            "default_auth_profile"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "default_auth_profile": {
+              "enum": [
+                "access-layer-legacy-v1",
+                "unguess-oauth-oidc-v1",
+                "none"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "api": {
+          "type": "object",
+          "required": [
+            "enabled",
+            "base_path",
+            "openapi",
+            "resource_id"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "base_path": {
+              "type": "string",
+              "pattern": "^/"
+            },
+            "openapi": {
+              "type": "string",
+              "minLength": 1
+            },
+            "resource_id": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mcp": {
+          "type": "object",
+          "required": [
+            "enabled",
+            "deployment_mode",
+            "resource_id",
+            "capability_manifest",
+            "rollout_state"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "deployment_mode": {
+              "enum": [
+                "gateway",
+                "native",
+                "disabled"
+              ]
+            },
+            "resource_id": {
+              "type": "string",
+              "format": "uri"
+            },
+            "capability_manifest": {
+              "type": "string",
+              "minLength": 1
+            },
+            "rollout_state": {
+              "enum": [
+                "disabled_until_registered",
+                "canary",
+                "enabled",
+                "disabled"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "authentication": {
+      "type": "object",
+      "required": [
+        "authority",
+        "target_profile",
+        "compatibility_mode",
+        "accepted_profiles",
+        "legacy",
+        "oauth",
+        "introspection"
+      ],
+      "properties": {
+        "authority": {
+          "enum": [
+            "access-layer",
+            "none"
+          ]
+        },
+        "target_profile": {
+          "enum": [
+            "unguess-oauth-oidc-v1",
+            "none"
+          ]
+        },
+        "compatibility_mode": {
+          "enum": [
+            "dual-run",
+            "oauth-only",
+            "legacy-only",
+            "not-applicable"
+          ]
+        },
+        "accepted_profiles": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "access-layer-legacy-v1",
+              "unguess-oauth-oidc-v1",
+              "none"
+            ]
+          }
+        },
+        "legacy": {
+          "type": "object",
+          "required": [
+            "enabled",
+            "contract",
+            "preserve_existing_consumers",
+            "forced_migration",
+            "preserve_active_sessions",
+            "preserve_refresh_tokens",
+            "preserve_token_claims",
+            "preserve_endpoints_and_payloads",
+            "rollback_without_data_loss",
+            "permission_alias_registry"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "contract": {
+              "type": "string",
+              "minLength": 1
+            },
+            "preserve_existing_consumers": {
+              "type": "boolean"
+            },
+            "forced_migration": {
+              "type": "boolean"
+            },
+            "preserve_active_sessions": {
+              "type": "boolean"
+            },
+            "preserve_refresh_tokens": {
+              "type": "boolean"
+            },
+            "preserve_token_claims": {
+              "type": "boolean"
+            },
+            "preserve_endpoints_and_payloads": {
+              "type": "boolean"
+            },
+            "rollback_without_data_loss": {
+              "type": "boolean"
+            },
+            "permission_alias_registry": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "oauth": {
+          "type": "object",
+          "required": [
+            "enabled",
+            "issuer",
+            "resource_id",
+            "audience",
+            "access_token_profile",
+            "pkce_method",
+            "protected_resource_metadata",
+            "service_principals",
+            "token_exchange"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "issuer": {
+              "type": "string",
+              "format": "uri"
+            },
+            "resource_id": {
+              "type": "string",
+              "format": "uri"
+            },
+            "audience": {
+              "type": "string",
+              "format": "uri"
+            },
+            "access_token_profile": {
+              "const": "rfc9068"
+            },
+            "pkce_method": {
+              "const": "S256"
+            },
+            "protected_resource_metadata": {
+              "type": "string",
+              "minLength": 1
+            },
+            "service_principals": {
+              "enum": [
+                "disabled",
+                "planned",
+                "enabled"
+              ]
+            },
+            "token_exchange": {
+              "enum": [
+                "disabled",
+                "planned",
+                "enabled"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "introspection": {
+          "type": "object",
+          "required": [
+            "policy",
+            "cached_max_age_seconds",
+            "force_for_risk"
+          ],
+          "properties": {
+            "policy": {
+              "enum": [
+                "strict",
+                "risk_based",
+                "local_only"
+              ]
+            },
+            "cached_max_age_seconds": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 300
+            },
+            "force_for_risk": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "critical",
+                  "administrative"
+                ]
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "request_context": {
+      "type": "object",
+      "required": [
+        "schema",
+        "required_for_all_interfaces"
+      ],
+      "properties": {
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required_for_all_interfaces": {
+          "const": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 0,
+      "items": {
+        "type": "object",
+        "required": [
+          "capability_id",
+          "operation_id",
+          "kind",
+          "exposure",
+          "permission",
+          "oauth_scope",
+          "risk",
+          "read_only",
+          "destructive",
+          "idempotency",
+          "human_confirmation",
+          "timeout_ms",
+          "output_schema",
+          "telemetry_feature"
+        ],
+        "properties": {
+          "capability_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]+(?::[a-z][a-z0-9-]+){1,}$"
+          },
+          "operation_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+          },
+          "mcp_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-z][a-z0-9_]{0,63}$"
+          },
+          "kind": {
+            "enum": [
+              "tool",
+              "resource",
+              "prompt"
+            ]
+          },
+          "exposure": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "web",
+                "api",
+                "mcp",
+                "worker"
+              ]
+            }
+          },
+          "permission": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]+(?::[a-z][a-z0-9-]+){1,}$"
+          },
+          "oauth_scope": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]+(?::[a-z][a-z0-9-]+){1,}$"
+          },
+          "risk": {
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ]
+          },
+          "read_only": {
+            "type": "boolean"
+          },
+          "destructive": {
+            "type": "boolean"
+          },
+          "idempotency": {
+            "enum": [
+              "optional",
+              "required",
+              "not_applicable"
+            ]
+          },
+          "human_confirmation": {
+            "enum": [
+              "never",
+              "conditional",
+              "always"
+            ]
+          },
+          "timeout_ms": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 900000
+          },
+          "input_schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "output_schema": {
+            "type": "string",
+            "minLength": 1
+          },
+          "telemetry_feature": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{1,63}$"
+          },
+          "ai_use_case": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "language": {
+      "type": "object",
+      "required": [
+        "ui_locale",
+        "documentation_locale",
+        "api_locale",
+        "fallback_locale",
+        "preserve_user_content_language",
+        "automatic_translation",
+        "generated_output_default_locale",
+        "generated_output_locale_selectable"
+      ],
+      "properties": {
+        "ui_locale": {
+          "const": "en-GB"
+        },
+        "documentation_locale": {
+          "const": "en"
+        },
+        "api_locale": {
+          "const": "en"
+        },
+        "fallback_locale": {
+          "const": "en-GB"
+        },
+        "preserve_user_content_language": {
+          "type": "boolean"
+        },
+        "automatic_translation": {
+          "type": "boolean"
+        },
+        "generated_output_default_locale": {
+          "type": "string",
+          "minLength": 2
+        },
+        "generated_output_locale_selectable": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ui": {
+      "type": "object",
+      "required": [
+        "applicable",
+        "design_system",
+        "tokens",
+        "raw_colors_forbidden",
+        "accessibility_target",
+        "reduced_motion_required"
+      ],
+      "properties": {
+        "design_system": {
+          "enum": [
+            "unguess-garden-v1",
+            "none"
+          ]
+        },
+        "tokens": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_colors_forbidden": {
+          "const": true
+        },
+        "accessibility_target": {
+          "const": "wcag-2.2-aa"
+        },
+        "reduced_motion_required": {
+          "const": true
+        },
+        "applicable": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ai": {
+      "type": "object",
+      "required": [
+        "enabled",
+        "profile",
+        "assessment",
+        "system_spec",
+        "use_cases",
+        "provider_registry",
+        "data_boundary",
+        "human_oversight",
+        "evaluation"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "profile": {
+          "enum": [
+            "no_ai",
+            "assistive_generation",
+            "decision_support",
+            "autonomous_action",
+            "high_risk_candidate",
+            "prohibited"
+          ]
+        },
+        "assessment": {
+          "type": "string",
+          "minLength": 1
+        },
+        "system_spec": {
+          "type": "string",
+          "minLength": 1
+        },
+        "use_cases": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provider_registry": {
+          "type": "string",
+          "minLength": 1
+        },
+        "data_boundary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "human_oversight": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evaluation": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "telemetry": {
+      "type": "object",
+      "required": [
+        "enabled",
+        "service_name",
+        "technical_standard",
+        "collector_protocol",
+        "non_blocking",
+        "product_event_schema",
+        "prohibit_user_identity_in_metric_labels",
+        "invocation_channels",
+        "synthetic_checks",
+        "instrumentation_source",
+        "technical_destination",
+        "product_event_destination"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "service_name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{1,62}$"
+        },
+        "technical_standard": {
+          "const": "opentelemetry"
+        },
+        "collector_protocol": {
+          "const": "otlp"
+        },
+        "non_blocking": {
+          "const": true
+        },
+        "product_event_schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prohibit_user_identity_in_metric_labels": {
+          "const": true
+        },
+        "invocation_channels": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "web",
+              "api",
+              "mcp",
+              "worker"
+            ]
+          }
+        },
+        "synthetic_checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "check_id",
+              "type",
+              "endpoint",
+              "interval_seconds",
+              "timeout_seconds"
+            ],
+            "properties": {
+              "check_id": {
+                "type": "string",
+                "minLength": 3
+              },
+              "type": {
+                "enum": [
+                  "liveness",
+                  "readiness",
+                  "authenticated-smoke",
+                  "capability-smoke"
+                ]
+              },
+              "endpoint": {
+                "type": "string",
+                "pattern": "^/"
+              },
+              "interval_seconds": {
+                "type": "integer",
+                "minimum": 15
+              },
+              "timeout_seconds": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 60
+              },
+              "weight": {
+                "enum": [
+                  "informational",
+                  "standard",
+                  "critical"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "instrumentation_source": {
+          "const": "unguess-platform-sdk"
+        },
+        "technical_destination": {
+          "const": "unguess-observability-stack"
+        },
+        "product_event_destination": {
+          "const": "tool-observatory"
+        }
+      },
+      "additionalProperties": false
+    },
+    "observatory": {
+      "type": "object",
+      "required": [
+        "registration_required",
+        "export_formats",
+        "iframe_embedding"
+      ],
+      "properties": {
+        "registration_required": {
+          "type": "boolean"
+        },
+        "export_formats": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "csv",
+              "json",
+              "parquet"
+            ]
+          }
+        },
+        "iframe_embedding": {
+          "type": "object",
+          "required": [
+            "allowed",
+            "read_only",
+            "exact_frame_ancestors_required"
+          ],
+          "properties": {
+            "allowed": {
+              "type": "boolean"
+            },
+            "read_only": {
+              "type": "boolean"
+            },
+            "exact_frame_ancestors_required": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "slo": {
+      "type": "object",
+      "required": [
+        "tier",
+        "specification"
+      ],
+      "properties": {
+        "tier": {
+          "enum": [
+            "experimental",
+            "standard",
+            "critical"
+          ]
+        },
+        "specification": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "deployment": {
+      "type": "object",
+      "required": [
+        "applicable",
+        "platform",
+        "registration",
+        "environment",
+        "configuration_status",
+        "unit_policy",
+        "coolify",
+        "services",
+        "public_routes",
+        "network",
+        "port_policy",
+        "persistent_storage",
+        "database",
+        "backups",
+        "rollback",
+        "registry"
+      ],
+      "properties": {
+        "applicable": {
+          "type": "boolean"
+        },
+        "platform": {
+          "enum": [
+            "coolify",
+            "none"
+          ]
+        },
+        "registration": {
+          "type": "string",
+          "minLength": 1
+        },
+        "environment": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{1,31}$"
+        },
+        "configuration_status": {
+          "enum": [
+            "template",
+            "pending",
+            "ready"
+          ]
+        },
+        "unit_policy": {
+          "const": "one-coolify-resource-per-project"
+        },
+        "coolify": {
+          "type": "object",
+          "required": [
+            "server_name",
+            "project_name",
+            "environment_name",
+            "resource_name",
+            "resource_type",
+            "build_strategy",
+            "destination_name",
+            "connect_to_predefined_network",
+            "raw_compose_deployment"
+          ],
+          "properties": {
+            "server_name": {
+              "type": "string",
+              "minLength": 2
+            },
+            "project_name": {
+              "type": "string",
+              "minLength": 2
+            },
+            "environment_name": {
+              "type": "string",
+              "minLength": 2
+            },
+            "resource_name": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{1,127}$"
+            },
+            "resource_type": {
+              "enum": [
+                "application",
+                "service",
+                "not_applicable"
+              ]
+            },
+            "build_strategy": {
+              "enum": [
+                "dockerfile",
+                "docker_compose",
+                "nixpacks",
+                "static",
+                "prebuilt_image",
+                "not_applicable"
+              ]
+            },
+            "destination_name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "connect_to_predefined_network": {
+              "type": "boolean"
+            },
+            "raw_compose_deployment": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "services": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "service_name",
+              "role",
+              "exposure",
+              "protocol",
+              "container_port",
+              "bind_address",
+              "health",
+              "stateful"
+            ],
+            "properties": {
+              "service_name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,62}$"
+              },
+              "role": {
+                "enum": [
+                  "web",
+                  "api",
+                  "worker",
+                  "scheduler",
+                  "database",
+                  "cache",
+                  "collector",
+                  "proxy",
+                  "other"
+                ]
+              },
+              "exposure": {
+                "enum": [
+                  "public",
+                  "private",
+                  "none"
+                ]
+              },
+              "protocol": {
+                "enum": [
+                  "http",
+                  "https",
+                  "tcp",
+                  "udp",
+                  "none"
+                ]
+              },
+              "container_port": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "bind_address": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 2
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "health": {
+                "type": "object",
+                "required": [
+                  "mode",
+                  "liveness_path",
+                  "readiness_path"
+                ],
+                "properties": {
+                  "mode": {
+                    "enum": [
+                      "http",
+                      "command",
+                      "none"
+                    ]
+                  },
+                  "liveness_path": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^/"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "readiness_path": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^/"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              "stateful": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "public_routes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "route_id",
+              "hostname",
+              "scheme",
+              "path",
+              "target_service",
+              "target_container_port",
+              "canonical",
+              "shared_hostname"
+            ],
+            "properties": {
+              "route_id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{1,62}$"
+              },
+              "hostname": {
+                "type": "string",
+                "pattern": "^(?=.{1,253}$)(?!-)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$"
+              },
+              "scheme": {
+                "const": "https"
+              },
+              "path": {
+                "type": "string",
+                "pattern": "^/"
+              },
+              "target_service": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,62}$"
+              },
+              "target_container_port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "canonical": {
+                "type": "boolean"
+              },
+              "shared_hostname": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "network": {
+          "type": "object",
+          "required": [
+            "default_isolation",
+            "cross_resource_strategy",
+            "allowed_external_resources"
+          ],
+          "properties": {
+            "default_isolation": {
+              "const": "resource-specific-network"
+            },
+            "cross_resource_strategy": {
+              "enum": [
+                "none",
+                "authenticated-https",
+                "coolify-predefined-network",
+                "mixed"
+              ]
+            },
+            "allowed_external_resources": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 2
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "port_policy": {
+          "type": "object",
+          "required": [
+            "container_ports_may_repeat_across_coolify_resources",
+            "host_ports_forbidden_by_default",
+            "published_host_ports"
+          ],
+          "properties": {
+            "container_ports_may_repeat_across_coolify_resources": {
+              "const": true
+            },
+            "host_ports_forbidden_by_default": {
+              "const": true
+            },
+            "published_host_ports": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "target_service",
+                  "container_port",
+                  "host_port",
+                  "protocol",
+                  "bind_address",
+                  "reason",
+                  "approved_by",
+                  "firewall_scope",
+                  "expires_at"
+                ],
+                "properties": {
+                  "target_service": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]{0,62}$"
+                  },
+                  "container_port": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535
+                  },
+                  "host_port": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535
+                  },
+                  "protocol": {
+                    "enum": [
+                      "tcp",
+                      "udp"
+                    ]
+                  },
+                  "bind_address": {
+                    "type": "string",
+                    "minLength": 2
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 10
+                  },
+                  "approved_by": {
+                    "type": "string",
+                    "minLength": 2
+                  },
+                  "firewall_scope": {
+                    "type": "string",
+                    "minLength": 2
+                  },
+                  "expires_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "persistent_storage": {
+          "type": "object",
+          "required": [
+            "required",
+            "volumes"
+          ],
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "volumes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "volume_id",
+                  "target_path",
+                  "source_type",
+                  "backup_required"
+                ],
+                "properties": {
+                  "volume_id": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]{1,62}$"
+                  },
+                  "target_path": {
+                    "type": "string",
+                    "pattern": "^/"
+                  },
+                  "source_type": {
+                    "enum": [
+                      "named_volume",
+                      "bind_mount",
+                      "object_storage",
+                      "other"
+                    ]
+                  },
+                  "backup_required": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "database": {
+          "type": "object",
+          "required": [
+            "required",
+            "service_name",
+            "public_exposure",
+            "backup_required"
+          ],
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "service_name": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{0,62}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "public_exposure": {
+              "const": "forbidden"
+            },
+            "backup_required": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "backups": {
+          "type": "object",
+          "required": [
+            "required",
+            "policy",
+            "schedule",
+            "retention_days",
+            "restore_test_frequency"
+          ],
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "policy": {
+              "enum": [
+                "not_applicable",
+                "coolify_scheduled",
+                "database_native",
+                "external",
+                "combined",
+                "pending"
+              ]
+            },
+            "schedule": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 3
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "retention_days": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "restore_test_frequency": {
+              "enum": [
+                "not_applicable",
+                "monthly",
+                "quarterly",
+                "biannual",
+                "annual",
+                "pending"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "rollback": {
+          "type": "object",
+          "required": [
+            "supported",
+            "application_strategy",
+            "database_migration_strategy",
+            "backward_compatible_window_required",
+            "runbook"
+          ],
+          "properties": {
+            "supported": {
+              "const": true
+            },
+            "application_strategy": {
+              "enum": [
+                "previous-coolify-deployment",
+                "image-tag",
+                "git-revision",
+                "compose-redeploy",
+                "manual-approved"
+              ]
+            },
+            "database_migration_strategy": {
+              "const": "expand-migrate-verify-contract"
+            },
+            "backward_compatible_window_required": {
+              "const": true
+            },
+            "runbook": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "registry": {
+          "type": "object",
+          "required": [
+            "status",
+            "central_registry_id",
+            "registration_id",
+            "validation_required_in_ci",
+            "last_verified_at"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "pending_registration",
+                "registered",
+                "exempt"
+              ]
+            },
+            "central_registry_id": {
+              "type": "string",
+              "minLength": 3
+            },
+            "registration_id": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,31}$"
+            },
+            "validation_required_in_ci": {
+              "type": "boolean"
+            },
+            "last_verified_at": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "authentication": {
+            "properties": {
+              "compatibility_mode": {
+                "const": "dual-run"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "authentication": {
+            "properties": {
+              "legacy": {
+                "properties": {
+                  "enabled": {
+                    "const": true
+                  },
+                  "forced_migration": {
+                    "const": false
+                  },
+                  "preserve_existing_consumers": {
+                    "const": true
+                  },
+                  "preserve_active_sessions": {
+                    "const": true
+                  },
+                  "preserve_refresh_tokens": {
+                    "const": true
+                  },
+                  "preserve_token_claims": {
+                    "const": true
+                  },
+                  "preserve_endpoints_and_payloads": {
+                    "const": true
+                  },
+                  "rollback_without_data_loss": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "ai": {
+            "properties": {
+              "enabled": {
+                "const": false
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "ai": {
+            "properties": {
+              "profile": {
+                "const": "no_ai"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

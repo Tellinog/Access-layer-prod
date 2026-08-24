@@ -1,0 +1,7 @@
+schema_version: 1
+project_slug: access-layer
+status: no_ai
+providers: []
+production_rules:
+  providers_forbidden_until_use_case_approved: true
+  material_change_requires_reassessment: true

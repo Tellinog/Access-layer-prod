@@ -256,3 +256,19 @@ For production, create a Coolify compose app from this package, fill variables f
 - Bulk commit refuses to write when any row has validation errors; warning rows such as no-op revokes are reported without failing the whole import.
 - Added per-row audit events and a summary `admin.grant.bulk_import_committed` event.
 - Verification: `npm ci`, `npm run lint`, `npm run build` and `npm test` passed locally; test suite result is 9 files and 95 tests.
+
+## Step 1 template adoption and compatibility freeze, 2026-08-24
+
+- Adopted Agent Ready Project Template v2.1.0 additively in `legacy-migration` mode.
+- Classified Access Layer as a Coolify-deployed `platform_service` at `https://access-layer.unguess-internal.net`, app port `8080`, private PostgreSQL and no published host ports.
+- Froze repository-observed v1 route, JWKS, callback, JWT, exchange, refresh, session, grant, cookie, error and database behavior in `specs/legacy-contract-baseline.v1.json`.
+- Added synthetic golden-contract fixtures and source/route/error/database conformance tests without changing runtime behavior.
+- Documented supplied Nancy, Test Generator, Goodman and Petyr compatibility evidence. Consumer and current-production archive hashes do not match the instruction-pack reference hashes; conclusions are limited to the supplied archives.
+- No OAuth/OIDC implementation, database migration, UI translation/redesign, telemetry integration, Platform SDK adoption, secret rotation or deployment was performed.
+- The Compose PostgreSQL volume mismatch is a continuity `BLOCKER`: the service mounts `access_layer_postgres_data_v2`, while the top-level declaration is `access_layer_postgres_data`. Neither side was renamed.
+- The N→N+1 survival harness is documented but has status `DOCUMENTED_NOT_RUN` because two immutable real versions/images were not provided.
+- Verification passed: TypeScript lint/build, 106 Vitest tests, non-strict platform conformance and 34 Python conformance tests (two pristine-template bootstrap tests skipped). Strict release conformance remains intentionally blocked on six documented gates.
+
+## Current release posture
+
+Do not deploy the Step 1 commit. Verify the live Coolify volume mapping and create a tested backup first. The previous deployment recommendation above is superseded while this blocker is open.

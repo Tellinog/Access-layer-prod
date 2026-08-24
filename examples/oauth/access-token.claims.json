@@ -1,0 +1,16 @@
+{
+  "iss": "https://access-layer.unguess-internal.net",
+  "sub": "usr_example_001",
+  "aud": "https://template-project.unguess-internal.net/api",
+  "client_id": "agent-gateway",
+  "scope": "template-project:example:read",
+  "iat": 1786951200,
+  "exp": 1786952100,
+  "jti": "jti_oauth_example_001",
+  "sid": "oauth_session_example_001",
+  "principal_type": "human",
+  "act": {
+    "sub": "service:agent-gateway",
+    "client_id": "agent-gateway"
+  }
+}

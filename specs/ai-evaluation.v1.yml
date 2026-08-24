@@ -1,0 +1,6 @@
+schema_version: 1
+project_slug: access-layer
+evaluation_status: not_applicable_while_no_ai
+metrics: []
+release_thresholds: []
+rollback_plan: Keep AI disabled; remove any unapproved provider, model, prompt or AI dependency before release.

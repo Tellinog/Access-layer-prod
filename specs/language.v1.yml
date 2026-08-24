@@ -1,0 +1,18 @@
+schema_version: 1
+project_slug: access-layer
+current_state:
+  ui_locale: it
+  safe_error_copy_locale: it
+  documentation_languages: [it, en]
+  api_identifiers_locale: en
+target_state:
+  ui_locale: en-GB
+  fallback_locale: en-GB
+  documentation_language: en
+  api_language: en
+  preserve_user_content_language: true
+  automatic_translation: false
+adoption:
+  status: deferred_scope
+  reason: Step 1 forbids UI translation or redesign and freezes existing error messages.
+  runtime_change: false

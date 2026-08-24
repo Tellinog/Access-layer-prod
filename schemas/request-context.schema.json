@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://platform.unguess-internal.net/schemas/request-context.schema.json",
+  "title": "Normalised platform request context",
+  "type": "object",
+  "required": [
+    "auth_profile",
+    "principal_type",
+    "principal_id",
+    "project_slug",
+    "resource_id",
+    "permissions",
+    "scopes",
+    "invocation_channel",
+    "correlation_id",
+    "environment",
+    "request_started_at"
+  ],
+  "properties": {
+    "auth_profile": {
+      "enum": [
+        "access-layer-legacy-v1",
+        "unguess-oauth-oidc-v1",
+        "system-internal"
+      ]
+    },
+    "principal_type": {
+      "enum": [
+        "human",
+        "service"
+      ]
+    },
+    "principal_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable subject identifier. Email must not be used as the primary identity."
+    },
+    "delegated_subject": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Optional human subject represented by a service principal; null when principal_id is already the effective subject."
+    },
+    "actor_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Optional intermediary actor, such as Agent Gateway during delegated access."
+    },
+    "client_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "project_slug": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,62}$"
+    },
+    "resource_id": {
+      "type": "string",
+      "format": "uri",
+      "description": "Canonical HTTPS identifier and OAuth audience of the receiving project resource server."
+    },
+    "capability_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-z][a-z0-9-]+(?::[a-z][a-z0-9-]+){1,}$"
+    },
+    "permissions": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]+(?::[a-z][a-z0-9-]+){1,}$"
+      }
+    },
+    "scopes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]+(?::[a-z][a-z0-9-]+){1,}$"
+      }
+    },
+    "invocation_channel": {
+      "enum": [
+        "web",
+        "api",
+        "mcp",
+        "worker"
+      ]
+    },
+    "access_session_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "authorization_grant_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "token_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "correlation_id": {
+      "type": "string",
+      "minLength": 8
+    },
+    "trace_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "environment": {
+      "type": "string",
+      "minLength": 2
+    },
+    "request_started_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "additionalProperties": false
+}

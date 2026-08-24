@@ -1,0 +1,360 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://platform.unguess-internal.net/schemas/deployment-registry.schema.json",
+  "title": "UNGUESS central Coolify deployment registry",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "registry_name",
+    "updated_at",
+    "deployments"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "registry_name": {
+      "type": "string",
+      "minLength": 3
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "deployments": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/registration"
+      }
+    }
+  },
+  "$defs": {
+    "route": {
+      "type": "object",
+      "required": [
+        "route_id",
+        "hostname",
+        "scheme",
+        "path",
+        "target_service",
+        "target_container_port",
+        "canonical",
+        "shared_hostname"
+      ],
+      "properties": {
+        "route_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{1,62}$"
+        },
+        "hostname": {
+          "type": "string",
+          "pattern": "^(?=.{1,253}$)(?!-)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$"
+        },
+        "scheme": {
+          "const": "https"
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^/"
+        },
+        "target_service": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$"
+        },
+        "target_container_port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "canonical": {
+          "type": "boolean"
+        },
+        "shared_hostname": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "service": {
+      "type": "object",
+      "required": [
+        "service_name",
+        "role",
+        "exposure",
+        "protocol",
+        "container_port"
+      ],
+      "properties": {
+        "service_name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$"
+        },
+        "role": {
+          "enum": [
+            "web",
+            "api",
+            "worker",
+            "scheduler",
+            "database",
+            "cache",
+            "collector",
+            "proxy",
+            "other"
+          ]
+        },
+        "exposure": {
+          "enum": [
+            "public",
+            "private",
+            "none"
+          ]
+        },
+        "protocol": {
+          "enum": [
+            "http",
+            "https",
+            "tcp",
+            "udp",
+            "none"
+          ]
+        },
+        "container_port": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "hostPort": {
+      "type": "object",
+      "required": [
+        "target_service",
+        "container_port",
+        "host_port",
+        "protocol",
+        "bind_address",
+        "reason",
+        "approved_by",
+        "firewall_scope",
+        "expires_at"
+      ],
+      "properties": {
+        "target_service": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$"
+        },
+        "container_port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "host_port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "protocol": {
+          "enum": [
+            "tcp",
+            "udp"
+          ]
+        },
+        "bind_address": {
+          "type": "string",
+          "minLength": 2
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 10
+        },
+        "approved_by": {
+          "type": "string",
+          "minLength": 2
+        },
+        "firewall_scope": {
+          "type": "string",
+          "minLength": 2
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false
+    },
+    "registration": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "registration_id",
+        "project_slug",
+        "project_kind",
+        "owner_team",
+        "environment",
+        "coolify",
+        "routes",
+        "services",
+        "published_host_ports",
+        "state",
+        "registry"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "registration_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,31}$"
+        },
+        "project_slug": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{1,62}$"
+        },
+        "project_kind": {
+          "enum": [
+            "tool",
+            "platform_service",
+            "infrastructure_stack"
+          ]
+        },
+        "owner_team": {
+          "type": "string",
+          "minLength": 2
+        },
+        "environment": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{1,31}$"
+        },
+        "coolify": {
+          "type": "object",
+          "required": [
+            "server_name",
+            "project_name",
+            "environment_name",
+            "resource_name",
+            "resource_type",
+            "build_strategy",
+            "destination_name"
+          ],
+          "properties": {
+            "server_name": {
+              "type": "string",
+              "minLength": 2
+            },
+            "project_name": {
+              "type": "string",
+              "minLength": 2
+            },
+            "environment_name": {
+              "type": "string",
+              "minLength": 2
+            },
+            "resource_name": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{1,127}$"
+            },
+            "resource_type": {
+              "enum": [
+                "application",
+                "service",
+                "not_applicable"
+              ]
+            },
+            "build_strategy": {
+              "enum": [
+                "dockerfile",
+                "docker_compose",
+                "nixpacks",
+                "static",
+                "prebuilt_image",
+                "not_applicable"
+              ]
+            },
+            "destination_name": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "routes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/route"
+          }
+        },
+        "services": {
+          "type": "array",
+          "minItems": 0,
+          "items": {
+            "$ref": "#/$defs/service"
+          }
+        },
+        "published_host_ports": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hostPort"
+          }
+        },
+        "state": {
+          "type": "object",
+          "required": [
+            "persistent_storage_required",
+            "database_required",
+            "backup_required"
+          ],
+          "properties": {
+            "persistent_storage_required": {
+              "type": "boolean"
+            },
+            "database_required": {
+              "type": "boolean"
+            },
+            "backup_required": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "registry": {
+          "type": "object",
+          "required": [
+            "status",
+            "last_verified_at"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "pending_registration",
+                "registered",
+                "exempt"
+              ]
+            },
+            "last_verified_at": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,4 +1,7 @@
 version: 1
+compatibility_status: frozen_no_permission_changes
+legacy_permission_aliases: {}
+capability_catalogue: ../CAPABILITY_CATALOGUE.yml
 roles:
   platform_admin:
     description: Full administration of Access Layer.

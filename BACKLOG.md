@@ -3,9 +3,12 @@
 ## BLOCKER
 
 - Confirm who receives bootstrap platform admin access after first deploy.
+- 2026-08-24: `docker-compose.yaml` mounts `access_layer_postgres_data_v2` but declares `access_layer_postgres_data`. Do not rename either value or deploy until the live Coolify volume mapping is identified and a verified backup/restore point exists.
+- 2026-08-24: production deployment remains blocked until exact Coolify server/project/resource/destination identifiers and the central registry record are verified.
 
 ## RESOLVED
 
+- 2026-08-24: restored root `.env.example` as a compatibility copy with the same 41 variable names as `.env.production.example`; production values and secret handling remain unchanged.
 - 2026-06-17: Corrected and confirmed real Google Workspace domain list for `GOOGLE_ALLOWED_HD`: `unguess.io`.
 - 2026-06-16: Confirmed production and local redirect URIs before creating OAuth clients:
   - `http://localhost:8080/access-control/v1/auth/google/callback`
@@ -16,11 +19,16 @@
 
 ## QUESTION
 
-- 2026-07-02: `AGENTS.md`, `docs/DEPLOYMENT.md` and `docs/SECURITY.md` reference `.env.example`, but this workspace currently provides `.env.production.example` and no root `.env.example`. Confirm whether `.env.production.example` is the canonical template or restore a general `.env.example`.
 - Should raw IP be stored for audit, or only salted hash plus country/ASN metadata?
 - Should logs be exported to an external SIEM in v1?
 - Should per-tool role labels remain free-form strings after v1, or become centrally managed values?
 - Define retention/cleanup for revoked and expired refresh-token rows now that active sessions rotate tokens repeatedly.
+- 2026-08-24: confirm the exact owner team, technical owner and product owner for platform/deployment registration.
+- 2026-08-24: confirm the backup schedule, retention, storage destination and restore-test frequency from live Coolify operations.
+- 2026-08-24: confirm whether `GET /v1/admin/backup/secret-material`, present in runtime but absent from `schemas/openapi.yaml`, should be added to a future OpenAPI revision or intentionally remain undocumented. Step 1 freezes the drift.
+- 2026-08-24: confirm Nancy's production callback and live registration; only its local callback was present in the supplied evidence.
+- 2026-08-24: approve measurable availability, latency, correctness, error-budget and alert-window SLO targets; repository evidence does not define them.
+- 2026-08-24: export the live tool, callback and permission catalogue before asserting that the repository-only capability inventory is operationally complete.
 
 ## ASSUMPTION_TO_VALIDATE
 
@@ -34,6 +42,11 @@
 - Delegated `tool_admin` scope can use `admin_tool_assignments` plus matching `tools.owner_email` for v1.
 - Storing tool callback `state` in `auth_requests` is acceptable because tool integrations must not include secrets in state.
 - Admin-only restore secret material export includes runtime secrets such as `TOOL_CLIENT_SECRET_PEPPER` and `BACKUP_ENCRYPTION_KEY`; existing per-tool client secrets remain non-recoverable because only hashes are stored, so lost per-tool secrets require rotation.
+- 2026-08-24: the user-supplied Access Layer, Nancy, Test Generator, Goodman and Petyr archives are acceptable Step 1 compatibility evidence despite not matching the instruction-pack checksums. Obtain the referenced revisions or formally accept the supplied hashes.
+- 2026-08-24: Coolify represents this Docker Compose deployment as resource type `service`; verify against the live resource before central registration.
+- 2026-08-24: the named central deployment registry ID is `unguess-coolify-deployments`; its authoritative location and record ownership remain unverified.
+- 2026-08-24: Nancy, Test Generator and Goodman in-memory refresh locks are sufficient only for their observed single-replica assumptions; multi-replica safety is not proven.
+- 2026-08-24: Petyr's supplied registration and code are deployed as inspected. Evidence contains a superseded Access Layer origin and a permission used in code but absent from the supplied tool registration.
 
 ## DEFERRED_SCOPE
 
@@ -44,6 +57,12 @@
 - Full SIEM integration.
 - Dedicated SDK packages per framework.
 - Immutable append-only log storage with WORM retention.
+- OAuth/OIDC endpoints, discovery metadata, authorization-server tables, scopes, service principals and token exchange.
+- UNGUESS Platform SDK dependency adoption and telemetry SDK integration.
+- Tool Observatory registration and synthetic monitor deployment.
+- MCP exposure and stable platform capability/OAuth-scope mapping.
+- Garden UI migration and English-first UI translation/redesign.
+- N→N+1 survival execution until two real immutable versions/images and an isolated production-shaped database are available.
 
 ## RESOLVED_2026_06_17
 

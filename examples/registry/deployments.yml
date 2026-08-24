@@ -1,0 +1,71 @@
+schema_version: 1
+registry_name: unguess-coolify-deployments
+updated_at: '2026-08-18T00:00:00Z'
+deployments:
+  - schema_version: 1
+    registration_id: example-tool:production
+    project_slug: example-tool
+    project_kind: tool
+    owner_team: example-team
+    environment: production
+    coolify:
+      server_name: main-server
+      project_name: internal-tools
+      environment_name: production
+      resource_name: example-tool-production
+      resource_type: application
+      build_strategy: docker_compose
+      destination_name: coolify
+    routes:
+      - route_id: primary-web
+        hostname: example-tool.example.invalid
+        scheme: https
+        path: /
+        target_service: web
+        target_container_port: 3000
+        canonical: true
+        shared_hostname: false
+    services:
+      - service_name: web
+        role: web
+        exposure: public
+        protocol: http
+        container_port: 3000
+    published_host_ports: []
+    state:
+      persistent_storage_required: false
+      database_required: false
+      backup_required: false
+    registry:
+      status: registered
+      last_verified_at: '2026-08-18T00:00:00Z'
+
+  - schema_version: 1
+    registration_id: example-observability:production
+    project_slug: example-observability
+    project_kind: infrastructure_stack
+    owner_team: platform-team
+    environment: production
+    coolify:
+      server_name: main-server
+      project_name: platform-infrastructure
+      environment_name: production
+      resource_name: example-observability-production
+      resource_type: service
+      build_strategy: docker_compose
+      destination_name: coolify
+    routes: []
+    services:
+      - service_name: otel-collector
+        role: collector
+        exposure: private
+        protocol: http
+        container_port: 4318
+    published_host_ports: []
+    state:
+      persistent_storage_required: true
+      database_required: false
+      backup_required: true
+    registry:
+      status: registered
+      last_verified_at: '2026-08-18T00:00:00Z'

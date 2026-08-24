@@ -1,0 +1,78 @@
+schema_version: 1
+project_slug: access-layer
+status: legacy_compatibility_inventory
+machine_contract: ./specs/legacy-contract-baseline.v1.json
+rules:
+  runtime_change: none
+  identifiers_are_documentation_only: true
+  oauth_scopes_created: false
+  mcp_exposure_created: false
+  platform_sdk_mapping_created: false
+capability_groups:
+- id: legacy-auth-public
+  exposure: api
+  authentication: mixed_public_and_tool_basic
+  operations:
+  - GET /v1/.well-known/jwks.json
+  - GET /v1/auth/start
+  - GET /v1/auth/google/callback
+  - POST /v1/auth/exchange
+  - POST /v1/auth/refresh
+  - POST /v1/auth/introspect
+  - POST /v1/auth/logout
+  - GET /v1/me
+- id: legacy-admin-tools
+  exposure: api
+  authentication: admin_access_jwt_or_signed_cookie
+  permission_model: specs/permissions.v1.yml
+  operations:
+  - GET /v1/admin/tools
+  - POST /v1/admin/tools
+  - PATCH /v1/admin/tools/:tool_id
+  - DELETE /v1/admin/tools/:tool_id
+  - POST /v1/admin/tools/:tool_id/rotate-secret
+  - GET /v1/admin/tools/permissions/export
+- id: legacy-admin-backup
+  exposure: api
+  authentication: admin_access_jwt_or_signed_cookie
+  permission_model: specs/permissions.v1.yml
+  operations:
+  - GET /v1/admin/backup/export
+  - GET /v1/admin/backup/secret-material
+  - POST /v1/admin/backup/import
+- id: legacy-admin-users-grants
+  exposure: api
+  authentication: admin_access_jwt_or_signed_cookie
+  permission_model: specs/permissions.v1.yml
+  operations:
+  - GET /v1/admin/users
+  - PATCH /v1/admin/users/:user_id
+  - GET /v1/admin/grants
+  - GET /v1/admin/grants/export
+  - GET /v1/admin/grants/bulk/template
+  - POST /v1/admin/grants/bulk/preview
+  - POST /v1/admin/grants/bulk/commit
+  - POST /v1/admin/grants
+  - PATCH /v1/admin/grants/:grant_id
+- id: legacy-admin-access-requests-audit
+  exposure: api
+  authentication: admin_access_jwt_or_signed_cookie
+  permission_model: specs/permissions.v1.yml
+  operations:
+  - GET /v1/admin/access-requests
+  - POST /v1/admin/access-requests/:request_id/approve
+  - POST /v1/admin/access-requests/:request_id/reject
+  - POST /v1/admin/access-requests/:request_id/close
+  - GET /v1/admin/audit-logs
+- id: legacy-admin-web
+  exposure: web
+  authentication: signed_cookie_and_google_callback
+  operations:
+  - GET /admin/login
+  - GET /admin/auth/callback
+  - POST /admin/refresh
+  - POST /admin/logout
+  - GET /admin
+unresolved:
+- Stable platform capability IDs, one-to-one OAuth scopes and operation IDs require a later approved design.
+- The live permission catalogue and consumer registrations must be exported before claiming completeness beyond repository evidence.

@@ -87,3 +87,6 @@ See:
 - Breaking changes require a new major path, e.g. `/v2`.
 - Additive fields are allowed if documented in `schemas/openapi.yaml` and examples.
 - Deprecations require documentation in `CURRENT_STATE.md` and `DEVLOG.md`.
+# Step 1 machine baseline
+
+The exhaustive repository-observed route and wire-contract freeze is `../specs/legacy-contract-baseline.v1.json`. It records one known documentation drift: runtime registers `GET /v1/admin/backup/secret-material`, while the historical `../schemas/openapi.yaml` omits it. Step 1 changes neither side.

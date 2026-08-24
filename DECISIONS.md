@@ -301,3 +301,23 @@ The standard bulk-release form accepts one company email per line with one selec
 Rationale: access administration is primarily an entitlement-management task. Exposing the relationship in both directions reduces lookup and transcription errors while preserving the backend's existing validation, audit events, pending-email grants and atomic commit behavior.
 
 Operational consequence: this is an Admin UI behavior change only. No API, grant model, permission policy or delegated tool-admin visibility is expanded; platform admins alone may see a complete registered-user access matrix.
+
+## D-031 - Adopt Template v2.1 in legacy-migration mode
+
+Status: accepted
+
+Confirmed: 2026-08-24
+
+Decision: Access Layer is classified as a `platform_service` and adopts Agent Ready Project Template v2.1.0 additively in `legacy-migration` mode. Existing repository documentation, decisions, tests, runtime files and history remain authoritative. Copied OAuth, MCP, Garden, AI-governance and telemetry material is target/reference documentation until explicitly implemented and recorded in `CURRENT_STATE.md`.
+
+Rationale: the repository needs the platform contract and governance structure without changing the production authentication authority during the adoption step.
+
+## D-032 - Freeze legacy v1 compatibility and block deployment on volume ambiguity
+
+Status: accepted
+
+Confirmed: 2026-08-24
+
+Decision: the repository-observed v1 endpoints, callback, JWT/JWKS, session, refresh, grant, cookie, error and database contracts are frozen in `specs/legacy-contract-baseline.v1.json`. Step 1 makes no runtime or database change. The Compose reference `access_layer_postgres_data_v2` and declaration `access_layer_postgres_data` must remain untouched, and deployment is prohibited until the live Coolify mapping and a verified backup are available.
+
+Rationale: preserving active sessions, refresh tokens, grant semantics and PostgreSQL continuity is more important than normalizing configuration whose live binding is unknown.

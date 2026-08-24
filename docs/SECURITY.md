@@ -180,3 +180,6 @@ To prevent spam and enumeration:
 - rate limit repeated login attempts;
 - expose requests only to `platform_admin` or assigned `tool_admin`;
 - keep raw IP disabled by default and store only hashes unless approved.
+# Step 1 compatibility freeze
+
+As of 2026-08-24, the repository-observed security contract is frozen in `../specs/legacy-contract-baseline.v1.json`. Step 1 adds no OAuth/OIDC surface, secret rotation, permission, token, cookie or session change. Copied template OAuth and SDK material is reference-only. Never log or store raw golden tokens; all new fixtures use synthetic `.invalid` identities and non-secret token strings.

@@ -1,0 +1,22 @@
+# Repository text is stored as LF so Windows and Linux checkouts are deterministic.
+* text=auto eol=lf
+
+# Windows command scripts retain their native line endings.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary assets must never be line-ending normalized.
+*.png -text
+*.jpg -text
+*.jpeg -text
+*.gif -text
+*.webp -text
+*.ico -text
+*.pdf -text
+*.zip -text
+*.gz -text
+*.tar -text
+*.woff -text
+*.woff2 -text
+*.ttf -text
+*.eot -text

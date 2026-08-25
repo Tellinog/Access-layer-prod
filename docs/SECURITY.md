@@ -19,6 +19,12 @@ Required Google ID token checks:
 
 Do not trust the email domain alone.
 
+## OAuth vNext P0 target security
+
+The additive OAuth target is frozen but not implemented. `OAUTH_P0_CONTRACT.md` and `../specs/oauth-p0.v1.yml` require Authorization Code plus Refresh Token only, PKCE `S256` for every code flow, exact redirects, one RFC 8707 resource, exact single audience, RFC 9068 `typ=at+jwt`, RFC 9207 response issuer, header-only bearer transport, OAuth-standard errors, refresh-family replay revocation and a dedicated OAuth key ring. Human OAuth `sub` remains Google `sub`; email, hosted domain, role and legacy permission arrays are excluded from OAuth access tokens by default.
+
+First-party browser clients remain BFF/server-side-token applications. Public-client rollout, SPA bearer-token storage, downstream OIDC, service principals, `client_credentials`, token exchange, `private_key_jwt` and dynamic registration are disabled/deferred.
+
 ## Authorization / permissions
 
 Authentication and authorization are separate.

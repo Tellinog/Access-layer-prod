@@ -1,45 +1,104 @@
 openapi: 3.1.0
 info:
-  title: Access Layer OAuth/OIDC target contract
-  version: 1.0.0-target
+  title: Access Layer OAuth vNext P0 target contract
+  version: 1.0.0-p0-contract
   description: >-
-    Proposal B target profile. This is an implementation contract for the
-    central Access Layer, not proof that the endpoints are deployed.
+    Frozen additive OAuth authorization-server contract. These endpoints are
+    not implemented or enabled. The existing /v1/* contract is separate and
+    unchanged. Stable RFCs are normative; OAuth 2.1 is only a draft-aligned
+    profile.
 servers:
   - url: https://access-layer.unguess-internal.net
+security: []
 paths:
   /.well-known/oauth-authorization-server:
     get:
-      summary: OAuth authorization-server metadata
+      operationId: oauthAuthorizationServerMetadata
+      summary: RFC 8414 authorization-server metadata
       responses:
         '200':
-          description: Metadata
+          description: P0 metadata advertising only enabled P0 capabilities
+          headers:
+            Cache-Control:
+              schema: {type: string}
           content:
             application/json:
               schema: {$ref: '#/components/schemas/AuthorizationServerMetadata'}
-  /.well-known/openid-configuration:
+  /.well-known/oauth-protected-resource/v1:
     get:
-      summary: OpenID Provider metadata when OIDC is enabled
+      operationId: oauthProtectedResourceMetadataForAccessLayerV1
+      summary: RFC 9728 metadata for the Access Layer v1 resource target
       responses:
-        '200': {description: OIDC metadata}
+        '200':
+          description: Protected-resource metadata; publication does not enable OAuth runtime
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProtectedResourceMetadata'}
   /oauth/authorize:
     get:
-      summary: Authorize a client using Authorization Code with PKCE
+      operationId: oauthAuthorize
+      summary: Authorize a human using Authorization Code with mandatory PKCE S256
+      description: >-
+        Requires one RFC 8707 resource and exact redirect matching. Access and
+        refresh tokens never appear in browser URLs. Google state/nonce are an
+        internal upstream transaction and remain separate from client state.
       parameters:
-        - {in: query, name: response_type, required: true, schema: {type: string, const: code}}
-        - {in: query, name: client_id, required: true, schema: {type: string}}
-        - {in: query, name: redirect_uri, required: true, schema: {type: string, format: uri}}
-        - {in: query, name: scope, required: true, schema: {type: string}}
-        - {in: query, name: state, required: true, schema: {type: string}}
-        - {in: query, name: code_challenge, required: true, schema: {type: string}}
-        - {in: query, name: code_challenge_method, required: true, schema: {type: string, const: S256}}
-        - {in: query, name: resource, required: true, schema: {type: string, format: uri}}
-        - {in: query, name: nonce, required: false, schema: {type: string}}
+        - in: query
+          name: response_type
+          required: true
+          schema: {type: string, const: code}
+        - in: query
+          name: client_id
+          required: true
+          schema: {type: string, minLength: 1}
+        - in: query
+          name: redirect_uri
+          required: true
+          schema: {type: string, format: uri}
+        - in: query
+          name: scope
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}(?: [a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62})*$'
+        - in: query
+          name: state
+          required: true
+          schema: {type: string, minLength: 1}
+        - in: query
+          name: code_challenge
+          required: true
+          schema: {type: string, minLength: 43, maxLength: 128}
+        - in: query
+          name: code_challenge_method
+          required: true
+          schema: {type: string, const: S256}
+        - in: query
+          name: resource
+          required: true
+          description: Exactly one registered HTTPS resource identifier.
+          schema: {type: string, format: uri, pattern: '^https://'}
       responses:
-        '302': {description: Redirect with authorization code and issuer or OAuth error}
+        '302':
+          description: >-
+            Exact registered redirect with code, original state and RFC 9207
+            iss, or with a standard OAuth error, safe state and iss.
+          headers:
+            Location:
+              required: true
+              schema: {type: string, format: uri}
+        '400':
+          description: Invalid client or redirect request that cannot be redirected safely
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OAuthError'}
   /oauth/token:
     post:
-      summary: Issue or rotate tokens
+      operationId: oauthToken
+      summary: Exchange an authorization code or rotate a refresh token
+      security:
+        - clientSecretBasic: []
+        - {}
       requestBody:
         required: true
         content:
@@ -48,149 +107,258 @@ paths:
               oneOf:
                 - {$ref: '#/components/schemas/AuthorizationCodeTokenRequest'}
                 - {$ref: '#/components/schemas/RefreshTokenRequest'}
-                - {$ref: '#/components/schemas/ClientCredentialsRequest'}
-                - {$ref: '#/components/schemas/TokenExchangeRequest'}
       responses:
         '200':
           description: OAuth token response
+          headers:
+            Cache-Control:
+              required: true
+              schema: {type: string, const: no-store}
+            Pragma:
+              required: true
+              schema: {type: string, const: no-cache}
           content:
             application/json:
               schema: {$ref: '#/components/schemas/TokenResponse'}
-        '400':
-          description: OAuth error
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/OAuthError'}
-        '401':
-          description: Client authentication failed
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/OAuthError'}
+        '400': {$ref: '#/components/responses/OAuthError'}
+        '401': {$ref: '#/components/responses/OAuthInvalidClient'}
   /oauth/revoke:
     post:
-      summary: Revoke a token or token family according to policy
+      operationId: oauthRevoke
+      summary: Revoke an OAuth token per RFC 7009
+      description: >-
+        Unknown and already-revoked tokens receive the same idempotent response.
+        Access-token revocation records the jti for online state; refresh-token
+        revocation revokes the complete family and linked OAuth session.
+      security:
+        - clientSecretBasic: []
+        - {}
       requestBody:
         required: true
         content:
           application/x-www-form-urlencoded:
-            schema:
-              type: object
-              required: [token]
-              properties:
-                token: {type: string}
-                token_type_hint: {type: string}
-      responses:
-        '200': {description: Revocation request processed}
-  /oauth/introspect:
-    post:
-      summary: Introspect a token for an authorised resource server
-      requestBody:
-        required: true
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              type: object
-              required: [token]
-              properties:
-                token: {type: string}
-                token_type_hint: {type: string}
+            schema: {$ref: '#/components/schemas/RevocationRequest'}
       responses:
         '200':
-          description: Token activity record
+          description: Revocation request processed without token-existence disclosure
+        '400': {$ref: '#/components/responses/OAuthError'}
+        '401': {$ref: '#/components/responses/OAuthInvalidClient'}
+  /oauth/introspect:
+    post:
+      operationId: oauthIntrospect
+      summary: Introspect a token per RFC 7662
+      description: Restricted to separately authorised confidential clients or resource servers.
+      security:
+        - introspectionClientBasic: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema: {$ref: '#/components/schemas/IntrospectionRequest'}
+      responses:
+        '200':
+          description: Active token metadata or exactly active=false for unknown/inactive tokens
+          headers:
+            Cache-Control:
+              required: true
+              schema: {type: string, const: no-store}
           content:
             application/json:
               schema: {$ref: '#/components/schemas/IntrospectionResponse'}
+        '401': {$ref: '#/components/responses/OAuthInvalidClient'}
   /oauth/jwks:
     get:
-      summary: OAuth/OIDC signing keys
+      operationId: oauthJwks
+      summary: Dedicated OAuth public signing-key set
+      description: Separate from the unchanged legacy /v1/.well-known/jwks.json key material.
       responses:
-        '200': {description: JWKS}
-  /oauth/userinfo:
-    get:
-      summary: OIDC UserInfo when enabled
-      security: [{oauthBearer: []}]
-      responses:
-        '200': {description: Standard minimised user claims}
+        '200':
+          description: OAuth verification keys, including overlap keys during rotation
+          headers:
+            Cache-Control:
+              required: true
+              schema: {type: string, const: 'public, max-age=300'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Jwks'}
 components:
   securitySchemes:
-    oauthBearer: {type: http, scheme: bearer, bearerFormat: JWT access token}
+    clientSecretBasic:
+      type: http
+      scheme: basic
+      description: client_secret_basic for a registered confidential OAuth client.
+    introspectionClientBasic:
+      type: http
+      scheme: basic
+      description: Separately authorised confidential client or resource-server credential.
+  responses:
+    OAuthError:
+      description: Standard OAuth protocol error
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/OAuthError'}
+    OAuthInvalidClient:
+      description: Client authentication failed
+      headers:
+        WWW-Authenticate:
+          schema: {type: string}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/OAuthError'}
   schemas:
     AuthorizationServerMetadata:
       type: object
-      required: [issuer, authorization_endpoint, token_endpoint, jwks_uri, response_types_supported, grant_types_supported, code_challenge_methods_supported]
+      required: [issuer, authorization_endpoint, token_endpoint, jwks_uri, revocation_endpoint, introspection_endpoint, response_types_supported, grant_types_supported, code_challenge_methods_supported, token_endpoint_auth_methods_supported, revocation_endpoint_auth_methods_supported, introspection_endpoint_auth_methods_supported, authorization_response_iss_parameter_supported]
       properties:
-        issuer: {type: string, format: uri}
-        authorization_endpoint: {type: string, format: uri}
-        token_endpoint: {type: string, format: uri}
-        jwks_uri: {type: string, format: uri}
-        revocation_endpoint: {type: string, format: uri}
-        introspection_endpoint: {type: string, format: uri}
-        response_types_supported: {type: array, items: {type: string}}
-        grant_types_supported: {type: array, items: {type: string}}
-        code_challenge_methods_supported: {type: array, contains: {const: S256}}
+        issuer: {type: string, const: 'https://access-layer.unguess-internal.net'}
+        authorization_endpoint: {type: string, const: 'https://access-layer.unguess-internal.net/oauth/authorize'}
+        token_endpoint: {type: string, const: 'https://access-layer.unguess-internal.net/oauth/token'}
+        jwks_uri: {type: string, const: 'https://access-layer.unguess-internal.net/oauth/jwks'}
+        revocation_endpoint: {type: string, const: 'https://access-layer.unguess-internal.net/oauth/revoke'}
+        introspection_endpoint: {type: string, const: 'https://access-layer.unguess-internal.net/oauth/introspect'}
+        response_types_supported:
+          type: array
+          const: [code]
+        grant_types_supported:
+          type: array
+          const: [authorization_code, refresh_token]
+        code_challenge_methods_supported:
+          type: array
+          const: [S256]
+        token_endpoint_auth_methods_supported:
+          type: array
+          const: [client_secret_basic, none]
+        revocation_endpoint_auth_methods_supported:
+          type: array
+          const: [client_secret_basic, none]
+        introspection_endpoint_auth_methods_supported:
+          type: array
+          const: [client_secret_basic]
+        authorization_response_iss_parameter_supported: {type: boolean, const: true}
+      additionalProperties: false
+    ProtectedResourceMetadata:
+      type: object
+      required: [resource, authorization_servers, scopes_supported, bearer_methods_supported]
+      properties:
+        resource: {type: string, format: uri}
+        authorization_servers:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: {type: string, format: uri}
+        scopes_supported:
+          type: array
+          uniqueItems: true
+          items: {$ref: '#/components/schemas/CapabilityScope'}
+        bearer_methods_supported:
+          type: array
+          const: [header]
+        resource_name: {type: string}
+      additionalProperties: false
     AuthorizationCodeTokenRequest:
       type: object
       required: [grant_type, code, redirect_uri, client_id, code_verifier, resource]
       properties:
-        grant_type: {const: authorization_code}
-        code: {type: string}
+        grant_type: {type: string, const: authorization_code}
+        code: {type: string, minLength: 1}
         redirect_uri: {type: string, format: uri}
-        client_id: {type: string}
-        code_verifier: {type: string}
-        resource: {type: string, format: uri}
+        client_id: {type: string, minLength: 1}
+        code_verifier: {type: string, minLength: 43, maxLength: 128}
+        resource: {type: string, format: uri, pattern: '^https://'}
+      additionalProperties: false
     RefreshTokenRequest:
       type: object
       required: [grant_type, refresh_token, client_id, resource]
       properties:
-        grant_type: {const: refresh_token}
-        refresh_token: {type: string}
-        client_id: {type: string}
-        resource: {type: string, format: uri}
-        scope: {type: string}
-    ClientCredentialsRequest:
-      type: object
-      required: [grant_type, resource]
-      properties:
-        grant_type: {const: client_credentials}
-        resource: {type: string, format: uri}
-        scope: {type: string}
-    TokenExchangeRequest:
-      type: object
-      required: [grant_type, subject_token, subject_token_type, resource]
-      properties:
-        grant_type: {const: 'urn:ietf:params:oauth:grant-type:token-exchange'}
-        subject_token: {type: string}
-        subject_token_type: {type: string}
-        resource: {type: string, format: uri}
-        scope: {type: string}
+        grant_type: {type: string, const: refresh_token}
+        refresh_token: {type: string, minLength: 1}
+        client_id: {type: string, minLength: 1}
+        resource: {type: string, format: uri, pattern: '^https://'}
+        scope:
+          type: string
+          pattern: '^[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}(?: [a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62})*$'
+      additionalProperties: false
     TokenResponse:
       type: object
-      required: [access_token, token_type, expires_in, scope]
+      required: [access_token, token_type, expires_in, scope, refresh_token]
       properties:
-        access_token: {type: string}
+        access_token: {type: string, minLength: 1, description: RFC 9068 JWT with typ=at+jwt}
         token_type: {type: string, const: Bearer}
-        expires_in: {type: integer}
-        refresh_token: {type: string}
-        scope: {type: string}
-        id_token: {type: string}
-        issued_token_type: {type: string}
-    IntrospectionResponse:
+        expires_in: {type: integer, const: 900}
+        refresh_token: {type: string, minLength: 1, description: Opaque rotating credential}
+        scope:
+          type: string
+          pattern: '^[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}(?: [a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62})*$'
+      additionalProperties: false
+    RevocationRequest:
       type: object
-      required: [active]
+      required: [token]
       properties:
-        active: {type: boolean}
-        client_id: {type: string}
-        sub: {type: string}
-        scope: {type: string}
-        aud: {type: string}
-        iss: {type: string}
-        exp: {type: integer}
-        token_type: {type: string}
+        token: {type: string, minLength: 1}
+        token_type_hint: {enum: [access_token, refresh_token]}
+        client_id: {type: string, description: Required only for a registered public client using auth method none.}
+      additionalProperties: false
+    IntrospectionRequest:
+      type: object
+      required: [token]
+      properties:
+        token: {type: string, minLength: 1}
+        token_type_hint: {enum: [access_token, refresh_token]}
+      additionalProperties: false
+    IntrospectionResponse:
+      oneOf:
+        - type: object
+          required: [active]
+          properties:
+            active: {const: false}
+          additionalProperties: false
+        - type: object
+          required: [active, iss, sub, aud, client_id, scope, exp, iat, jti, token_type]
+          properties:
+            active: {const: true}
+            iss: {type: string, format: uri}
+            sub: {type: string, minLength: 1}
+            aud: {type: string, format: uri}
+            client_id: {type: string, minLength: 1}
+            scope:
+              type: string
+              pattern: '^[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}(?: [a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62})*$'
+            exp: {type: integer, minimum: 1}
+            iat: {type: integer, minimum: 0}
+            nbf: {type: integer, minimum: 0}
+            jti: {type: string, minLength: 8}
+            sid: {type: string}
+            token_type: {type: string, const: Bearer}
+          additionalProperties: false
     OAuthError:
       type: object
       required: [error]
       properties:
-        error: {type: string}
+        error:
+          enum: [invalid_request, invalid_client, invalid_grant, unauthorized_client, unsupported_grant_type, invalid_scope, invalid_target, access_denied, unsupported_response_type, unsupported_token_type, server_error, temporarily_unavailable]
         error_description: {type: string}
         error_uri: {type: string, format: uri}
-        correlation_id: {type: string}
+        correlation_id: {type: string, minLength: 8}
+      additionalProperties: false
+    CapabilityScope:
+      type: string
+      pattern: '^[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}$'
+    Jwks:
+      type: object
+      required: [keys]
+      properties:
+        keys:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [kty, kid, use, alg]
+            properties:
+              kty: {type: string}
+              kid: {type: string, minLength: 1}
+              use: {type: string, const: sig}
+              alg: {type: string, const: RS256}
+              n: {type: string}
+              e: {type: string}
+            additionalProperties: true
+      additionalProperties: false

@@ -36,6 +36,10 @@
 - Password login.
 - Public user registration.
 
+## Step 2 target-contract boundary
+
+The additive OAuth vNext P0 protocol and proposed data model are in scope as design contracts only. OAuth handlers, discovery responses, SQL migrations/tables, production registrations, downstream OIDC, machine grants, token exchange and deployment remain out of scope until a separately approved implementation step.
+
 ## Personas
 
 | Persona | Goal | Main needs | Notes |

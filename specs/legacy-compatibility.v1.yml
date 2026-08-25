@@ -1,11 +1,17 @@
 version: 1
-status: frozen_step_1
-strategy: legacy_only_no_runtime_change
+status: frozen_step_2_contract_only
+strategy: legacy_only_runtime_with_additive_oauth_contract
 machine_baseline: ./legacy-contract-baseline.v1.json
 step_1:
   oauth_oidc_added: false
   database_migration_added: false
   platform_sdk_adopted: false
+  deployment_performed: false
+step_2:
+  oauth_p0_contract_frozen: true
+  oauth_runtime_added: false
+  database_migration_added: false
+  legacy_runtime_changed: false
   deployment_performed: false
 
 invariants:
@@ -35,7 +41,7 @@ invariants:
     rule: Signing and encryption material required for existing state is retained through its validity window.
   - id: LEGACY-009
     priority: p0
-    rule: Any separately approved future OAuth tables and fields must be additive during the rollback window; none exist in Step 1.
+    rule: Any separately approved future OAuth tables and fields must be additive during the rollback window; none exist through Step 2.
   - id: LEGACY-010
     priority: p0
     rule: OAuth, OIDC and MCP can be disabled independently without affecting legacy traffic.

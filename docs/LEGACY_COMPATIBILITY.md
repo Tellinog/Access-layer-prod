@@ -1,6 +1,6 @@
 # Legacy Compatibility
 
-> Step 1 status: the current legacy-only surface is frozen in `../specs/legacy-contract-baseline.v1.json`. No OAuth/OIDC endpoint, table, flag or adapter has been introduced. All additive/dual-run material below is a future constraint, not current behavior or a passed migration result.
+> Step 2 status: the current legacy-only surface remains frozen in `../specs/legacy-contract-baseline.v1.json`. The additive OAuth P0 contract is frozen in `../specs/oauth-p0.v1.yml`, but no OAuth endpoint, table, migration, flag or adapter has been introduced. All dual-run material below remains a future constraint, not current behavior or a passed migration result.
 
 ## Objective
 

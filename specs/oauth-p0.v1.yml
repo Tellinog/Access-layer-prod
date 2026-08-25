@@ -1,0 +1,231 @@
+schema_version: 1
+profile_id: unguess-oauth-vnext-p0
+status: contract_frozen_not_implemented
+runtime_enabled: false
+issuer: https://access-layer.unguess-internal.net
+normative_standards:
+  - rfc6749
+  - rfc6750
+  - rfc7636
+  - rfc7009
+  - rfc7662
+  - rfc8414
+  - rfc8707
+  - rfc9068
+  - rfc9207
+  - rfc9700
+  - rfc9728
+  - rfc10017
+oauth_2_1_alignment:
+  status: work_in_progress_draft_profile
+  final_rfc_claimed: false
+endpoints:
+  authorization_server_metadata: /.well-known/oauth-authorization-server
+  authorization: /oauth/authorize
+  token: /oauth/token
+  revocation: /oauth/revoke
+  introspection: /oauth/introspect
+  jwks: /oauth/jwks
+  protected_resource_metadata_for_access_layer_v1: /.well-known/oauth-protected-resource/v1
+authorization_code:
+  response_type: code
+  ttl_seconds: 60
+  single_use: true
+  hash_at_rest: required_non_reversible
+  request_parameters_required:
+    - response_type
+    - client_id
+    - redirect_uri
+    - scope
+    - state
+    - code_challenge
+    - code_challenge_method
+    - resource
+  redirect_match: exact_string
+  pkce:
+    required_for_every_code_flow: true
+    supported_methods: [S256]
+    plain_forbidden: true
+  resource_parameter:
+    standard: rfc8707
+    cardinality: exactly_one
+    registered_https_uri_required: true
+  success_response_query: [code, state, iss]
+  error_response_iss_required_when_redirected: true
+  upstream_google_state_and_nonce_separate: true
+  binding:
+    - client_id
+    - redirect_uri
+    - resource
+    - granted_scopes
+    - human_subject
+    - code_challenge
+token_endpoint:
+  content_type: application/x-www-form-urlencoded
+  grant_types_p0: [authorization_code, refresh_token]
+  client_authentication:
+    confidential_first_party: client_secret_basic
+    public_contract: none
+    public_rollout_enabled: false
+  cache_control: no-store
+  pragma: no-cache
+browser_architecture:
+  first_party: bff_server_side_tokens
+  browser_receives_oauth_tokens: false
+  local_session_cookie: opaque_httponly_secure_samesite_lax_or_stricter
+  spa_bearer_token_model: forbidden
+resource_and_audience:
+  resource_id_format: canonical_https_uri
+  request_cardinality: exactly_one
+  access_token_aud_shape: string
+  audience_match: exact
+  multi_audience_forbidden: true
+scope:
+  business_identifier_format: project:domain:action
+  pattern: ^[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}$
+  requested_scope_grant_rule: intersection
+  required_sources:
+    - registered_for_resource
+    - allowed_for_client_resource_relationship
+    - effective_human_entitlement
+    - centrally_allowed_by_policy
+  unknown_or_unauthorised: invalid_scope
+  implicit_alias_rewriting: forbidden
+access_token:
+  profile: rfc9068
+  format: jwt
+  ttl_seconds: 900
+  header:
+    typ: at+jwt
+    alg_initial: RS256
+    kid_required: true
+  claims_required: [iss, sub, aud, client_id, iat, exp, jti, scope, principal_type]
+  human_subject_source: user.google_sub
+  principal_type: human
+  pii_default_forbidden: [email, hd, display_name, picture_url, role, permissions]
+  optional_profile_claims: [nbf, sid]
+token_transport:
+  protected_resource_bearer_methods: [header]
+  authorization_header_scheme: Bearer
+  bearer_in_query: forbidden
+  bearer_in_form: forbidden_at_protected_resources
+  access_or_refresh_token_in_browser_url: forbidden
+  protected_resource_errors:
+    missing_or_invalid_token:
+      status: 401
+      www_authenticate_error: invalid_token
+    valid_token_insufficient_scope:
+      status: 403
+      www_authenticate_error: insufficient_scope
+    resource_metadata_parameter_required: true
+security_bcp:
+  implicit_grant: forbidden
+  password_grant: forbidden
+  authorization_server_open_redirect: forbidden
+  client_open_redirect: forbidden
+  authorization_code_injection_mitigations: [pkce_s256, authorization_response_iss]
+  mix_up_mitigation: authorization_response_iss
+  refresh_rotation_and_replay_detection: required
+  access_token_privilege_restriction: exact_resource_and_scope
+  tls_required_except_loopback_development_redirect: true
+refresh:
+  token_format: opaque
+  hash_at_rest: required_non_reversible
+  idle_timeout_seconds: 28800
+  activity_driven_only: true
+  background_refresh: forbidden
+  rotate_atomically: true
+  family_tracking: required
+  replay_action:
+    revoke_family: true
+    revoke_linked_oauth_session: true
+    deny_presented_request: invalid_grant
+  invariant_fields: [subject, client_id, resource]
+  scope_rule: equal_or_narrower_than_original_grant
+revocation:
+  standard: rfc7009
+  idempotent_external_response: true
+  client_authentication: client_secret_basic_or_none_as_registered
+  unknown_token_response_status: 200
+  access_token_action: revoke_jti_for_online_state
+  refresh_token_action: revoke_complete_family_and_linked_oauth_session
+  self_contained_access_token_offline_window: until_expiry_unless_online_policy_required
+introspection:
+  standard: rfc7662
+  authentication: separately_authorised_confidential_client_or_resource_server
+  inactive_response_fields: [active]
+  inactive_reason_disclosure: forbidden
+signing_keys:
+  namespace: dedicated_oauth_key_ring
+  jwks_uri: /oauth/jwks
+  legacy_key_material_reused: false
+  legacy_jwks_changed: false
+  kid_reuse_for_different_material: forbidden
+  publish_before_activation_seconds: 300
+  jwks_cache_max_age_seconds: 300
+  verifier_clock_skew_seconds: 60
+  retire_after_last_sign_seconds: 1260
+registration:
+  mode: controlled_static_admin
+  dynamic_client_registration: deferred
+  client_schema: ../schemas/oauth-client-registration.schema.json
+  resource_schema: ../schemas/oauth-resource-registration.schema.json
+  client_and_resource_identity_separate: true
+  transitional_entitlement_bridge: explicit_resource_to_legacy_tool
+authorization:
+  deny_by_default: true
+  human_consent_screen_p0: none_centrally_administered_first_party_grants
+  stable_human_key: google_sub
+errors:
+  protocol_error_shape: oauth
+  names:
+    - invalid_request
+    - invalid_client
+    - invalid_grant
+    - unauthorized_client
+    - unsupported_grant_type
+    - invalid_scope
+    - invalid_target
+    - access_denied
+    - unsupported_response_type
+    - unsupported_token_type
+    - server_error
+    - temporarily_unavailable
+  legacy_error_envelope_reused: false
+  correlation_id_extension_allowed: true
+audit:
+  required_events:
+    - oauth.authorization.requested
+    - oauth.authorization.allowed
+    - oauth.authorization.denied
+    - oauth.code.issued
+    - oauth.code.exchanged
+    - oauth.code.exchange_denied
+    - oauth.token.refreshed
+    - oauth.refresh.replay_detected
+    - oauth.token.revoked
+    - oauth.token.introspected
+    - oauth.client.changed
+    - oauth.resource.changed
+    - oauth.scope.changed
+    - oauth.signing_key.changed
+  forbidden_values: [authorization_code, access_token, refresh_token, client_secret, cookie, private_key, raw_secret_payload]
+deferred_p1:
+  - oidc_discovery
+  - oidc_id_token
+  - oidc_userinfo
+  - client_credentials
+  - token_exchange
+  - private_key_jwt
+  - dynamic_client_registration
+  - client_id_metadata_documents
+  - par
+  - jar
+  - dpop
+compatibility:
+  legacy_profile: access-layer-legacy-v1
+  legacy_contract: ./legacy-contract-baseline.v1.json
+  forced_migration: false
+  oauth_runtime_implemented: false
+  database_migration_created: false
+  legacy_fallback_on_oauth_failure: forbidden

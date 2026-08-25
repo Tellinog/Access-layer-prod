@@ -28,7 +28,9 @@ legacy_profile:
 oauth_profile:
   id: unguess-oauth-oidc-v1
   enabled: false
-  implementation_status: deferred_scope_no_endpoints_or_tables
+  implementation_status: p0_contract_frozen_no_endpoints_or_tables
+  p0_contract: ./oauth-p0.v1.yml
+  target_openapi: ../schemas/access-layer-oauth-v1.openapi.yaml
   issuer: https://access-layer.unguess-internal.net
   authorization_endpoint: /oauth/authorize
   token_endpoint: /oauth/token
@@ -49,12 +51,26 @@ oauth_profile:
   resource_indicator_required: true
   one_audience_per_token: true
   jwt_access_token_profile: rfc9068
+  jwt_typ: at+jwt
+  human_subject_source: user.google_sub
+  browser_architecture: bff_server_side_tokens
+  oidc_provider_p0_enabled: false
+  dedicated_oauth_signing_keys: true
   forbidden:
     - implicit_grant
     - password_grant
     - wildcard_redirect_uri
     - pkce_plain
     - bearer_token_in_query
+    - spa_browser_token_storage
+    - multi_audience_access_token
+  deferred_p1:
+    - client_credentials
+    - urn:ietf:params:oauth:grant-type:token-exchange
+    - private_key_jwt
+    - oidc_id_token
+    - oidc_userinfo
+    - dynamic_client_registration
 request_context:
   schema: ../schemas/request-context.schema.json
   adapters:

@@ -87,6 +87,10 @@ See:
 - Breaking changes require a new major path, e.g. `/v2`.
 - Additive fields are allowed if documented in `schemas/openapi.yaml` and examples.
 - Deprecations require documentation in `CURRENT_STATE.md` and `DEVLOG.md`.
+
+## Additive OAuth P0 target
+
+The target-only OAuth surface is documented separately in `../schemas/access-layer-oauth-v1.openapi.yaml` and `OAUTH_P0_CONTRACT.md`. It is not registered by the runtime. Target paths are RFC 8414 metadata, `/oauth/authorize`, `/oauth/token`, `/oauth/revoke`, `/oauth/introspect`, `/oauth/jwks`, and RFC 9728 protected-resource metadata. The historical `../schemas/openapi.yaml` remains the unchanged legacy `/v1/*` contract.
 # Step 1 machine baseline
 
 The exhaustive repository-observed route and wire-contract freeze is `../specs/legacy-contract-baseline.v1.json`. It records one known documentation drift: runtime registers `GET /v1/admin/backup/secret-material`, while the historical `../schemas/openapi.yaml` omits it. Step 1 changes neither side.

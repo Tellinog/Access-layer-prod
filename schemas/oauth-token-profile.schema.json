@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://access-layer.unguess-internal.net/schemas/oauth-token-profile.p0.schema.json",
+  "title": "Access Layer OAuth vNext P0 RFC 9068 token profile",
+  "type": "object",
+  "required": ["header", "claims"],
+  "properties": {
+    "header": {
+      "type": "object",
+      "required": ["alg", "kid", "typ"],
+      "properties": {
+        "alg": {"const": "RS256"},
+        "kid": {"type": "string", "minLength": 1},
+        "typ": {"const": "at+jwt"}
+      },
+      "additionalProperties": false
+    },
+    "claims": {"$ref": "https://platform.unguess-internal.net/schemas/oauth-access-token-claims.schema.json"}
+  },
+  "additionalProperties": false
+}

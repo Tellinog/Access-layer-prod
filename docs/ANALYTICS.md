@@ -18,6 +18,8 @@ This project does not track product analytics for user behavior. It tracks secur
 | Refresh failures | `token.refresh.denied` | Expiry, replay, integration and authorization monitoring |
 | Admin grant changes | `admin.grant.*` | Change tracking |
 
+Future OAuth P0 operational metrics derive from `oauth.authorization.*`, `oauth.code.*`, `oauth.token.refreshed`, `oauth.refresh.replay_detected`, `oauth.token.revoked`, `oauth.token.introspected` and registration/key lifecycle events. They remain disabled until OAuth runtime exists and must use aggregate client/resource/scope dimensions without tokens, email or subject in metric labels.
+
 ## Dashboards
 
 Recommended filters:

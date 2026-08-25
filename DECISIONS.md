@@ -359,3 +359,21 @@ Decision: production evidence resolves the PostgreSQL source mismatch in favour 
 No explicit Compose `name:` is added. The service mount paths, UUID-prefixed physical volumes, database, network, resource and JWT volume are not renamed. This decision supersedes only D-032's instruction to leave the now-proven source mismatch untouched; the frozen legacy runtime contract and all remaining deployment gates continue unchanged.
 
 Rationale: the resolved Coolify Compose supplies the previously missing continuity evidence. Matching the source declaration to the already-running logical mount prevents creation of an unintended empty PostgreSQL volume while leaving Coolify's physical-name management intact.
+
+## D-036 - Freeze additive OAuth vNext P0 without implementation
+
+Status: accepted
+
+Confirmed: 2026-08-25
+
+Decision: `specs/oauth-p0.v1.yml` is the normative Access Layer OAuth vNext P0 profile. Stable RFCs are normative and OAuth 2.1 is described only as a work-in-progress draft alignment. P0 contains RFC 8414 metadata, Authorization Code and Refresh Token, mandatory PKCE `S256`, exact redirect matching, one RFC 8707 resource, exact single audience, RFC 9068 JWT access tokens with `typ=at+jwt`, RFC 9207 authorization-response `iss`, RFC 7009 revocation, RFC 7662 introspection, RFC 9700 controls and RFC 9728 protected-resource metadata.
+
+Human OAuth `sub` remains `users.google_sub` under D-004. OAuth tokens are PII-minimised and exclude email, hosted domain, profile data, legacy role and legacy permissions by default. Business scopes are exact `project:domain:action` capability IDs and are granted only by the intersection of resource registration, client/resource allowance, effective human entitlement and central policy.
+
+OAuth client and resource identities are separate. A resource may explicitly bind to an existing legacy tool/grant entitlement domain without changing the legacy tool model. P0 first-party browser applications remain BFF/server-side-token based and use centrally administered grants without a new end-user consent screen. A public authorization-code client contract exists, but production rollout is disabled until a concrete approved consumer exists.
+
+OAuth uses a dedicated signing key ring and `/oauth/jwks`; legacy signing material and `/v1/.well-known/jwks.json` remain untouched. New keys are published 300 seconds before activation, JWKS cache age is 300 seconds, verifier skew is 60 seconds, and old verification keys remain for at least 1,260 seconds after last use. OAuth refresh replay revokes the complete family and linked OAuth session.
+
+`client_credentials`, token exchange, `private_key_jwt`, downstream OIDC discovery/ID Token/UserInfo, dynamic registration, Client ID Metadata Documents, PAR, JAR and DPoP remain P1/deferred. Step 2 adds no handler, dependency, environment variable, table or migration.
+
+Rationale: a complete machine-testable contract is required before implementation, while signing-key isolation, role separation and additive storage preserve rollback and every frozen legacy consumer contract.

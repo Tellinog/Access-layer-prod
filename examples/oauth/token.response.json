@@ -1,0 +1,7 @@
+{
+  "access_token": "example-access-token-not-a-real-jwt",
+  "token_type": "Bearer",
+  "expires_in": 900,
+  "refresh_token": "example-refresh-token-not-a-real-credential",
+  "scope": "example-project:records:read"
+}

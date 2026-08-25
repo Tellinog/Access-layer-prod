@@ -1,5 +1,13 @@
 version: 1
 feature_flags:
+  enable_oauth_authorization_server:
+    default: false
+    status: target_not_implemented
+    description: Future global dark-rollout gate for the additive OAuth P0 runtime; no environment variable or handler exists in Step 2.
+  oauth_enabled_clients:
+    default: []
+    status: target_not_implemented
+    description: Future explicit pilot-client allow-list subordinate to the global OAuth gate; never triggers legacy credential fallback.
   enable_refresh_tokens:
     default: true
     description: Issue opaque single-use refresh tokens and allow activity-driven sliding session renewal.

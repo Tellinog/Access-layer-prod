@@ -1,5 +1,13 @@
 # TESTING.md
 
+## Step 2 OAuth P0 contract conformance
+
+`scripts/validate_oauth_p0_contract.py` and `tests/test_oauth_p0_contract.py` validate the target OpenAPI, machine profile, registration schemas and synthetic examples without invoking runtime endpoints. Checks freeze the exact P0 path/grant/auth-method set, RFC 9207 `iss`, mandatory PKCE `S256`, one RFC 8707 resource, exact single audience, RFC 9068 `typ=at+jwt`, Google-sub mapping, PII minimisation, canonical three-segment scopes, BFF architecture, replay-family behavior, dedicated key rotation, OAuth errors and P1 exclusions.
+
+The validator also resolves every internal OpenAPI component reference and rejects wildcard redirects, P1 advertisement, real-looking fixture credentials and OAuth runtime/migration additions. Existing legacy source-hash tests remain mandatory; the only accepted Step 2 source change is the separately committed Compose top-level declaration correction recorded in the legacy baseline.
+
+Step 2 final result: the validator passed 12 check groups; the full Python suite passed 50 tests with two expected template-bootstrap skips; Vitest passed 113 tests across 12 files; lint/build and targeted legacy baseline checks passed. Strict platform release validation still reports only the five external operational gates documented in `CURRENT_STATE.md` and `BACKLOG.md`.
+
 ## Step 1.5 production-continuity evidence checks
 
 `scripts/validate_production_continuity.py` validates `operations/production-continuity.evidence.yml` against its v2 JSON Schema, rejects secret-bearing fields/values and reusable verifiers, and reports separate isolated-restore and N→N+1 gates. Exit codes are `0` (final `READY`), `2` (`VALID_BUT_NOT_READY`) and `1` (`INVALID`). The committed bundle is expected to return exit `2` with both gates false until live operator evidence and a later isolated restore exist.

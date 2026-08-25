@@ -82,6 +82,10 @@ Default retention:
 - one-time codes: delete after expiration + 24 hours;
 - revoked sessions: keep 90 days unless compliance requires longer;
 - users: keep while account or logs require linkage, then pseudonymize if needed.
+
+## OAuth vNext additive proposal
+
+`OAUTH_ADDITIVE_DATA_MODEL.md` defines future independent `oauth_*` client, resource, scope, authorization-code, session, refresh-family and signing-key entities. It is a design proposal only. Step 2 adds no migration and does not rename, reuse or reinterpret any table above.
 # Step 2 continuity note
 
 Live Coolify evidence proves that logical volume `access_layer_postgres_data_v2` backs `/var/lib/postgresql/data` and resolves to the recorded UUID-prefixed physical volume. The source top-level declaration now matches the unchanged service mount. Do not add an explicit physical name, rename the logical/live volume, migrate data or deploy. Backup/restore evidence and the other release gates remain open. The machine database baseline is `../specs/legacy-contract-baseline.v1.json`.

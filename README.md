@@ -2,6 +2,8 @@
 
 > Platform status (2026-08-25): Template v2.1 is adopted in `legacy-migration` mode. Live evidence resolved the source Compose PostgreSQL logical-volume mismatch without renaming the live volume. Deployment remains blocked by the backup/restore, ownership, registry and remaining continuity gates in `BACKLOG.md`.
 
+> OAuth vNext status: the additive P0 contract is frozen in `specs/oauth-p0.v1.yml` and `docs/OAUTH_P0_CONTRACT.md`; no OAuth runtime endpoint, table, migration or client registration exists yet.
+
 Layer di accesso condiviso per tool web interni aziendali.
 
 Il servizio centralizza autenticazione, autorizzazione e audit trail per tutti i tool interni. Gli utenti accedono con account Google aziendale; il layer verifica che l'identita appartenga al dominio Google Workspace aziendale, controlla se l'utente e autorizzato al tool richiesto, registra il tentativo di accesso e rilascia al tool una identita verificata.
@@ -89,9 +91,11 @@ Leggere in questo ordine:
 7. `docs/ARCHITECTURE.md`
 8. `docs/SECURITY.md`
 9. `docs/API.md`
-10. `docs/GOOGLE_CLOUD_SETUP.md`
-11. `docs/INTEGRATION_GUIDE.md`
-12. `docs/IMPLEMENTATION_PLAN.md`
+10. `docs/OAUTH_P0_CONTRACT.md` for target OAuth work
+11. `docs/OAUTH_ADDITIVE_DATA_MODEL.md` for target OAuth data design
+12. `docs/GOOGLE_CLOUD_SETUP.md`
+13. `docs/INTEGRATION_GUIDE.md`
+14. `docs/IMPLEMENTATION_PLAN.md`
 
 Per aggiornare un tool gia integrato alla rotazione refresh e alle sessioni sliding, usare `prompts/TOOL_REFRESH_MIGRATION_PROMPT.md`.
 

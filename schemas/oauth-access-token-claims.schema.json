@@ -1,7 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://platform.unguess-internal.net/schemas/oauth-access-token-claims.schema.json",
-  "title": "UNGUESS OAuth JWT access-token claims",
+  "title": "Access Layer OAuth vNext P0 RFC 9068 human access-token claims",
+  "x-unguess-subject-source": "user.google_sub",
+  "x-unguess-pii-minimised": true,
   "type": "object",
   "required": [
     "iss",
@@ -11,7 +13,8 @@
     "scope",
     "iat",
     "exp",
-    "jti"
+    "jti",
+    "principal_type"
   ],
   "properties": {
     "iss": {
@@ -20,7 +23,8 @@
     },
     "sub": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "description": "Stable Google sub for the human, preserving D-004; never email or the local user UUID."
     },
     "aud": {
       "type": "string",
@@ -32,7 +36,7 @@
     },
     "scope": {
       "type": "string",
-      "pattern": "^[a-z0-9:-]+(?: [a-z0-9:-]+)*$"
+      "pattern": "^[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}(?: [a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62})*$"
     },
     "iat": {
       "type": "integer",
@@ -54,30 +58,7 @@
       "type": "string"
     },
     "principal_type": {
-      "enum": [
-        "human",
-        "service"
-      ]
-    },
-    "act": {
-      "type": "object",
-      "required": [
-        "sub"
-      ],
-      "properties": {
-        "sub": {
-          "type": "string",
-          "minLength": 1
-        },
-        "client_id": {
-          "type": "string",
-          "minLength": 1
-        }
-      },
-      "additionalProperties": false
-    },
-    "authorization_details": {
-      "type": "array"
+      "const": "human"
     }
   },
   "additionalProperties": false

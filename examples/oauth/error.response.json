@@ -1,0 +1,5 @@
+{
+  "error": "invalid_scope",
+  "error_description": "The requested scope is not available for this client and resource.",
+  "correlation_id": "corr_oauth_example_001"
+}

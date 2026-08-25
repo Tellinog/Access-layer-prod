@@ -2,7 +2,7 @@
 
 ## Decision
 
-Access Layer is mandatory. The target architecture is **Proposal B**: Access Layer itself evolves into the OAuth/OIDC authorization server and identity provider. The current legacy protocol remains available side by side.
+Access Layer is mandatory. The target architecture is **Proposal B**: Access Layer itself evolves additively into the OAuth authorization server while continuing to broker upstream Google OIDC. Downstream OpenID Provider functionality is P1. The current legacy protocol remains available side by side.
 
 ## Supported profiles
 
@@ -25,9 +25,8 @@ The project must preserve the current behavior of callback allowlisting, one-tim
 The target standard profile includes:
 
 - OAuth authorization-server metadata;
-- OpenID Provider discovery for web login;
 - authorization code with PKCE `S256`;
-- public and confidential clients;
+- confidential clients plus a public-client contract whose rollout is disabled;
 - resource indicators and audience binding;
 - JWT access tokens following the selected platform profile;
 - refresh rotation and replay detection;
@@ -35,6 +34,8 @@ The target standard profile includes:
 - protected-resource metadata for MCP/API resources;
 - client credentials for service principals after the core release;
 - token exchange only after explicit platform approval.
+
+The frozen P0 contract is `OAUTH_P0_CONTRACT.md`. OpenID Provider discovery, ID Tokens and UserInfo are P1/deferred and must not appear in P0 metadata.
 
 ## Legacy compatibility invariant
 

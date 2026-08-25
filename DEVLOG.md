@@ -1,5 +1,42 @@
 # DEVLOG.md
 
+## 2026-08-25 - Step 2 OAuth vNext P0 contract freeze
+
+Changed by: Codex
+Related task: Freeze the additive OAuth authorization-server contract without implementing runtime.
+
+### Changed
+
+- Added a normative machine-readable P0 profile and human contract for metadata, code/refresh grants, PKCE, exact redirects, resource/audience, JWT token profile, transport, errors, registration, refresh replay, key rotation and audit.
+- Rebuilt the target-only OAuth OpenAPI so it advertises only P0 and uses OAuth-standard errors.
+- Added JSON Schemas and synthetic examples for authorization metadata, token header/claims, confidential client registration, resource registration, protected-resource metadata and RFC 9207 authorization response.
+- Added the proposed expand-only `oauth_*` data model without a SQL migration.
+- Added an OAuth contract validator and Python conformance tests; extended example/platform validation.
+
+### Decisions
+
+- Preserved Google `sub` for P0 human tokens, PII-minimised access tokens, exact three-segment capability scopes, separate client/resource identity, explicit legacy entitlement bridge, BFF browser architecture, dedicated OAuth keys and full refresh-family replay revocation.
+- Kept `client_credentials`, token exchange, `private_key_jwt`, downstream OIDC and dynamic registration in P1/deferred scope.
+
+### Behavior
+
+- OAuth runtime implemented/enabled: no.
+- Legacy `/v1/*`, database/migrations, dependencies, Admin UI and consumer behavior changed: no.
+- Deployment or publication: no.
+
+### Tests/checks
+
+- `npm.cmd run lint` passed.
+- `npm.cmd run build` passed.
+- `npm.cmd test` passed: 12 files, 113 tests.
+- Full Python conformance passed: 50 tests, two expected pristine-template bootstrap skips.
+- OAuth P0 validator passed all 12 check groups, including target OpenAPI internal references and schemas/examples.
+- Legacy baseline targeted suite passed: 6 tests; the OAuth slice has no diff under runtime, migrations, dependencies, legacy OpenAPI, Compose, Dockerfile or entrypoint.
+- Resolved `docker compose config` targets only logical volumes `access_layer_postgres_data_v2` and `access_layer_jwt_secrets`, with zero published app/PostgreSQL host ports.
+- Non-strict platform check passed: 27 checks and seven known warnings.
+- Strict platform check intentionally remains non-passing only on five external gates: deployment readiness, backup/restore policy, central registration status, missing authoritative registry input and named ownership.
+- Continuity evidence remains schema-valid `VALID_BUT_NOT_READY`: zero errors, isolated-restore gate false (170 missing facts), N→N+1 gate false (178 missing facts).
+
 ## 2026-08-25 - Step 2 production evidence and Compose continuity reconciliation
 
 Changed by: Codex

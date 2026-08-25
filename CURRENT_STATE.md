@@ -11,6 +11,14 @@ V1 implementation scaffold complete, with local dependency, typecheck, build and
 - Live resolved Compose proves logical PostgreSQL volume `access_layer_postgres_data_v2` and logical JWT volume `access_layer_jwt_secrets`, backed by the recorded UUID-prefixed named volumes. The source Compose top-level PostgreSQL declaration now matches the unchanged service mount. No explicit physical volume name was added and no live resource was changed.
 - The volume-name mismatch is resolved. Production remains blocked by unverified backup/restore, destination identity, central registry, named ownership, deployed revision/image and continuity-secret/key evidence. No deployment was performed.
 
+## Step 2 OAuth vNext P0 contract freeze, 2026-08-25
+
+- The additive P0 OAuth contract is frozen in `specs/oauth-p0.v1.yml`, `docs/OAUTH_P0_CONTRACT.md` and the target-only OAuth OpenAPI/schemas/examples. It is not implemented or enabled.
+- P0 defines RFC 8414 metadata, Authorization Code and Refresh Token, PKCE `S256`, exact redirects, one RFC 8707 resource/audience, RFC 9068 `typ=at+jwt`, RFC 9207 `iss`, revocation, introspection, RFC 9700 controls, RFC 9728 metadata, OAuth errors, controlled registration, refresh-family replay, dedicated key rotation and audit requirements.
+- Human OAuth `sub` remains Google `sub`; access tokens are PII-minimised. OAuth clients/resources are separate, with an explicit optional resource-to-legacy-tool entitlement bridge. Browser applications remain BFF/server-side-token based.
+- `client_credentials`, token exchange, `private_key_jwt`, downstream OIDC ID Token/UserInfo/discovery and dynamic registration remain P1/deferred. No OAuth handler, migration, dependency, production registration or deploy was added.
+- Verification passes: lint, build, 113 Vitest tests, 50 Python tests (two template-bootstrap skips), 12 OAuth contract check groups, schema/example/OpenAPI reference validation, legacy baseline checks and resolved Compose inspection. Non-strict platform conformance passes with 27 checks and seven known warnings; strict release conformance remains blocked on five external operational gates.
+
 ## Step 1.5B continuity evidence hardening, 2026-08-25
 
 - Production-continuity evidence is schema v2 and remains deliberately redacted and `NOT_READY`. It now distinguishes absent, empty, and non-empty environment states, preserves an empty production `PUBLIC_BASE_PATH` as valid, and inventories all 41 configuration inputs derived from `src/config.ts`, `docker-compose.yaml`, and `docker/entrypoint.sh`.

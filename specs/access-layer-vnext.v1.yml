@@ -1,7 +1,8 @@
 schema_version: 1
 profile_id: unguess-oauth-oidc-v1
 proposal: B
-status: target
+status: p0_contract_frozen_runtime_disabled
+contract: ./oauth-p0.v1.yml
 legacy_compatibility:
   required: true
   forced_migration: false
@@ -32,6 +33,8 @@ protocol:
   audience_policy: one_resource_per_access_token
   public_clients: supported
   confidential_clients: supported
+  browser_architecture: bff_server_side_tokens
+  oauth_2_1_status: aligned_work_in_progress_draft_not_final_rfc
 security:
   redirect_match: exact
   pkce: S256
@@ -40,6 +43,17 @@ security:
   signing_key_overlap_rotation: required
   token_in_query: forbidden
   token_forwarding_to_other_resource: forbidden
+  human_subject_source: user.google_sub
+  oauth_signing_key_namespace: dedicated
+  legacy_signing_key_reuse: forbidden
+  oauth_runtime_implemented: false
+deferred_p1:
+  - client_credentials
+  - token_exchange
+  - private_key_jwt
+  - oidc_id_token
+  - oidc_userinfo
+  - dynamic_client_registration
 rollout:
   first_consumer: agent_gateway_recommended
   feature_flagged: true

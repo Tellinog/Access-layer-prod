@@ -313,7 +313,7 @@ def check_platform_baseline(manifest: dict[str, Any], result: CheckResult) -> No
         "Enabled API", "Enabled MCP", "Enabled web", "Proposal B", "telemetry", "Observatory"
     )
     if not any(any(term.lower() in error.lower() for term in baseline_terms) for error in result.errors):
-        result.ok("Project type, mandatory platform baseline and Proposal B target are coherent")
+        result.ok("Project type, mandatory platform baseline and additive OAuth target are coherent")
 
 
 def _registration_comparable(registration: dict[str, Any]) -> dict[str, Any]:
@@ -881,6 +881,9 @@ def check_legacy_compatibility(root: Path, manifest: dict[str, Any], result: Che
 
 def check_examples(root: Path, result: CheckResult) -> None:
     pairs = [
+        ("examples/oauth/authorization-server-metadata.expected.json", "schemas/oauth-authorization-server-metadata.schema.json"),
+        ("examples/oauth/client-registration.confidential.json", "schemas/oauth-client-registration.schema.json"),
+        ("examples/oauth/resource-registration.json", "schemas/oauth-resource-registration.schema.json"),
         ("examples/oauth/access-token.claims.json", "schemas/oauth-access-token-claims.schema.json"),
         ("examples/oauth/oauth-protected-resource-metadata.json", "schemas/oauth-protected-resource-metadata.schema.json"),
         ("examples/auth/request-context.legacy.json", "schemas/request-context.schema.json"),

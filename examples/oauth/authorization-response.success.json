@@ -1,0 +1,5 @@
+{
+  "code": "example-authorization-code-not-a-real-credential",
+  "state": "example-client-state",
+  "iss": "https://access-layer.unguess-internal.net"
+}

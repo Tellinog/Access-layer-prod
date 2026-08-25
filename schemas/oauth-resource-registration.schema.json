@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://access-layer.unguess-internal.net/schemas/oauth-resource-registration.p0.schema.json",
+  "title": "Access Layer OAuth vNext P0 controlled resource registration",
+  "type": "object",
+  "required": ["resource_id", "display_name", "status", "owner", "scopes", "audience_policy", "protected_resource_metadata_url", "entitlement_binding", "created_at", "updated_at"],
+  "properties": {
+    "resource_id": {"type": "string", "format": "uri", "pattern": "^https://[^*#]+$"},
+    "display_name": {"type": "string", "minLength": 1},
+    "status": {"enum": ["draft", "active", "disabled"]},
+    "owner": {"type": "object", "required": ["team"], "properties": {"team": {"type": "string", "minLength": 1}, "contact": {"type": ["string", "null"]}}, "additionalProperties": false},
+    "scopes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}$"}},
+    "audience_policy": {"const": "exact_single_resource"},
+    "protected_resource_metadata_url": {"type": "string", "format": "uri", "pattern": "^https://"},
+    "entitlement_binding": {"type": "object", "required": ["type", "legacy_tool_slug"], "properties": {"type": {"const": "legacy_tool"}, "legacy_tool_slug": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,62}$"}}, "additionalProperties": false},
+    "created_at": {"type": "string", "format": "date-time"},
+    "updated_at": {"type": "string", "format": "date-time"}
+  },
+  "additionalProperties": false
+}

@@ -37,6 +37,8 @@
 - 2026-08-24 Step 1.5: provide the exact Coolify server/project/environment/resource/destination identifiers, current live domain, deployed revision/image identity, replica/deploy/auto-deploy facts and named continuity operator.
 - 2026-08-24 Step 1.5: identify the authoritative central deployment registry location and the Access Layer record identifier/evidence reference.
 - 2026-08-25 Step 1.5B: identify the approved access-controlled evidence system and authorised operators for secret-manager version references, side-by-side comparisons, or controlled binding records. No secret value or reusable verifier may be stored in Git.
+- 2026-08-25 Step 2: identify the first approved P0 pilot client, resource, exact redirects, entitlement-domain binding and registered capability scopes before Step 3 implementation or any production registration.
+- 2026-08-25 Step 2: define the operational owner and protected storage mechanism for the dedicated OAuth signing key ring before implementation; the legacy key ring cannot be reused.
 
 ## ASSUMPTION_TO_VALIDATE
 
@@ -67,7 +69,8 @@
 - Full SIEM integration.
 - Dedicated SDK packages per framework.
 - Immutable append-only log storage with WORM retention.
-- OAuth/OIDC endpoints, discovery metadata, authorization-server tables, scopes, service principals and token exchange.
+- OAuth runtime endpoints, discovery handlers, additive authorization-server tables/migrations and production client/resource/scope registrations. The P0 contract is frozen; runtime remains deferred.
+- OAuth P1 features: service principals, `client_credentials`, token exchange, `private_key_jwt`, downstream OIDC ID Token/UserInfo/discovery and dynamic client registration.
 - UNGUESS Platform SDK dependency adoption and telemetry SDK integration.
 - Tool Observatory registration and synthetic monitor deployment.
 - MCP exposure and stable platform capability/OAuth-scope mapping.

@@ -1,14 +1,15 @@
 # Authentication and Authorization
 
-## Selected target: Access Layer as OAuth/OIDC authority
+## Selected target: additive OAuth authority, with OIDC provider functionality deferred
 
-This template selects the architecture in which Access Layer evolves into:
+The frozen P0 target evolves Access Layer into:
 
 - an OAuth authorization server;
-- an OpenID Provider for standardized web login;
 - an identity broker to the approved upstream identity provider;
-- the registry for clients, resource servers, scopes, grants and service principals;
-- the token, refresh, revocation, introspection and later token-exchange authority.
+- the separate registry for OAuth clients, resource servers and scopes;
+- the token, refresh, revocation and introspection authority.
+
+Downstream OpenID Provider features (ID Token, UserInfo and OIDC discovery), service principals and token exchange are P1. Google OIDC remains the internal upstream human authentication mechanism and is not exposed as P0 downstream OIDC.
 
 This is implemented **additively**. The current Access Layer remains available to existing tools while the new standard interface is introduced.
 
@@ -28,7 +29,7 @@ A current Access Layer `tool` must not continue to represent all of these roles 
 
 ### Web
 
-Target: OIDC Authorization Code flow through a backend-for-frontend.
+P0 target: OAuth Authorization Code flow through a backend-for-frontend.
 
 - PKCE `S256` required;
 - state and nonce required;
@@ -37,6 +38,8 @@ Target: OIDC Authorization Code flow through a backend-for-frontend.
 - browser receives only an opaque, `HttpOnly`, `Secure`, `SameSite=Lax` local session cookie;
 - session and refresh material is encrypted at rest;
 - CSRF protection is required for mutations.
+- the human OAuth `sub` is the stable Google `sub`;
+- OAuth tokens exclude email/profile claims by default.
 
 During transition, web may continue using the current legacy flow.
 
@@ -52,11 +55,11 @@ Target: OAuth resource server.
 - received tokens are not forwarded to downstream services;
 - high-risk capabilities force online policy/introspection according to policy.
 
-### Machine identity
+### Machine identity (P1)
 
 Use client credentials only for a registered service principal. A service principal never impersonates a human or uses a synthetic email.
 
-### Delegated agents
+### Delegated agents (P1)
 
 When Agent Gateway calls a downstream project on behalf of a human, the final token must be audience-bound to the downstream project and preserve subject and actor separately. Direct forwarding of a gateway-audience token is forbidden. Token exchange is a later central capability, not project-specific code.
 
@@ -83,6 +86,8 @@ It is used as:
 - audit subject.
 
 OpenAPI `operationId` and MCP tool names map explicitly to it because their naming conventions differ.
+
+The normative P0 contract, token transport, errors, registrations, refresh-family replay and key rotation are in `OAUTH_P0_CONTRACT.md` and `../specs/oauth-p0.v1.yml`.
 
 ## Introspection policy
 

@@ -89,6 +89,10 @@ A request is allowed only if all checks pass:
 - DB write path for audit logs must be available before accepting auth traffic.
 - Avoid browser-delivered long-lived tokens.
 
+## Additive OAuth vNext target
+
+P0 adds a future authorization-server adapter beside, not inside, the legacy flow. OAuth clients, resources and entitlement domains are separate identities. A resource may explicitly bridge to one existing tool/grant domain for human entitlement reads without reinterpreting the legacy tool as both client and resource. OAuth protocol state uses proposed independent `oauth_*` entities and a dedicated signing key ring/JWKS. See `OAUTH_P0_CONTRACT.md` and `OAUTH_ADDITIVE_DATA_MODEL.md`; neither is runtime-implemented.
+
 ## Risks
 
 | Risk | Mitigation |

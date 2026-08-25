@@ -1,21 +1,31 @@
 {
-  "client_id": "template-project-web",
-  "client_name": "Template Project Web BFF",
+  "client_id": "example-web-bff",
+  "client_name": "Example Web BFF",
   "client_type": "confidential",
+  "status": "draft",
   "grant_types": [
     "authorization_code",
     "refresh_token"
   ],
   "redirect_uris": [
-    "https://template-project.unguess-internal.net/oauth/callback"
+    "https://example-client.invalid/oauth/callback"
   ],
   "token_endpoint_auth_method": "client_secret_basic",
   "allowed_resources": [
-    "https://template-project.unguess-internal.net/api"
+    "https://example-resource.invalid/api"
   ],
   "allowed_scopes": [
-    "template-project:example:read"
+    "example-project:records:read"
   ],
-  "owner_team": "platform-owner",
-  "status": "draft"
+  "owner": {
+    "team": "example-owner",
+    "contact": null
+  },
+  "credential_lifecycle": {
+    "secret_present": true,
+    "rotated_at": null,
+    "expires_at": null
+  },
+  "created_at": "2026-08-25T00:00:00Z",
+  "updated_at": "2026-08-25T00:00:00Z"
 }

@@ -24,6 +24,12 @@ class ExampleSchemaTests(unittest.TestCase):
     def test_mcp_resource_metadata(self) -> None:
         self.assert_valid("examples/oauth/oauth-protected-resource-metadata.json", "schemas/oauth-protected-resource-metadata.schema.json")
 
+    def test_oauth_p0_metadata_and_registrations(self) -> None:
+        self.assert_valid("examples/oauth/authorization-server-metadata.expected.json", "schemas/oauth-authorization-server-metadata.schema.json")
+        self.assert_valid("examples/oauth/client-registration.confidential.json", "schemas/oauth-client-registration.schema.json")
+        self.assert_valid("examples/oauth/resource-registration.json", "schemas/oauth-resource-registration.schema.json")
+        self.assert_valid("examples/oauth/access-token.claims.json", "schemas/oauth-access-token-claims.schema.json")
+
     def test_ai_output_envelope(self) -> None:
         self.assert_valid("examples/ai/ai-output-envelope.json", "schemas/ai-output-envelope.schema.json")
 

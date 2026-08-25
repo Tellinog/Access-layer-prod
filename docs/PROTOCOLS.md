@@ -1,6 +1,8 @@
 # PROTOCOLS.md
 
-## Access Layer JWT claims
+## Legacy Access Layer JWT claims
+
+The claims below are frozen legacy `/v1/*` behavior. They are not the OAuth vNext token profile.
 
 Recommended claims:
 
@@ -71,3 +73,7 @@ Examples denied:
 - `https://evil.com/auth/callback`
 - `javascript:alert(1)`
 - `https://crm.draftapps.it/auth/callback?next=https://evil.com` unless exact URL was registered
+
+## OAuth vNext P0 target
+
+The additive RFC 9068 token has `typ=at+jwt`, one HTTPS resource audience, stable Google `sub`, client ID and space-delimited `project:domain:action` scopes. It excludes the legacy email/hosted-domain/role/permissions claims by default and uses dedicated `/oauth/jwks` keys. The complete target protocol is `OAUTH_P0_CONTRACT.md`; it is not runtime-implemented.

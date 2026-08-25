@@ -1,6 +1,6 @@
 # Access Layer OAuth/OIDC Authorization Server Profile
 
-Status: target platform contract
+Status: P0 contract frozen; runtime not implemented
 Version: 1
 Last reviewed: 2026-08-17
 
@@ -14,23 +14,21 @@ The legacy `/v1/auth/*` interface remains operational. New standard surfaces are
 
 ```text
 /.well-known/oauth-authorization-server
-/.well-known/openid-configuration          when OIDC is enabled
 /oauth/authorize
 /oauth/token
 /oauth/revoke
 /oauth/introspect
 /oauth/jwks
-/oauth/userinfo                             when OIDC is enabled
 ```
 
 Resource servers publish RFC 9728 protected-resource metadata.
 
 ## P0 protocol profile
 
-- OAuth 2.1 draft profile with Authorization Code and Refresh Token grants;
+- stable RFC contract aligned with the OAuth 2.1 work-in-progress draft, using Authorization Code and Refresh Token grants;
 - PKCE `S256` for all authorization-code clients;
 - exact redirect URI matching;
-- public and confidential clients;
+- confidential clients and a public-client code-flow contract whose production rollout is disabled;
 - RFC 8414 discovery;
 - RFC 8707 resource indicators and audience-bound access tokens;
 - RFC 9068 JWT access-token profile;
@@ -41,6 +39,8 @@ Resource servers publish RFC 9728 protected-resource metadata.
 - pre-registered first-party clients and resources;
 - key rotation without invalidating still-valid tokens.
 
+The Access Layer-specific normative profile is `../../specs/oauth-p0.v1.yml`; `../OAUTH_P0_CONTRACT.md` is its human-readable design. Human token `sub` is Google `sub`, OAuth signing keys are isolated from legacy keys, and browser applications retain BFF/server-side token storage.
+
 ## P1 profile
 
 - client credentials and governed service-principal lifecycle;
@@ -48,6 +48,7 @@ Resource servers publish RFC 9728 protected-resource metadata.
 - `private_key_jwt` for strategic confidential clients;
 - Client ID Metadata Documents for compatible remote MCP clients;
 - token exchange for Agent Gateway delegation, with subject and actor separation and downscoping only.
+- OpenID Provider discovery, ID Tokens and UserInfo.
 
 ## Explicit exclusions from the initial release
 

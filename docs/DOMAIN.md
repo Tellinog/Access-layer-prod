@@ -17,6 +17,10 @@
 | Refresh token | Opaque, single-use server-side credential used to rotate the access token and extend an active session |
 | Introspection | API call by a tool backend to check whether an Access Layer token is still active |
 | Audit event | Structured log entry for access attempts, decisions and admin actions |
+| OAuth client | Software registered to request tokens; distinct from a legacy tool and from the resource |
+| OAuth resource | Canonical HTTPS API/MCP audience receiving a token; may explicitly bind to a legacy tool entitlement domain |
+| OAuth scope | Canonical `project:domain:action` capability granted by the fail-closed intersection policy |
+| Refresh family | Lineage of rotating OAuth refresh tokens; replay revokes the family and linked OAuth session |
 
 ## Core entities
 

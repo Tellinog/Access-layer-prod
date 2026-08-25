@@ -34,8 +34,10 @@ Status: platform target, not implemented by individual projects
 | AS-SEC-006 | P0 | Enforce issuer, audience, token type, expiry and algorithm allowlists. |
 | AS-SEC-007 | P0 | Rate-limit and audit security-sensitive endpoints. |
 | AS-SEC-008 | P0 | Protect metadata-document retrieval from SSRF, DNS rebinding and oversized/redirecting responses. |
-| AS-SEC-009 | P0 | Keep client, subject and actor identities distinct in delegation. |
-| AS-SEC-010 | P0 | Permit token exchange only for registered client-resource policies and only with downscoping. |
+| AS-SEC-009 | P1 | Keep client, subject and actor identities distinct in delegation. |
+| AS-SEC-010 | P1 | Permit token exchange only for registered client-resource policies and only with downscoping. |
+
+The frozen P0 contract is `../../specs/oauth-p0.v1.yml`; P0 human `sub` is Google `sub`, authorization responses include RFC 9207 `iss`, access tokens use `typ=at+jwt`, and OAuth signing keys are isolated from legacy keys.
 
 ## Compatibility requirements
 

@@ -1,0 +1,19 @@
+{
+  "header": {
+    "alg": "RS256",
+    "kid": "oauth-example-key-1",
+    "typ": "at+jwt"
+  },
+  "claims": {
+    "iss": "https://access-layer.unguess-internal.net",
+    "sub": "110000000000000000001",
+    "aud": "https://example-resource.invalid/api",
+    "client_id": "example-web-bff",
+    "scope": "example-project:records:read",
+    "iat": 1786951200,
+    "exp": 1786952100,
+    "jti": "jti_oauth_example_001",
+    "sid": "oauth_session_example_001",
+    "principal_type": "human"
+  }
+}

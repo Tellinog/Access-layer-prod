@@ -41,6 +41,20 @@ Access Layer deve sapere da chi arriva ogni richiesta di accesso, per quale tool
 | `admin.grant.revoked` | admin revoca grant | `success` |
 | `admin.user.status_changed` | admin cambia stato utente | `success` |
 
+OAuth vNext target events (contract frozen, not emitted yet):
+
+| Event type | Purpose |
+|---|---|
+| `oauth.authorization.requested` / `allowed` / `denied` | Correlate P0 authorization decisions without logging request credentials |
+| `oauth.code.issued` / `exchanged` / `exchange_denied` | Record code lifecycle without the code or PKCE verifier |
+| `oauth.token.refreshed` | Record activity-driven family rotation |
+| `oauth.refresh.replay_detected` | High-signal replay event with family/session revocation outcome |
+| `oauth.token.revoked` / `introspected` | Record revocation and authorised online validation without raw tokens or inactive reason leakage |
+| `oauth.client.changed` / `resource.changed` / `scope.changed` | Record controlled registration changes |
+| `oauth.signing_key.changed` | Record public `kid` lifecycle action without private key material |
+
+OAuth audit metadata may contain client ID, exact resource ID, canonical scope IDs, stable Google subject when known, correlation ID, outcome and non-sensitive reason code. It must not contain codes, tokens, client secrets, cookies, PKCE verifiers, private keys, secret hashes/verifiers or raw form bodies.
+
 ## Campi comuni
 
 | Field | Required | Notes |

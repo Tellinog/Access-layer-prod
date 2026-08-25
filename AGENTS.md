@@ -39,7 +39,7 @@ Before working on any task, read these files in this order:
 
 Then read task-specific documents:
 
-- Google/OAuth work: `docs/GOOGLE_CLOUD_SETUP.md`, `docs/SECURITY.md`, `specs/policy.v1.yml`
+- Google/OAuth work: `docs/GOOGLE_CLOUD_SETUP.md`, `docs/SECURITY.md`, `docs/OAUTH_P0_CONTRACT.md`, `docs/OAUTH_ADDITIVE_DATA_MODEL.md`, `specs/oauth-p0.v1.yml`, `specs/policy.v1.yml`
 - Tool integration work: `docs/INTEGRATION_GUIDE.md`, `docs/API_PAYLOADS.md`, `schemas/openapi.yaml`, `examples/api/`
 - Admin work: `docs/ADMIN_GUIDE.md`, `docs/UX.md`, `docs/UI_SYSTEM.md`, `docs/COPY.md`, `specs/permissions.v1.yml`
 - Database/data work: `docs/DB.md`, `seeds/`, `schemas/`

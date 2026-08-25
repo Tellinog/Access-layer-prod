@@ -42,9 +42,8 @@ class PlatformCheckTests(unittest.TestCase):
             "backup schedule",
             "must be registered in the central deployment registry",
             "Named project ownership is unresolved",
-            "Continuity blocker",
         )
-        self.assertEqual(5, len(report.errors), "\n".join(report.errors))
+        self.assertEqual(4, len(report.errors), "\n".join(report.errors))
         for fragment in expected_fragments:
             self.assertTrue(any(fragment in error for error in report.errors), fragment)
         self.assertFalse(any("Central deployment registry was not supplied" in warning for warning in report.warnings))
@@ -63,15 +62,12 @@ class PlatformCheckTests(unittest.TestCase):
         platform_check.check_capability_contract(ROOT, manifest, report)
         self.assertTrue(any("audience" in error.lower() for error in report.errors))
 
-    def test_template_mode_does_not_hide_legacy_continuity_blocker(self) -> None:
+    def test_resolved_legacy_volumes_do_not_create_a_continuity_error(self) -> None:
         manifest = copy.deepcopy(self.manifest)
         manifest["template_mode"] = True
         report = platform_check.CheckResult()
         platform_check.check_security_and_placeholders(ROOT, manifest, report, strict=True)
-        self.assertEqual(
-            ["Continuity blocker: Compose PostgreSQL volume reference and declaration do not match"],
-            report.errors,
-        )
+        self.assertEqual([], report.errors)
         self.assertTrue(report.warnings)
 
 

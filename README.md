@@ -1,6 +1,6 @@
 # Access Layer Google SSO
 
-> Platform status (2026-08-24): Template v2.1 is adopted in `legacy-migration` mode. Read `PLATFORM_ADOPTION_REPORT.md` and `STEP_1_HANDOFF.md`. Deployment is blocked by the unresolved PostgreSQL volume mapping; do not deploy until `BACKLOG.md` records resolution.
+> Platform status (2026-08-25): Template v2.1 is adopted in `legacy-migration` mode. Live evidence resolved the source Compose PostgreSQL logical-volume mismatch without renaming the live volume. Deployment remains blocked by the backup/restore, ownership, registry and remaining continuity gates in `BACKLOG.md`.
 
 Layer di accesso condiviso per tool web interni aziendali.
 

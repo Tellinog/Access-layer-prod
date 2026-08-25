@@ -2,9 +2,9 @@
 
 ## Purpose and boundary
 
-This runbook prepares evidence required before an isolated restore exercise or any vNext runtime, deployment, database, or authentication work. Step 1.5B is read-only preparation: do not collect live facts yet, deploy, restart services, alter environment variables, create or rename volumes, run migrations, restore a database, rotate secrets, or change Coolify configuration.
+This runbook prepares evidence required before an isolated restore exercise or any vNext runtime, deployment, database, or authentication work. Step 2 reconciled only the supplied non-secret Coolify facts. Do not deploy, restart services, alter environment variables, create or rename volumes, run migrations, restore a database, rotate secrets, or change Coolify configuration.
 
-The committed `production-continuity.evidence.yml` is an intentionally incomplete, redacted schema-v2 record with status `NOT_READY`. Repository expectations are not observations. The intended target domain is documented separately from the still-unobserved live/current domain.
+The committed `production-continuity.evidence.yml` is an incomplete, redacted schema-v2 record with status `NOT_READY`. It contains the non-secret live topology and named-volume observations supplied on 2026-08-25; every other repository expectation remains distinct from an observation.
 
 When live collection is separately authorised, first create the ignored working copy:
 
@@ -30,9 +30,9 @@ An authorised operator must observe and record each item separately:
 
 Do not mark a field verified merely because it matches `docker-compose.yaml` or a platform manifest. Those files describe repository intent, not the live resource.
 
-## Persistent PostgreSQL storage — mandatory manual proof
+## Persistent PostgreSQL storage — proven mapping and remaining protection
 
-The repository mounts `access_layer_postgres_data_v2` in the PostgreSQL service but declares `access_layer_postgres_data` at the Compose top level. This mismatch is a continuity `BLOCKER`. Do not correct either name.
+Supplied Coolify evidence proves that the PostgreSQL service and top-level source use logical volume `access_layer_postgres_data_v2`, resolving live to `u3cyw3y1obp88to9la0w8c75_access-layer-postgres-data-v2`. The source declaration has been reconciled without an explicit physical `name:`. Preserve both identities exactly.
 
 In the Coolify resource UI, inspect the PostgreSQL service's persistent storage configuration and record the storage type, exact live source/volume identifier, container target `/var/lib/postgresql/data`, any explicitly shown destination/host path, evidence location, observation time, and operator.
 
@@ -44,7 +44,7 @@ docker inspect --format '{{json .Mounts}}' <exact-postgres-container-id>
 docker volume inspect <exact-observed-volume-name>
 ```
 
-Never run a broad `docker inspect` export: it can expose environment values. Never infer the live volume name from Compose. Stop if more than one candidate container or volume exists.
+Never run a broad `docker inspect` export: it can expose environment values. Never infer a future live volume name from Compose or use inspection to justify renaming the proven volume. Stop if more than one candidate container or volume exists.
 
 ## JWT signing-key source and persistence
 

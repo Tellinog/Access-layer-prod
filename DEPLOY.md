@@ -87,6 +87,6 @@ Do not expose production until tests in `docs/TESTING.md` pass for:
 - invalid tool client secret denied;
 - token introspection success and revocation behavior;
 - audit events generated for every path above.
-# Step 1 deployment block
+# Step 2 deployment block
 
-Deployment is prohibited while the Compose PostgreSQL volume reference/declaration mismatch remains unresolved. See `PLATFORM_ADOPTION_REPORT.md` and `BACKLOG.md`. Do not normalize the volume names without live Coolify mapping evidence and a verified backup.
+The source Compose mismatch is resolved from live Coolify evidence: both the PostgreSQL service mount and top-level declaration use `access_layer_postgres_data_v2`, while JWT storage remains `access_layer_jwt_secrets`. Do not add explicit physical volume names or rename either logical/live volume. Deployment is still prohibited until the backup/restore, ownership, registry and remaining continuity gates in `BACKLOG.md` are complete.

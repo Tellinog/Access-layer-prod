@@ -61,7 +61,7 @@ The local compose stack starts a `postgres` service and exposes it on `localhost
 DATABASE_URL=postgresql://access_layer:<password>@postgres:5432/access_layer
 ```
 
-The database files live in the Docker volume `access_layer_postgres_data`. Removing the volume destroys local data and should only be done intentionally.
+The database files live in the Docker volume `access_layer_postgres_data_v2`. Removing the volume destroys local data and should only be done intentionally.
 
 ## Seeds order
 
@@ -82,6 +82,6 @@ Default retention:
 - one-time codes: delete after expiration + 24 hours;
 - revoked sessions: keep 90 days unless compliance requires longer;
 - users: keep while account or logs require linkage, then pseudonymize if needed.
-# Step 1 continuity note
+# Step 2 continuity note
 
-The production Compose file currently mounts `access_layer_postgres_data_v2` but declares `access_layer_postgres_data`. This mismatch is frozen as a continuity blocker. Do not rename either side, migrate data or deploy until the live Coolify mapping and a verified backup/restore point are available. The machine database baseline is `../specs/legacy-contract-baseline.v1.json`.
+Live Coolify evidence proves that logical volume `access_layer_postgres_data_v2` backs `/var/lib/postgresql/data` and resolves to the recorded UUID-prefixed physical volume. The source top-level declaration now matches the unchanged service mount. Do not add an explicit physical name, rename the logical/live volume, migrate data or deploy. Backup/restore evidence and the other release gates remain open. The machine database baseline is `../specs/legacy-contract-baseline.v1.json`.

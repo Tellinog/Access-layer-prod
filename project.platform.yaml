@@ -29,11 +29,11 @@ deployment:
   configuration_status: pending
   unit_policy: one-coolify-resource-per-project
   coolify:
-    server_name: unresolved-see-backlog
-    project_name: unresolved-see-backlog
+    server_name: agentic-unguess-prod
+    project_name: agentic-unguess
     environment_name: production
-    resource_name: access-layer-production
-    resource_type: service
+    resource_name: access-layer-prod
+    resource_type: application
     build_strategy: docker_compose
     destination_name: unresolved-see-backlog
     connect_to_predefined_network: false
@@ -81,13 +81,13 @@ deployment:
   persistent_storage:
     required: true
     volumes:
-    - volume_id: postgres-live-volume-unresolved
+    - volume_id: access-layer-postgres-data-v2
       target_path: /var/lib/postgresql/data
       source_type: named_volume
       backup_required: true
-    - volume_id: jwt-key-files
+    - volume_id: access-layer-jwt-secrets
       target_path: /run/secrets
-      source_type: bind_mount
+      source_type: named_volume
       backup_required: true
   database:
     required: true

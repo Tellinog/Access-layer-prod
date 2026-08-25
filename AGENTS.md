@@ -100,7 +100,7 @@ Never hardcode secrets.
 - OAuth/OIDC, MCP, Garden UI conversion, English-first UI conversion, OpenTelemetry, Tool Observatory and Platform SDK files describe target/reference states unless `CURRENT_STATE.md` explicitly marks an implementation complete.
 - Do not infer that copied template assets are runtime-adopted.
 - Coolify deployments must have no public host-port mapping. PostgreSQL must remain private.
-- Do not deploy or rename either Compose volume reference while the `access_layer_postgres_data_v2` versus `access_layer_postgres_data` continuity blocker is open.
+- Preserve the evidence-backed Compose logical volumes `access_layer_postgres_data_v2` and `access_layer_jwt_secrets`. Do not add an explicit physical `name:`, rename the service mounts, or rename the UUID-prefixed live Docker volumes.
 - Do not claim N→N+1 session or refresh survival without two immutable real versions/images and the evidence required by `N_TO_N_PLUS_1_SURVIVAL_PLAN.md`.
 - Garden and English-first rules apply to future UI work; the existing UI is frozen in Step 1 and must not be silently translated or redesigned.
 

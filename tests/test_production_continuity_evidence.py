@@ -165,7 +165,11 @@ class ProductionContinuityEvidenceTests(unittest.TestCase):
         evidence = self.restore_ready_evidence("inline_env")
         report = self.write_and_validate(evidence)
         self.assertTrue(report.ready_for_isolated_restore, report.missing_for_isolated_restore)
-        self.assertFalse(evidence["jwt_signing_material"]["file_persistence"]["mapping_verified"])
+        self.assertTrue(evidence["jwt_signing_material"]["file_persistence"]["mapping_verified"])
+        self.assertNotIn(
+            "jwt_signing_material.file_persistence.mapping_verified=true",
+            report.missing_for_isolated_restore,
+        )
         evidence["jwt_signing_material"]["public_key"]["fingerprint_sha256"] = None
         report = self.write_and_validate(evidence)
         self.assertFalse(report.ready_for_isolated_restore)

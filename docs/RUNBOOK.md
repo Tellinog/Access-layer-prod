@@ -110,6 +110,6 @@ still-valid legacy tokens only when security approves.
 - attach test and rollback evidence;
 - add or update a synthetic check when the incident was externally observable;
 - record a decision when the remediation changes a platform contract.
-# Access Layer Step 1 release gate
+# Access Layer Step 2 release gate
 
-No deployment or rollback rehearsal is authorized from Step 1. First resolve the named-volume continuity blocker, verify a backup restore point and provide exact Coolify registry identifiers. The procedures below are target runbook guidance, not evidence of an executed deployment.
+No deployment or rollback rehearsal is authorized. The logical named-volume mismatch is resolved from live evidence, but a verified backup/restore point, central registry, named owners and remaining continuity proof are still required. Preserve `access_layer_postgres_data_v2`, `access_layer_jwt_secrets` and their UUID-prefixed live volumes exactly. The procedures above are target runbook guidance, not evidence of an executed deployment.

@@ -1,5 +1,7 @@
 # Platform Template v2.1 Adoption Report
 
+> Step 2 update, 2026-08-25: live Coolify evidence supersedes the Step 1 volume ambiguity and resource-type assumption. The source declaration now preserves logical PostgreSQL volume `access_layer_postgres_data_v2`; JWT storage is a named volume; the observed Coolify resource type is `application`. Deployment remains blocked by the other continuity and release gates.
+
 ## Outcome
 
 Agent Ready Project Template v2.1.0 was adopted additively in `legacy-migration` mode on 2026-08-24. Existing documentation, decisions, history, runtime code, tests, migrations, Compose, Docker and package files were preserved. Step 1 changes records and conformance tests only; it does not change production behavior.

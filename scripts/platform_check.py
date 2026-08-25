@@ -1093,12 +1093,14 @@ def check_security_and_placeholders(
 
     if manifest.get("project", {}).get("mode") == "legacy-migration":
         compose_text = (root / "docker-compose.yaml").read_text(encoding="utf-8", errors="ignore")
-        continuity_mismatch = (
+        continuity_volumes_resolved = (
             "access_layer_postgres_data_v2:/var/lib/postgresql/data" in compose_text
-            and "\n  access_layer_postgres_data:\n" in compose_text.replace("\r\n", "\n")
+            and "access_layer_jwt_secrets:/run/secrets" in compose_text
+            and "\n  access_layer_postgres_data_v2:\n" in compose_text.replace("\r\n", "\n")
+            and "\n  access_layer_jwt_secrets:\n" in compose_text.replace("\r\n", "\n")
         )
-        if continuity_mismatch:
-            message = "Continuity blocker: Compose PostgreSQL volume reference and declaration do not match"
+        if not continuity_volumes_resolved:
+            message = "Continuity blocker: Compose logical PostgreSQL/JWT volumes differ from the evidence-backed declarations"
             if strict:
                 result.error(message)
             else:

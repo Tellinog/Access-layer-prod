@@ -3,15 +3,16 @@
 ## BLOCKER
 
 - Confirm who receives bootstrap platform admin access after first deploy.
-- 2026-08-24: `docker-compose.yaml` mounts `access_layer_postgres_data_v2` but declares `access_layer_postgres_data`. Do not rename either value or deploy until the live Coolify volume mapping is identified and a verified backup/restore point exists.
 - 2026-08-24: production deployment remains blocked until exact Coolify server/project/resource/destination identifiers and the central registry record are verified.
-- 2026-08-24 Step 1.5: `operations/production-continuity.evidence.yml` is intentionally `NOT_READY`; the actual PostgreSQL storage identity, verified backup, and isolated restore result remain unproven. Do not deploy, rename volumes, or begin N→N+1 execution.
-- 2026-08-25 Step 1.5B: observe whether live JWT signing uses inline PEM or a file. If file-backed, prove the actual persistent storage/mount identity for `/run/secrets`; also prove same-key continuity using public-key/external evidence. Do not read, hash, copy, rotate, or regenerate the private key.
+- 2026-08-24 Step 1.5: `operations/production-continuity.evidence.yml` remains `NOT_READY`; verified backup and isolated restore results remain unproven. Do not deploy or begin N→N+1 execution.
+- 2026-08-25 Step 1.5B: observe whether live JWT signing uses inline PEM or a file and prove same-key continuity using public-key/external evidence. The live `/run/secrets` named-volume identity is proven, but key source/state and continuity are not. Do not read, hash, copy, rotate, or regenerate the private key.
 - 2026-08-25 Step 1.5B: the isolated-restore gate is blocked until external secret-safe sameness evidence exists for `SESSION_SECRET`, `TOOL_CLIENT_SECRET_PEPPER`, `BACKUP_ENCRYPTION_KEY`, `GOOGLE_CLIENT_SECRET`, and `LOG_IP_SALT`. Presence/state alone is not proof.
 - 2026-08-25 Step 1.5B: both machine gates remain false. The intermediate gate additionally needs complete live configuration/topology/storage/backup/database/registry/ownership evidence and approvals; final N→N+1 readiness additionally needs a real `PASSED` isolated restore and two immutable N/N+1 artifacts.
 
 ## RESOLVED
 
+- 2026-08-25 Step 2: Coolify evidence proves PostgreSQL logical volume `access_layer_postgres_data_v2` resolves to `u3cyw3y1obp88to9la0w8c75_access-layer-postgres-data-v2`; the source top-level declaration now matches the unchanged service mount. JWT logical volume `access_layer_jwt_secrets` is also proven as the named volume `u3cyw3y1obp88to9la0w8c75_access-layer-jwt-secrets`. No explicit physical name was added and no live volume was renamed.
+- 2026-08-25 Step 2: confirmed Coolify server `agentic-unguess-prod`, project `agentic-unguess`, environment `production`, resource `access-layer-prod` (`u3cyw3y1obp88to9la0w8c75`), resource type `application`, managed Docker Compose, `main` branch, deploy-on-push, disabled previews, isolated predefined-network setting, public app port 8080 without a shown host mapping, and private PostgreSQL port 5432.
 - 2026-08-24: restored root `.env.example` as a compatibility copy with the same 41 variable names as `.env.production.example`; production values and secret handling remain unchanged.
 - 2026-06-17: Corrected and confirmed real Google Workspace domain list for `GOOGLE_ALLOWED_HD`: `unguess.io`.
 - 2026-06-16: Confirmed production and local redirect URIs before creating OAuth clients:
@@ -50,11 +51,11 @@
 - Storing tool callback `state` in `auth_requests` is acceptable because tool integrations must not include secrets in state.
 - Admin-only restore secret material export includes runtime secrets such as `TOOL_CLIENT_SECRET_PEPPER` and `BACKUP_ENCRYPTION_KEY`; existing per-tool client secrets remain non-recoverable because only hashes are stored, so lost per-tool secrets require rotation.
 - 2026-08-24: the user-supplied Access Layer, Nancy, Test Generator, Goodman and Petyr archives are acceptable Step 1 compatibility evidence despite not matching the instruction-pack checksums. Obtain the referenced revisions or formally accept the supplied hashes.
-- 2026-08-24: Coolify represents this Docker Compose deployment as resource type `service`; verify against the live resource before central registration.
+- 2026-08-24: Coolify resource type was assumed to be `service`; live Step 2 evidence supersedes this with observed type `application`.
 - 2026-08-24: the named central deployment registry ID is `unguess-coolify-deployments`; its authoritative location and record ownership remain unverified.
 - 2026-08-24: Nancy, Test Generator and Goodman in-memory refresh locks are sufficient only for their observed single-replica assumptions; multi-replica safety is not proven.
 - 2026-08-24: Petyr's supplied registration and code are deployed as inspected. Evidence contains a superseded Access Layer origin and a permission used in code but absent from the supplied tool registration.
-- 2026-08-24 Step 1.5: repository expectations (app `8080`, PostgreSQL `5432` private, no public host-port mapping, target domain) match the live Coolify topology. They remain unverified observations.
+- 2026-08-24 Step 1.5: repository expectations (app `8080`, PostgreSQL `5432` private, no shown public host-port mapping, target domain) are now verified by the 2026-08-25 Step 2 evidence.
 - 2026-08-25 Step 1.5B: current live safe effective configuration matches the frozen production defaults and intended values. All 41 source-derived variables remain `UNOBSERVED` in the committed evidence template until an operator supplies state/effective-value proof.
 
 ## DEFERRED_SCOPE

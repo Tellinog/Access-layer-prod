@@ -1,5 +1,30 @@
 # DEVLOG.md
 
+## 2026-08-25 - Step 2 production evidence and Compose continuity reconciliation
+
+Changed by: Codex
+Related task: Reconcile only proven non-secret Coolify facts before the OAuth P0 contract freeze.
+
+### Changed
+
+- Recorded the observed Coolify server/project/resource topology, public/private ports, managed Compose mode, repository/branch, deployment trigger, preview state and isolated network facts.
+- Corrected only the PostgreSQL top-level Compose declaration to `access_layer_postgres_data_v2`; the service mount remains unchanged and no explicit physical volume name was added.
+- Recorded both UUID-prefixed live named-volume identities and corrected `/run/secrets` from bind-mount intent to named-volume evidence in the platform manifest.
+- Updated continuity validation and regression assertions for the resolved logical PostgreSQL and JWT volumes.
+
+### Behavior
+
+- Application runtime, `/v1/*`, database schema/data, sessions, tokens, grants, cookies, tool clients and Admin UI behavior changed: no.
+- Production deployment or live resource mutation: no.
+
+### Remaining gates
+
+- Backup/restore, exact destination, central registry, named ownership, deployed revision/image, runtime configuration, secret sameness and JWT key continuity remain unresolved.
+
+### Tests/checks
+
+- Final verification is recorded with the Step 2 OAuth contract entry and task handoff.
+
 ## 2026-08-25 - Step 1.5B continuity evidence hardening
 
 Changed by: Codex

@@ -38,12 +38,15 @@ describe("legacy compatibility baseline", () => {
     expect(httpStatusByCode).toEqual(baseline.errors.codes);
   });
 
-  it("keeps the known volume mismatch visible and unchanged", () => {
+  it("keeps the evidence-backed logical volumes exact without pinning physical names", () => {
     const compose = text("docker-compose.yaml");
     expect(compose).toContain("access_layer_postgres_data_v2:/var/lib/postgresql/data");
-    expect(compose).toMatch(/\nvolumes:\n\s+access_layer_postgres_data:\n/);
+    expect(compose).toMatch(/\nvolumes:\n\s+access_layer_postgres_data_v2:\n\s+access_layer_jwt_secrets:\n/);
+    expect(compose).toContain("access_layer_jwt_secrets:/run/secrets");
+    expect(compose).not.toMatch(/\n\s+name:\s+/);
     expect(compose).not.toMatch(/\n\s+ports:\s*\n/);
-    expect(baseline.compose_continuity_blocker.mismatch_frozen).toBe(true);
+    expect(baseline.compose_continuity.top_level_declared_volume).toBe("access_layer_postgres_data_v2");
+    expect(baseline.compose_continuity.explicit_physical_name_forbidden).toBe(true);
   });
 
   it("has no OAuth/OIDC runtime endpoint or table in Step 1", () => {

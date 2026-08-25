@@ -4,6 +4,13 @@
 
 V1 implementation scaffold complete, with local dependency, typecheck, build and automated test verification complete. Environment-backed integration verification remains pending.
 
+## Step 2 production evidence reconciliation, 2026-08-25
+
+- Non-secret Coolify evidence now identifies server `agentic-unguess-prod`, project `agentic-unguess`, production resource `access-layer-prod` (`u3cyw3y1obp88to9la0w8c75`), observed resource type `application`, managed Docker Compose, `main` branch, deploy-on-push, disabled previews and isolated networking.
+- The live origin is `https://access-layer.unguess-internal.net`; app port `8080` has no shown public host-port mapping and PostgreSQL port `5432` remains private.
+- Live resolved Compose proves logical PostgreSQL volume `access_layer_postgres_data_v2` and logical JWT volume `access_layer_jwt_secrets`, backed by the recorded UUID-prefixed named volumes. The source Compose top-level PostgreSQL declaration now matches the unchanged service mount. No explicit physical volume name was added and no live resource was changed.
+- The volume-name mismatch is resolved. Production remains blocked by unverified backup/restore, destination identity, central registry, named ownership, deployed revision/image and continuity-secret/key evidence. No deployment was performed.
+
 ## Step 1.5B continuity evidence hardening, 2026-08-25
 
 - Production-continuity evidence is schema v2 and remains deliberately redacted and `NOT_READY`. It now distinguishes absent, empty, and non-empty environment states, preserves an empty production `PUBLIC_BASE_PATH` as valid, and inventories all 41 configuration inputs derived from `src/config.ts`, `docker-compose.yaml`, and `docker/entrypoint.sh`.
@@ -288,4 +295,4 @@ For production, create a Coolify compose app from this package, fill variables f
 
 ## Current release posture
 
-Do not deploy the Step 1 commit. Verify the live Coolify volume mapping and create a tested backup first. The previous deployment recommendation above is superseded while this blocker is open.
+Do not deploy. The Compose logical-volume mismatch is resolved from live evidence, but a tested backup/restore, remaining continuity evidence, named ownership and central deployment registration are still required. The earlier production deployment recommendation remains superseded.

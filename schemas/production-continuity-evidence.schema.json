@@ -19,13 +19,24 @@
     },
     "coolify": {
       "type": "object", "additionalProperties": false,
-      "required": ["server_id", "project_id", "environment_id", "resource_id", "destination_id", "resource_type", "auto_deploy_enabled"],
+      "required": ["version", "server_name", "server_id", "project_name", "project_id", "environment_name", "environment_id", "resource_name", "resource_id", "destination_id", "resource_type", "repository", "branch", "auto_deploy_enabled", "preview_deployments_enabled", "compose_management", "predefined_network_enabled", "server_network"],
       "properties": {
+        "version": {"$ref": "#/$defs/nullableNonEmptyString"},
+        "server_name": {"$ref": "#/$defs/nullableNonEmptyString"},
         "server_id": {"$ref": "#/$defs/nullableNonEmptyString"}, "project_id": {"$ref": "#/$defs/nullableNonEmptyString"},
+        "project_name": {"$ref": "#/$defs/nullableNonEmptyString"},
+        "environment_name": {"$ref": "#/$defs/nullableNonEmptyString"},
         "environment_id": {"$ref": "#/$defs/nullableNonEmptyString"}, "resource_id": {"$ref": "#/$defs/nullableNonEmptyString"},
+        "resource_name": {"$ref": "#/$defs/nullableNonEmptyString"},
         "destination_id": {"$ref": "#/$defs/nullableNonEmptyString"},
         "resource_type": {"type": ["string", "null"], "enum": ["application", "service", null]},
-        "auto_deploy_enabled": {"type": ["boolean", "null"]}
+        "repository": {"$ref": "#/$defs/nullableNonEmptyString"},
+        "branch": {"$ref": "#/$defs/nullableNonEmptyString"},
+        "auto_deploy_enabled": {"type": ["boolean", "null"]},
+        "preview_deployments_enabled": {"type": ["boolean", "null"]},
+        "compose_management": {"type": ["string", "null"], "enum": ["coolify_managed", "raw", null]},
+        "predefined_network_enabled": {"type": ["boolean", "null"]},
+        "server_network": {"$ref": "#/$defs/nullableNonEmptyString"}
       }
     },
     "domains": {
@@ -67,7 +78,7 @@
       "properties": {
         "postgres_container_mount_path": {"const": "/var/lib/postgresql/data"},
         "compose_service_volume_reference": {"const": "access_layer_postgres_data_v2"},
-        "compose_top_level_volume_declaration": {"const": "access_layer_postgres_data"},
+        "compose_top_level_volume_declaration": {"const": "access_layer_postgres_data_v2"},
         "actual_storage_type": {"$ref": "#/$defs/nullableStorageType"},
         "actual_storage_identifier": {"$ref": "#/$defs/nullableNonEmptyString"},
         "actual_host_or_destination_path": {"$ref": "#/$defs/nullableNonEmptyString"},

@@ -83,5 +83,5 @@ services:
       retries: 12
 
 volumes:
-  access_layer_postgres_data:
+  access_layer_postgres_data_v2:
   access_layer_jwt_secrets:

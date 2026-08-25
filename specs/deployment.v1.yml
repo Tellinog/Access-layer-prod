@@ -9,7 +9,14 @@ project_record:
   postgres_public_exposure: forbidden
   published_host_ports: []
   deployment_status: blocked
-  continuity_blocker: access_layer_postgres_data_v2 mount reference does not match access_layer_postgres_data declaration
+  verified_logical_volumes:
+    postgres: access_layer_postgres_data_v2
+    jwt_signing_material: access_layer_jwt_secrets
+  remaining_release_blockers:
+    - backup_and_restore_evidence
+    - central_registry_registration
+    - named_ownership
+    - continuity_secret_sameness
 profile: unguess-coolify-deployment-v1
 project_kinds:
   tool:

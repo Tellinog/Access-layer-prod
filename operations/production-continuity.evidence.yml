@@ -4,39 +4,50 @@ captured_at: null
 captured_by: null
 repository:
   revision: 6c9bb3afb6f56dd907bff3bc2f699267b03b3eee
-  evidence_basis: Step 1.5 accepted repository state; observed production fields remain redacted and uncollected
+  evidence_basis: Step 1.5 accepted repository state plus non-secret Coolify UI and resolved Compose evidence supplied for Step 2 on 2026-08-25
 coolify:
+  version: 4.3.9
+  server_name: agentic-unguess-prod
   server_id: null
+  project_name: agentic-unguess
   project_id: null
+  environment_name: production
   environment_id: null
-  resource_id: null
+  resource_name: access-layer-prod
+  resource_id: u3cyw3y1obp88to9la0w8c75
   destination_id: null
-  resource_type: null
-  auto_deploy_enabled: null
+  resource_type: application
+  repository: Tellinog/Access-layer-prod
+  branch: main
+  auto_deploy_enabled: true
+  preview_deployments_enabled: false
+  compose_management: coolify_managed
+  predefined_network_enabled: false
+  server_network: coolify
 domains:
-  live_current_origin: null
-  live_current_origin_observed_from: null
+  live_current_origin: https://access-layer.unguess-internal.net
+  live_current_origin_observed_from: Coolify UI evidence supplied for Step 2 on 2026-08-25
   intended_target_origin: https://access-layer.unguess-internal.net
 runtime:
   deployed_revision: null
   image_reference: null
   image_digest: null
   replica_count: null
-  deployment_strategy: null
+  deployment_strategy: coolify_managed_docker_compose
   last_deployed_at: null
   observed_services:
     app:
-      service_name: null
-      target_container_port: null
+      service_name: app
+      target_container_port: 8080
       public_host_port: null
-      public_host_port_mapping_observed: false
-      exposure: null
+      public_host_port_mapping_observed: true
+      exposure: public_via_proxy
     postgres:
-      service_name: null
-      target_container_port: null
+      service_name: postgres
+      target_container_port: 5432
       public_host_port: null
-      public_host_port_mapping_observed: false
-      exposure: null
+      public_host_port_mapping_observed: true
+      exposure: private
   repository_expectations:
     app_target_container_port: 8080
     postgres_target_container_port: 5432
@@ -45,15 +56,15 @@ runtime:
 storage:
   postgres_container_mount_path: /var/lib/postgresql/data
   compose_service_volume_reference: access_layer_postgres_data_v2
-  compose_top_level_volume_declaration: access_layer_postgres_data
-  actual_storage_type: null
-  actual_storage_identifier: null
+  compose_top_level_volume_declaration: access_layer_postgres_data_v2
+  actual_storage_type: named_volume
+  actual_storage_identifier: u3cyw3y1obp88to9la0w8c75_access-layer-postgres-data-v2
   actual_host_or_destination_path: null
-  mapping_observed_from: null
-  mapping_verified: false
+  mapping_observed_from: Coolify resolved Compose evidence supplied for Step 2 on 2026-08-25
+  mapping_verified: true
   verified_at: null
   verified_by: null
-  evidence_reference: null
+  evidence_reference: Step 2 pack 03_PRODUCTION_EVIDENCE_RECONCILIATION.md
 backup:
   mechanism: null
   schedule: null
@@ -98,14 +109,14 @@ jwt_signing_material:
   file_persistence:
     container_mount_path: /run/secrets
     compose_volume_reference: access_layer_jwt_secrets
-    actual_storage_type: null
-    actual_storage_identifier: null
+    actual_storage_type: named_volume
+    actual_storage_identifier: u3cyw3y1obp88to9la0w8c75_access-layer-jwt-secrets
     actual_host_or_destination_path: null
-    mapping_observed_from: null
-    mapping_verified: false
+    mapping_observed_from: Coolify resolved Compose evidence supplied for Step 2 on 2026-08-25
+    mapping_verified: true
     verified_at: null
     verified_by: null
-    evidence_reference: null
+    evidence_reference: Step 2 pack 03_PRODUCTION_EVIDENCE_RECONCILIATION.md
 secret_continuity:
   secret_values_or_reusable_verifiers_committed: false
   records:
@@ -282,8 +293,8 @@ ownership:
   product_owner: null
   continuity_operator: null
 approvals:
-  live_topology_verified: false
-  postgres_storage_mapping_verified: false
+  live_topology_verified: true
+  postgres_storage_mapping_verified: true
   backup_policy_verified: false
   jwt_signing_material_verified: false
   secret_continuity_verified: false

@@ -88,13 +88,13 @@
     },
     "audit_logs_tool_fk_delete": "SET NULL"
   },
-  "compose_continuity_blocker": {"mount_source_reference":"access_layer_postgres_data_v2","top_level_declared_volume":"access_layer_postgres_data","mismatch_frozen":true,"rename_forbidden_until_live_mapping_and_backup_verified":true},
+  "compose_continuity": {"mount_source_reference":"access_layer_postgres_data_v2","top_level_declared_volume":"access_layer_postgres_data_v2","jwt_mount_source_reference":"access_layer_jwt_secrets","resolved_from_live_evidence_at":"2026-08-25","explicit_physical_name_forbidden":true,"published_host_ports":[]},
   "source_sha256_lf": {
     "src/app.ts":"4efdf4c62d1352950c8ddc65e87b9dcabffd0c39661ecd447f840c8b5ee4dabd",
     "src/token-service.ts":"9053ec749d42c2a3392b4ed580fb35d2e02538ff5e171f83973f65bacb3a6c44",
     "src/config.ts":"80ddb3bcb3f9b84d0201177e9001bd4413e89ca8aa777446333fe76e7d1db82a",
     "src/errors.ts":"6cfb09bd8e9f332b8ce65aeef59573b90d4f974ecdc55a67fa0a32664e094e87",
-    "docker-compose.yaml":"c6fc226b35c1d410e10991a4a2eae11045fb31c7621c14ef34b17e575923ebe7",
+    "docker-compose.yaml":"3c91dbaccd3dadae1ef8587fba307721e72fe281aed26b969b961cc9a84630aa",
     "schemas/openapi.yaml":"a3535c77f116a0c7c47be7af49be1273a2d07482495b24856c97c1100ac90217"
   }
 }

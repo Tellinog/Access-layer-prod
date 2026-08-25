@@ -5,11 +5,11 @@ project_kind: platform_service
 owner_team: unresolved-see-backlog
 environment: production
 coolify:
-  server_name: unresolved-see-backlog
-  project_name: unresolved-see-backlog
+  server_name: agentic-unguess-prod
+  project_name: agentic-unguess
   environment_name: production
-  resource_name: access-layer-production
-  resource_type: service
+  resource_name: access-layer-prod
+  resource_type: application
   build_strategy: docker_compose
   destination_name: unresolved-see-backlog
 routes:

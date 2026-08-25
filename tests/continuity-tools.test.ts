@@ -133,9 +133,9 @@ describe("production continuity helper safety", () => {
     expect(inventory.variables).toHaveLength(41);
   });
 
-  it("keeps Step 1.5 runtime, Compose, and entrypoint sources invariant", () => {
+  it("keeps runtime and entrypoint invariant and pins the approved Compose continuity correction", () => {
     expect(sha256Lf("src/config.ts")).toBe("80ddb3bcb3f9b84d0201177e9001bd4413e89ca8aa777446333fe76e7d1db82a");
-    expect(sha256Lf("docker-compose.yaml")).toBe("c6fc226b35c1d410e10991a4a2eae11045fb31c7621c14ef34b17e575923ebe7");
+    expect(sha256Lf("docker-compose.yaml")).toBe("3c91dbaccd3dadae1ef8587fba307721e72fe281aed26b969b961cc9a84630aa");
     expect(sha256Lf("docker/entrypoint.sh")).toBe("07d57fbdbb6bc09268b154c7d97afbfc5f8d5699b0378c747057393769ec6d76");
   });
 

@@ -347,3 +347,15 @@ Presence never proves secret continuity. JWT signing-key continuity and the same
 Readiness is staged. `ready_for_isolated_restore` permits only a separately authorised isolated restore exercise after all pre-restore evidence and approvals are complete. `ready_for_n_to_n_plus_1` additionally requires that isolated restore to be recorded `PASSED` with evidence and approval. Final `READY` is not weakened.
 
 Rationale: session and refresh survival depends on stable signing and symmetric secrets as well as database persistence. A staged, secret-safe evidence gate makes the next operation explicit without claiming continuity from variable presence or from an unexecuted restore.
+
+## D-035 - Preserve the live-resolved logical Compose volumes
+
+Status: accepted
+
+Confirmed: 2026-08-25
+
+Decision: production evidence resolves the PostgreSQL source mismatch in favour of logical volume `access_layer_postgres_data_v2`, which is already mounted by the service and resolves live to `u3cyw3y1obp88to9la0w8c75_access-layer-postgres-data-v2`. The source top-level declaration is corrected to that logical name. JWT signing storage remains logical volume `access_layer_jwt_secrets`, resolving live to `u3cyw3y1obp88to9la0w8c75_access-layer-jwt-secrets`, and is represented as a named volume.
+
+No explicit Compose `name:` is added. The service mount paths, UUID-prefixed physical volumes, database, network, resource and JWT volume are not renamed. This decision supersedes only D-032's instruction to leave the now-proven source mismatch untouched; the frozen legacy runtime contract and all remaining deployment gates continue unchanged.
+
+Rationale: the resolved Coolify Compose supplies the previously missing continuity evidence. Matching the source declaration to the already-running logical mount prevents creation of an unintended empty PostgreSQL volume while leaving Coolify's physical-name management intact.

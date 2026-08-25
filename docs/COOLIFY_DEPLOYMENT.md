@@ -179,6 +179,6 @@ sessions.
 - Coolify networking: <https://next.coolify.io/docs/services/configuration/networking>
 - Coolify domains: <https://next.coolify.io/docs/core/networking/domains>
 - Coolify health checks: <https://next.coolify.io/docs/applications/configuration/health-checks>
-# Access Layer Step 1 status
+# Access Layer Step 2 status
 
-This deployment contract is adopted, but deployment is blocked. The current Compose mount uses `access_layer_postgres_data_v2` while the top-level declaration uses `access_layer_postgres_data`; do not normalize or deploy until live Coolify state and backup continuity are verified.
+This deployment contract is adopted, and live Coolify evidence resolves the source declaration to the already-running logical volume `access_layer_postgres_data_v2`. JWT storage `access_layer_jwt_secrets` is also proven to be a named volume. Do not add explicit physical names or rename either logical/live volume. Deployment remains blocked until backup/restore, registry, ownership and remaining continuity evidence are complete.

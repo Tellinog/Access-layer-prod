@@ -330,6 +330,20 @@ Confirmed: 2026-08-24
 
 Decision: production continuity facts are captured in a versioned, schema-validated evidence bundle that distinguishes observed live state from repository expectations. The committed Step 1.5 bundle remains `NOT_READY`. It may become `READY` only when the validator confirms all Coolify, domain, runtime, storage, backup/restore, database metadata, environment-presence, public-key, registry, ownership and approval evidence. Validation is read-only and never propagates values into platform manifests or production.
 
-Sensitive environment variables are recorded only as presence booleans. Public JWT `kid` and public-key SHA-256 fingerprints are allowed; secrets, private keys, connection strings, cookies, tokens and personal rows are forbidden. The Compose volume mismatch remains untouched.
+Sensitive environment variables were initially recorded only as presence booleans; D-034 supersedes that representation with absent/empty/non-empty states, external sameness proof, and signing-key persistence evidence. Public JWT `kid` and public-key SHA-256 fingerprints are allowed; secrets, private keys, connection strings, cookies, tokens and personal rows are forbidden. The Compose volume mismatch remains untouched.
 
 Rationale: later runtime work needs reproducible continuity proof without turning an evidence file or collection command into a secret-export path, and without mistaking declared configuration for live state.
+
+## D-034 - Separate secret continuity proof and restore/upgrade readiness
+
+Status: accepted
+
+Confirmed: 2026-08-25
+
+Decision: production-continuity evidence schema v2 replaces presence booleans with `UNOBSERVED`, `ABSENT`, `PRESENT_EMPTY`, and `PRESENT_NON_EMPTY` states for the complete environment/configuration surface derived from runtime, Compose, and entrypoint sources. Empty `PUBLIC_BASE_PATH` remains valid. Safe effective non-secret configuration is recorded separately from state-only secret inputs.
+
+Presence never proves secret continuity. JWT signing-key continuity and the same-value binding of `SESSION_SECRET`, `TOOL_CLIENT_SECRET_PEPPER`, `BACKUP_ENCRYPTION_KEY`, `GOOGLE_CLIENT_SECRET`, and `LOG_IP_SALT` require operator/time/method records that reference access-controlled external evidence. Secret values, private key material, low-entropy hashes, HMACs, or other reusable verifiers are forbidden in Git. File-backed JWT mode additionally requires observation of the actual persistent storage/mount backing `/run/secrets`; Compose intent is not proof.
+
+Readiness is staged. `ready_for_isolated_restore` permits only a separately authorised isolated restore exercise after all pre-restore evidence and approvals are complete. `ready_for_n_to_n_plus_1` additionally requires that isolated restore to be recorded `PASSED` with evidence and approval. Final `READY` is not weakened.
+
+Rationale: session and refresh survival depends on stable signing and symmetric secrets as well as database persistence. A staged, secret-safe evidence gate makes the next operation explicit without claiming continuity from variable presence or from an unexecuted restore.

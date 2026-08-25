@@ -108,3 +108,5 @@ The service keeps these checks enabled so Docker/Coolify can identify unhealthy 
 # Step 1 deployment block
 
 Do not deploy the Step 1 compatibility-freeze commit. `docker-compose.yaml` mounts `access_layer_postgres_data_v2`, but the top-level volume declaration is `access_layer_postgres_data`. Neither side may be renamed until the live Coolify mapping is identified and a verified backup/restore point exists. The intended topology remains one Coolify Compose service, public app container port 8080 through HTTPS routing, private PostgreSQL and no public host-port mapping.
+
+Step 1.5B also requires observation of the JWT signing source. When `JWT_PRIVATE_KEY_PEM_PATH` is used, an operator must verify the real persistent mount/storage backing `/run/secrets`; repository Compose intent is insufficient because the entrypoint generates a new key when the configured file is missing. The redacted evidence validator's `ready_for_isolated_restore` gate must pass before a separately authorised isolated restore, and `ready_for_n_to_n_plus_1` must remain blocked until that restore is proven `PASSED`.

@@ -1,5 +1,38 @@
 # DEVLOG.md
 
+## 2026-08-25 - Step 1.5B continuity evidence hardening
+
+Changed by: Codex
+Related task: Harden production-continuity evidence before any live collection.
+
+### Changed
+
+- Replaced evidence presence booleans with `UNOBSERVED`/`ABSENT`/`PRESENT_EMPTY`/`PRESENT_NON_EMPTY` states across the 41-variable source-derived configuration inventory.
+- Added explicit inline/file-backed JWT signing-source evidence, public-key identity, external same-key verification, and mandatory real `/run/secrets` persistence proof for file-backed mode.
+- Added external, non-reusable sameness verification records for session, pepper, backup encryption, Google client, and log-IP salt continuity.
+- Added allowlisted safe effective configuration and a runtime collector that fails closed, does not read keys/secrets, accepts empty `PUBLIC_BASE_PATH`, and suppresses credential-bearing URLs.
+- Added separate machine-readable readiness gates for starting an isolated restore and starting N→N+1; final readiness continues to require a passed isolated restore.
+- Preserved runtime, Compose, entrypoint, database, deployment, platform manifests, line-ending policy, and all frozen v1 behavior.
+
+### Docs/specs/schemas updated
+
+- Updated the production-continuity schema/template, collection runbook, N→N+1 plan, security/deployment/database/testing documentation, project memory, helper READMEs, and Step 1.5B handoff.
+- No API, policy, permission, database, migration, runtime environment, or deployment record changed.
+
+### Tests/checks
+
+- Added Python gate/redaction tests and Node helper inventory, state, URL-redaction, JWT, PostgreSQL-error, and runtime-invariance tests.
+- Final lint, build, full test, platform conformance, continuity validation, and platform checker results are recorded in `STEP_1_5B_HANDOFF.md`.
+
+### Decisions
+
+- Recorded D-034: continuity evidence uses external sameness proof and staged restore/N→N+1 gates.
+
+### Follow-ups
+
+- Obtain the unresolved operator evidence listed in `BACKLOG.md` only after live collection is separately authorised.
+- Do not start an isolated restore until its machine gate is true; do not start N→N+1 until a real isolated restore is recorded `PASSED` and two immutable images are supplied.
+
 ## 2026-08-05 - Relationship-oriented grant administration UI
 
 Changed by: Codex

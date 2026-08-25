@@ -4,6 +4,14 @@
 
 V1 implementation scaffold complete, with local dependency, typecheck, build and automated test verification complete. Environment-backed integration verification remains pending.
 
+## Step 1.5B continuity evidence hardening, 2026-08-25
+
+- Production-continuity evidence is schema v2 and remains deliberately redacted and `NOT_READY`. It now distinguishes absent, empty, and non-empty environment states, preserves an empty production `PUBLIC_BASE_PATH` as valid, and inventories all 41 configuration inputs derived from `src/config.ts`, `docker-compose.yaml`, and `docker/entrypoint.sh`.
+- File-backed and inline JWT signing modes are explicit. File-backed readiness requires proof of the actual persistent `/run/secrets` storage/mount as well as public `kid`/public-key fingerprint evidence; private key material and private verifiers remain forbidden.
+- `SESSION_SECRET`, `TOOL_CLIENT_SECRET_PEPPER`, `BACKUP_ENCRYPTION_KEY`, `GOOGLE_CLIENT_SECRET`, and `LOG_IP_SALT` require external, secret-safe sameness proof. Presence alone is insufficient, and no secret value or reusable verifier may be committed.
+- Validation exposes separate `ready_for_isolated_restore` and `ready_for_n_to_n_plus_1` gates. The final gate still requires a `PASSED` isolated restore. The committed template has both gates false; no restore, live collection, or upgrade exercise was performed.
+- Runtime sources, Compose, entrypoint, production configuration, endpoints, JWT/session/refresh/grant behavior, database and migrations are unchanged. The PostgreSQL Compose-name mismatch remains an unresolved deployment blocker.
+
 ## Step 1.5 workspace hygiene and continuity evidence preparation, 2026-08-24
 
 - Repository line endings are deterministic: text is LF by default, Windows command scripts remain CRLF, and common binary assets are marked binary. Renormalization produced no tracked content changes beyond `.gitattributes`.
@@ -11,7 +19,7 @@ V1 implementation scaffold complete, with local dependency, typecheck, build and
 - The evidence model separates the unobserved live/current domain from the documented intended target `https://access-layer.unguess-internal.net`, and separates all observed runtime fields from repository expectations.
 - No live facts were inferred or copied into `project.platform.yaml` or `deployment.registration.yaml`. Coolify identifiers, owners, central registry proof, backup schedule/retention, real volume identity and isolated restore result remain unresolved.
 - The Compose mismatch remains unchanged: PostgreSQL references `access_layer_postgres_data_v2`, while the top-level volume declaration is `access_layer_postgres_data`. Deployment remains blocked.
-- The N→N+1 harness consumes a future `READY` evidence bundle but remains `DOCUMENTED_NOT_RUN`; no restore, upgrade, OAuth/OIDC, runtime, database, secret, deployment or production-configuration action occurred.
+- The N→N+1 harness remains `DOCUMENTED_NOT_RUN`; its original single-gate description is superseded by the schema-v2 staged gates described above.
 
 ## Current status
 

@@ -1,10 +1,10 @@
-schema_version: 1
+schema_version: 2
 status: NOT_READY
 captured_at: null
 captured_by: null
 repository:
-  revision: ba8821b857cc782eef8eba1df9d6ea977da36021
-  evidence_basis: Step 1 accepted repository state; observed production fields remain null
+  revision: 6c9bb3afb6f56dd907bff3bc2f699267b03b3eee
+  evidence_basis: Step 1.5 accepted repository state; observed production fields remain redacted and uncollected
 coolify:
   server_id: null
   project_id: null
@@ -53,6 +53,7 @@ storage:
   mapping_verified: false
   verified_at: null
   verified_by: null
+  evidence_reference: null
 backup:
   mechanism: null
   schedule: null
@@ -60,6 +61,7 @@ backup:
   storage_destination_class: null
   latest_verified_backup_id: null
   latest_verified_backup_at: null
+  evidence_reference: null
   restore_test:
     status: NOT_RUN
     isolated_target: null
@@ -77,37 +79,199 @@ database:
   applied_migration_ids: []
   metadata_source: null
   row_contents_collected: false
-application_continuity:
-  jwks_observed_from: null
-  jwt_public_kid: null
-  jwt_public_key_fingerprint_sha256: null
-  environment_presence_verified: false
-  required_environment_presence:
-    APP_BASE_URL: null
-    AUTH_ISSUER: null
-    PUBLIC_BASE_PATH: null
-    POSTGRES_USER: null
-    POSTGRES_PASSWORD: null
-    POSTGRES_DB: null
-    DATABASE_URL: null
-    GOOGLE_CLIENT_ID: null
-    GOOGLE_CLIENT_SECRET: null
-    GOOGLE_REDIRECT_URI: null
-    JWT_PRIVATE_KEY_PEM_PATH: null
-    JWT_PRIVATE_KEY_PEM: null
-    JWT_PUBLIC_KEY_ID: null
-    ACCESS_TOKEN_TTL_SECONDS: null
-    REFRESH_TOKEN_TTL_SECONDS: null
-    ONE_TIME_CODE_TTL_SECONDS: null
-    ENABLE_REFRESH_TOKENS: null
-    SESSION_COOKIE_NAME: null
-    SESSION_SECRET: null
-    TOOL_CLIENT_SECRET_PEPPER: null
-    BACKUP_ENCRYPTION_KEY: null
-    CORS_ALLOWED_ORIGINS: null
-    LOG_IP_SALT: null
-    SIEM_EXPORT_TOKEN: null
-    BACKUP_API_TOKEN: null
+jwt_signing_material:
+  source_mode: unknown
+  configured_file_path: null
+  file_state: UNOBSERVED
+  public_key:
+    jwks_observed_from: null
+    kid: null
+    fingerprint_sha256: null
+  continuity_verification:
+    comparison_scope: live_N_to_isolated_target
+    verified_same_key: false
+    verification_method: null
+    verified_by: null
+    verified_at: null
+    evidence_reference: null
+    reusable_private_verifier_committed: false
+  file_persistence:
+    container_mount_path: /run/secrets
+    compose_volume_reference: access_layer_jwt_secrets
+    actual_storage_type: null
+    actual_storage_identifier: null
+    actual_host_or_destination_path: null
+    mapping_observed_from: null
+    mapping_verified: false
+    verified_at: null
+    verified_by: null
+    evidence_reference: null
+secret_continuity:
+  secret_values_or_reusable_verifiers_committed: false
+  records:
+    SESSION_SECRET:
+      comparison_scope: live_N_to_isolated_target
+      verified_same_value: false
+      verification_method: null
+      verified_by: null
+      verified_at: null
+      evidence_reference: null
+      reusable_verifier_committed: false
+    TOOL_CLIENT_SECRET_PEPPER:
+      comparison_scope: live_N_to_isolated_target
+      verified_same_value: false
+      verification_method: null
+      verified_by: null
+      verified_at: null
+      evidence_reference: null
+      reusable_verifier_committed: false
+    BACKUP_ENCRYPTION_KEY:
+      comparison_scope: live_N_to_isolated_target
+      verified_same_value: false
+      verification_method: null
+      verified_by: null
+      verified_at: null
+      evidence_reference: null
+      reusable_verifier_committed: false
+    GOOGLE_CLIENT_SECRET:
+      comparison_scope: live_N_to_isolated_target
+      verified_same_value: false
+      verification_method: null
+      verified_by: null
+      verified_at: null
+      evidence_reference: null
+      reusable_verifier_committed: false
+    LOG_IP_SALT:
+      comparison_scope: live_N_to_isolated_target
+      verified_same_value: false
+      verification_method: null
+      verified_by: null
+      verified_at: null
+      evidence_reference: null
+      reusable_verifier_committed: false
+configuration:
+  source_inventory:
+    derived_from: [src/config.ts, docker-compose.yaml, docker/entrypoint.sh]
+    variables:
+      - ACCESS_REQUEST_REOPEN_AFTER_DAYS
+      - ACCESS_TOKEN_TTL_SECONDS
+      - ADMIN_BOOTSTRAP_EMAILS
+      - APP_BASE_URL
+      - APP_ENV
+      - AUDIT_LOG_RAW_IP
+      - AUDIT_LOG_RETENTION_DAYS
+      - AUTH_ISSUER
+      - BACKUP_API_TOKEN
+      - BACKUP_ENCRYPTION_KEY
+      - CORS_ALLOWED_ORIGINS
+      - DATABASE_URL
+      - ENABLE_REFRESH_TOKENS
+      - GOOGLE_ALLOWED_HD
+      - GOOGLE_CLIENT_ID
+      - GOOGLE_CLIENT_SECRET
+      - GOOGLE_OIDC_SCOPE
+      - GOOGLE_REDIRECT_URI
+      - JWT_PRIVATE_KEY_PEM
+      - JWT_PRIVATE_KEY_PEM_PATH
+      - JWT_PUBLIC_KEY_ID
+      - LOG_IP_SALT
+      - LOG_LEVEL
+      - ONE_TIME_CODE_TTL_SECONDS
+      - PORT
+      - POSTGRES_DB
+      - POSTGRES_PASSWORD
+      - POSTGRES_USER
+      - PUBLIC_BASE_PATH
+      - REFRESH_TOKEN_TTL_SECONDS
+      - RETURN_URL_ALLOWED_SCHEMES
+      - RUN_MIGRATIONS_ON_START
+      - RUN_SEED_ON_START
+      - SEED_EXAMPLE_TOOLS
+      - SESSION_COOKIE_NAME
+      - SESSION_SECRET
+      - SIEM_EXPORT_ENABLED
+      - SIEM_EXPORT_ENDPOINT
+      - SIEM_EXPORT_TOKEN
+      - TOOL_CLIENT_SECRET_PEPPER
+      - TRUST_PROXY_HOPS
+  observation:
+    observed_at: null
+    observed_by: null
+    evidence_reference: null
+    runtime_config_validation_observed: false
+  environment_state:
+    ACCESS_REQUEST_REOPEN_AFTER_DAYS: UNOBSERVED
+    ACCESS_TOKEN_TTL_SECONDS: UNOBSERVED
+    ADMIN_BOOTSTRAP_EMAILS: UNOBSERVED
+    APP_BASE_URL: UNOBSERVED
+    APP_ENV: UNOBSERVED
+    AUDIT_LOG_RAW_IP: UNOBSERVED
+    AUDIT_LOG_RETENTION_DAYS: UNOBSERVED
+    AUTH_ISSUER: UNOBSERVED
+    BACKUP_API_TOKEN: UNOBSERVED
+    BACKUP_ENCRYPTION_KEY: UNOBSERVED
+    CORS_ALLOWED_ORIGINS: UNOBSERVED
+    DATABASE_URL: UNOBSERVED
+    ENABLE_REFRESH_TOKENS: UNOBSERVED
+    GOOGLE_ALLOWED_HD: UNOBSERVED
+    GOOGLE_CLIENT_ID: UNOBSERVED
+    GOOGLE_CLIENT_SECRET: UNOBSERVED
+    GOOGLE_OIDC_SCOPE: UNOBSERVED
+    GOOGLE_REDIRECT_URI: UNOBSERVED
+    JWT_PRIVATE_KEY_PEM: UNOBSERVED
+    JWT_PRIVATE_KEY_PEM_PATH: UNOBSERVED
+    JWT_PUBLIC_KEY_ID: UNOBSERVED
+    LOG_IP_SALT: UNOBSERVED
+    LOG_LEVEL: UNOBSERVED
+    ONE_TIME_CODE_TTL_SECONDS: UNOBSERVED
+    PORT: UNOBSERVED
+    POSTGRES_DB: UNOBSERVED
+    POSTGRES_PASSWORD: UNOBSERVED
+    POSTGRES_USER: UNOBSERVED
+    PUBLIC_BASE_PATH: UNOBSERVED
+    REFRESH_TOKEN_TTL_SECONDS: UNOBSERVED
+    RETURN_URL_ALLOWED_SCHEMES: UNOBSERVED
+    RUN_MIGRATIONS_ON_START: UNOBSERVED
+    RUN_SEED_ON_START: UNOBSERVED
+    SEED_EXAMPLE_TOOLS: UNOBSERVED
+    SESSION_COOKIE_NAME: UNOBSERVED
+    SESSION_SECRET: UNOBSERVED
+    SIEM_EXPORT_ENABLED: UNOBSERVED
+    SIEM_EXPORT_ENDPOINT: UNOBSERVED
+    SIEM_EXPORT_TOKEN: UNOBSERVED
+    TOOL_CLIENT_SECRET_PEPPER: UNOBSERVED
+    TRUST_PROXY_HOPS: UNOBSERVED
+  effective_non_secret_config:
+    app_env: null
+    public_base_path: null
+    app_base_url: null
+    auth_issuer: null
+    port: null
+    log_level: null
+    postgres_user: null
+    postgres_database: null
+    google_client_id: null
+    google_redirect_uri: null
+    google_allowed_hd: []
+    google_oidc_scope: []
+    jwt_public_key_id: null
+    access_token_ttl_seconds: null
+    refresh_token_ttl_seconds: null
+    one_time_code_ttl_seconds: null
+    enable_refresh_tokens: null
+    session_cookie_name: null
+    cors_allowed_origins: []
+    return_url_allowed_schemes: []
+    trust_proxy_hops: null
+    audit_log_retention_days: null
+    audit_log_raw_ip: null
+    access_request_reopen_after_days: null
+    run_migrations_on_start: null
+    run_seed_on_start: null
+    seed_example_tools: null
+    siem_export_enabled: null
+    siem_export_endpoint: null
+    admin_bootstrap_email_count: null
 deployment_registry:
   record_verified: false
   registry_identifier: null
@@ -119,8 +283,11 @@ ownership:
   continuity_operator: null
 approvals:
   live_topology_verified: false
-  storage_mapping_verified: false
+  postgres_storage_mapping_verified: false
   backup_policy_verified: false
+  jwt_signing_material_verified: false
+  secret_continuity_verified: false
+  configuration_verified: false
+  ready_for_isolated_restore: false
   restore_test_verified: false
-  environment_presence_verified: false
   ready_for_n_to_n_plus_1: false

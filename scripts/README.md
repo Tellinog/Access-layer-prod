@@ -2,7 +2,7 @@
 
 ## Production continuity (Step 1.5)
 
-- `validate_production_continuity.py` validates the versioned evidence schema and returns `0` for `READY`, `2` for `VALID_BUT_NOT_READY`, or `1` for invalid/unsafe evidence. It is read-only and never updates platform manifests.
+- `validate_production_continuity.py` validates the versioned evidence schema, reports separate `ready_for_isolated_restore` and `ready_for_n_to_n_plus_1` gates, and returns `0` for final `READY`, `2` for `VALID_BUT_NOT_READY`, or `1` for invalid/unsafe evidence. It is read-only and never updates platform manifests.
 - `continuity/` contains allowlisted, read-only production metadata helpers. See `continuity/README.md` and `operations/PRODUCTION_CONTINUITY_COLLECTION.md` before use.
 
 These scripts wrap the Node.js/TypeScript implementation commands.

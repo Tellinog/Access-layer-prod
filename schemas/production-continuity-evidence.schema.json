@@ -1,18 +1,17 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://access-layer.unguess-internal.net/schemas/production-continuity-evidence.schema.json",
-  "title": "Access Layer production continuity evidence bundle v1",
+  "$id": "https://access-layer.unguess-internal.net/schemas/production-continuity-evidence.v2.schema.json",
+  "title": "Access Layer production continuity evidence bundle v2",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "status", "captured_at", "captured_by", "repository", "coolify", "domains", "runtime", "storage", "backup", "database", "application_continuity", "deployment_registry", "ownership", "approvals"],
+  "required": ["schema_version", "status", "captured_at", "captured_by", "repository", "coolify", "domains", "runtime", "storage", "backup", "database", "jwt_signing_material", "secret_continuity", "configuration", "deployment_registry", "ownership", "approvals"],
   "properties": {
-    "schema_version": {"const": 1},
+    "schema_version": {"const": 2},
     "status": {"enum": ["NOT_READY", "READY"]},
     "captured_at": {"$ref": "#/$defs/nullableDateTime"},
     "captured_by": {"$ref": "#/$defs/nullableNonEmptyString"},
     "repository": {
-      "type": "object", "additionalProperties": false,
-      "required": ["revision", "evidence_basis"],
+      "type": "object", "additionalProperties": false, "required": ["revision", "evidence_basis"],
       "properties": {
         "revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
         "evidence_basis": {"type": "string", "minLength": 1}
@@ -22,10 +21,8 @@
       "type": "object", "additionalProperties": false,
       "required": ["server_id", "project_id", "environment_id", "resource_id", "destination_id", "resource_type", "auto_deploy_enabled"],
       "properties": {
-        "server_id": {"$ref": "#/$defs/nullableNonEmptyString"},
-        "project_id": {"$ref": "#/$defs/nullableNonEmptyString"},
-        "environment_id": {"$ref": "#/$defs/nullableNonEmptyString"},
-        "resource_id": {"$ref": "#/$defs/nullableNonEmptyString"},
+        "server_id": {"$ref": "#/$defs/nullableNonEmptyString"}, "project_id": {"$ref": "#/$defs/nullableNonEmptyString"},
+        "environment_id": {"$ref": "#/$defs/nullableNonEmptyString"}, "resource_id": {"$ref": "#/$defs/nullableNonEmptyString"},
         "destination_id": {"$ref": "#/$defs/nullableNonEmptyString"},
         "resource_type": {"type": ["string", "null"], "enum": ["application", "service", null]},
         "auto_deploy_enabled": {"type": ["boolean", "null"]}
@@ -58,50 +55,42 @@
           "type": "object", "additionalProperties": false,
           "required": ["app_target_container_port", "postgres_target_container_port", "postgres_exposure", "public_host_port_mapping_expected"],
           "properties": {
-            "app_target_container_port": {"const": 8080},
-            "postgres_target_container_port": {"const": 5432},
-            "postgres_exposure": {"const": "private"},
-            "public_host_port_mapping_expected": {"const": false}
+            "app_target_container_port": {"const": 8080}, "postgres_target_container_port": {"const": 5432},
+            "postgres_exposure": {"const": "private"}, "public_host_port_mapping_expected": {"const": false}
           }
         }
       }
     },
     "storage": {
       "type": "object", "additionalProperties": false,
-      "required": ["postgres_container_mount_path", "compose_service_volume_reference", "compose_top_level_volume_declaration", "actual_storage_type", "actual_storage_identifier", "actual_host_or_destination_path", "mapping_observed_from", "mapping_verified", "verified_at", "verified_by"],
+      "required": ["postgres_container_mount_path", "compose_service_volume_reference", "compose_top_level_volume_declaration", "actual_storage_type", "actual_storage_identifier", "actual_host_or_destination_path", "mapping_observed_from", "mapping_verified", "verified_at", "verified_by", "evidence_reference"],
       "properties": {
         "postgres_container_mount_path": {"const": "/var/lib/postgresql/data"},
         "compose_service_volume_reference": {"const": "access_layer_postgres_data_v2"},
         "compose_top_level_volume_declaration": {"const": "access_layer_postgres_data"},
-        "actual_storage_type": {"type": ["string", "null"], "enum": ["named_volume", "bind_mount", "managed_storage", "other", null]},
+        "actual_storage_type": {"$ref": "#/$defs/nullableStorageType"},
         "actual_storage_identifier": {"$ref": "#/$defs/nullableNonEmptyString"},
         "actual_host_or_destination_path": {"$ref": "#/$defs/nullableNonEmptyString"},
         "mapping_observed_from": {"$ref": "#/$defs/nullableNonEmptyString"},
-        "mapping_verified": {"type": "boolean"},
-        "verified_at": {"$ref": "#/$defs/nullableDateTime"},
-        "verified_by": {"$ref": "#/$defs/nullableNonEmptyString"}
+        "mapping_verified": {"type": "boolean"}, "verified_at": {"$ref": "#/$defs/nullableDateTime"},
+        "verified_by": {"$ref": "#/$defs/nullableNonEmptyString"}, "evidence_reference": {"$ref": "#/$defs/nullableNonEmptyString"}
       }
     },
     "backup": {
       "type": "object", "additionalProperties": false,
-      "required": ["mechanism", "schedule", "retention", "storage_destination_class", "latest_verified_backup_id", "latest_verified_backup_at", "restore_test"],
+      "required": ["mechanism", "schedule", "retention", "storage_destination_class", "latest_verified_backup_id", "latest_verified_backup_at", "evidence_reference", "restore_test"],
       "properties": {
-        "mechanism": {"$ref": "#/$defs/nullableNonEmptyString"},
-        "schedule": {"$ref": "#/$defs/nullableNonEmptyString"},
-        "retention": {"$ref": "#/$defs/nullableNonEmptyString"},
-        "storage_destination_class": {"$ref": "#/$defs/nullableNonEmptyString"},
-        "latest_verified_backup_id": {"$ref": "#/$defs/nullableNonEmptyString"},
-        "latest_verified_backup_at": {"$ref": "#/$defs/nullableDateTime"},
+        "mechanism": {"$ref": "#/$defs/nullableNonEmptyString"}, "schedule": {"$ref": "#/$defs/nullableNonEmptyString"},
+        "retention": {"$ref": "#/$defs/nullableNonEmptyString"}, "storage_destination_class": {"$ref": "#/$defs/nullableNonEmptyString"},
+        "latest_verified_backup_id": {"$ref": "#/$defs/nullableNonEmptyString"}, "latest_verified_backup_at": {"$ref": "#/$defs/nullableDateTime"},
+        "evidence_reference": {"$ref": "#/$defs/nullableNonEmptyString"},
         "restore_test": {
           "type": "object", "additionalProperties": false,
           "required": ["status", "isolated_target", "target_identifier", "completed_at", "verified_by", "evidence_reference"],
           "properties": {
-            "status": {"enum": ["NOT_RUN", "PASSED", "FAILED"]},
-            "isolated_target": {"type": ["boolean", "null"]},
-            "target_identifier": {"$ref": "#/$defs/nullableNonEmptyString"},
-            "completed_at": {"$ref": "#/$defs/nullableDateTime"},
-            "verified_by": {"$ref": "#/$defs/nullableNonEmptyString"},
-            "evidence_reference": {"$ref": "#/$defs/nullableNonEmptyString"}
+            "status": {"enum": ["NOT_RUN", "PASSED", "FAILED"]}, "isolated_target": {"type": ["boolean", "null"]},
+            "target_identifier": {"$ref": "#/$defs/nullableNonEmptyString"}, "completed_at": {"$ref": "#/$defs/nullableDateTime"},
+            "verified_by": {"$ref": "#/$defs/nullableNonEmptyString"}, "evidence_reference": {"$ref": "#/$defs/nullableNonEmptyString"}
           }
         }
       }
@@ -110,58 +99,91 @@
       "type": "object", "additionalProperties": false,
       "required": ["metadata_collected", "collected_at", "server_version", "database_name", "schema_fingerprint_sha256", "migration_table", "applied_migration_ids", "metadata_source", "row_contents_collected"],
       "properties": {
-        "metadata_collected": {"type": "boolean"},
-        "collected_at": {"$ref": "#/$defs/nullableDateTime"},
-        "server_version": {"$ref": "#/$defs/nullableNonEmptyString"},
-        "database_name": {"$ref": "#/$defs/nullableNonEmptyString"},
-        "schema_fingerprint_sha256": {"$ref": "#/$defs/nullableSha256Hex"},
-        "migration_table": {"const": "schema_migrations"},
+        "metadata_collected": {"type": "boolean"}, "collected_at": {"$ref": "#/$defs/nullableDateTime"},
+        "server_version": {"$ref": "#/$defs/nullableNonEmptyString"}, "database_name": {"$ref": "#/$defs/nullableNonEmptyString"},
+        "schema_fingerprint_sha256": {"$ref": "#/$defs/nullableSha256Hex"}, "migration_table": {"const": "schema_migrations"},
         "applied_migration_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[^/\\\\]+\\.sql$"}},
-        "metadata_source": {"$ref": "#/$defs/nullableNonEmptyString"},
-        "row_contents_collected": {"const": false}
+        "metadata_source": {"$ref": "#/$defs/nullableNonEmptyString"}, "row_contents_collected": {"const": false}
       }
     },
-    "application_continuity": {
+    "jwt_signing_material": {
       "type": "object", "additionalProperties": false,
-      "required": ["jwks_observed_from", "jwt_public_kid", "jwt_public_key_fingerprint_sha256", "environment_presence_verified", "required_environment_presence"],
+      "required": ["source_mode", "configured_file_path", "file_state", "public_key", "continuity_verification", "file_persistence"],
       "properties": {
-        "jwks_observed_from": {"$ref": "#/$defs/nullableNonEmptyString"},
-        "jwt_public_kid": {"$ref": "#/$defs/nullableNonEmptyString"},
-        "jwt_public_key_fingerprint_sha256": {"$ref": "#/$defs/nullableSha256Hex"},
-        "environment_presence_verified": {"type": "boolean"},
-        "required_environment_presence": {
-          "type": "object", "additionalProperties": false,
-          "required": ["APP_BASE_URL", "AUTH_ISSUER", "PUBLIC_BASE_PATH", "POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB", "DATABASE_URL", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REDIRECT_URI", "JWT_PRIVATE_KEY_PEM_PATH", "JWT_PRIVATE_KEY_PEM", "JWT_PUBLIC_KEY_ID", "ACCESS_TOKEN_TTL_SECONDS", "REFRESH_TOKEN_TTL_SECONDS", "ONE_TIME_CODE_TTL_SECONDS", "ENABLE_REFRESH_TOKENS", "SESSION_COOKIE_NAME", "SESSION_SECRET", "TOOL_CLIENT_SECRET_PEPPER", "BACKUP_ENCRYPTION_KEY", "CORS_ALLOWED_ORIGINS", "LOG_IP_SALT", "SIEM_EXPORT_TOKEN", "BACKUP_API_TOKEN"],
+        "source_mode": {"enum": ["unknown", "inline_env", "file_path"]},
+        "configured_file_path": {"type": ["string", "null"], "pattern": "^/run/secrets/[^\\s]+$"},
+        "file_state": {"$ref": "#/$defs/environmentState"},
+        "public_key": {
+          "type": "object", "additionalProperties": false, "required": ["jwks_observed_from", "kid", "fingerprint_sha256"],
           "properties": {
-            "APP_BASE_URL": {"$ref": "#/$defs/presence"}, "AUTH_ISSUER": {"$ref": "#/$defs/presence"},
-            "PUBLIC_BASE_PATH": {"$ref": "#/$defs/presence"}, "POSTGRES_USER": {"$ref": "#/$defs/presence"},
-            "POSTGRES_PASSWORD": {"$ref": "#/$defs/presence"}, "POSTGRES_DB": {"$ref": "#/$defs/presence"},
-            "DATABASE_URL": {"$ref": "#/$defs/presence"}, "GOOGLE_CLIENT_ID": {"$ref": "#/$defs/presence"},
-            "GOOGLE_CLIENT_SECRET": {"$ref": "#/$defs/presence"}, "GOOGLE_REDIRECT_URI": {"$ref": "#/$defs/presence"},
-            "JWT_PRIVATE_KEY_PEM_PATH": {"$ref": "#/$defs/presence"}, "JWT_PRIVATE_KEY_PEM": {"$ref": "#/$defs/presence"},
-            "JWT_PUBLIC_KEY_ID": {"$ref": "#/$defs/presence"}, "ACCESS_TOKEN_TTL_SECONDS": {"$ref": "#/$defs/presence"},
-            "REFRESH_TOKEN_TTL_SECONDS": {"$ref": "#/$defs/presence"}, "ONE_TIME_CODE_TTL_SECONDS": {"$ref": "#/$defs/presence"},
-            "ENABLE_REFRESH_TOKENS": {"$ref": "#/$defs/presence"}, "SESSION_COOKIE_NAME": {"$ref": "#/$defs/presence"},
-            "SESSION_SECRET": {"$ref": "#/$defs/presence"}, "TOOL_CLIENT_SECRET_PEPPER": {"$ref": "#/$defs/presence"},
-            "BACKUP_ENCRYPTION_KEY": {"$ref": "#/$defs/presence"}, "CORS_ALLOWED_ORIGINS": {"$ref": "#/$defs/presence"},
-            "LOG_IP_SALT": {"$ref": "#/$defs/presence"}, "SIEM_EXPORT_TOKEN": {"$ref": "#/$defs/presence"},
-            "BACKUP_API_TOKEN": {"$ref": "#/$defs/presence"}
+            "jwks_observed_from": {"$ref": "#/$defs/nullableNonEmptyString"}, "kid": {"$ref": "#/$defs/nullableNonEmptyString"},
+            "fingerprint_sha256": {"$ref": "#/$defs/nullableSha256Hex"}
+          }
+        },
+        "continuity_verification": {"$ref": "#/$defs/keyContinuityRecord"},
+        "file_persistence": {
+          "type": "object", "additionalProperties": false,
+          "required": ["container_mount_path", "compose_volume_reference", "actual_storage_type", "actual_storage_identifier", "actual_host_or_destination_path", "mapping_observed_from", "mapping_verified", "verified_at", "verified_by", "evidence_reference"],
+          "properties": {
+            "container_mount_path": {"const": "/run/secrets"}, "compose_volume_reference": {"const": "access_layer_jwt_secrets"},
+            "actual_storage_type": {"$ref": "#/$defs/nullableStorageType"}, "actual_storage_identifier": {"$ref": "#/$defs/nullableNonEmptyString"},
+            "actual_host_or_destination_path": {"$ref": "#/$defs/nullableNonEmptyString"}, "mapping_observed_from": {"$ref": "#/$defs/nullableNonEmptyString"},
+            "mapping_verified": {"type": "boolean"}, "verified_at": {"$ref": "#/$defs/nullableDateTime"},
+            "verified_by": {"$ref": "#/$defs/nullableNonEmptyString"}, "evidence_reference": {"$ref": "#/$defs/nullableNonEmptyString"}
           }
         }
       }
     },
-    "deployment_registry": {
+    "secret_continuity": {
       "type": "object", "additionalProperties": false,
-      "required": ["record_verified", "registry_identifier", "evidence_reference"],
+      "required": ["secret_values_or_reusable_verifiers_committed", "records"],
       "properties": {
-        "record_verified": {"type": "boolean"},
-        "registry_identifier": {"$ref": "#/$defs/nullableNonEmptyString"},
+        "secret_values_or_reusable_verifiers_committed": {"const": false},
+        "records": {
+          "type": "object", "additionalProperties": false,
+          "required": ["SESSION_SECRET", "TOOL_CLIENT_SECRET_PEPPER", "BACKUP_ENCRYPTION_KEY", "GOOGLE_CLIENT_SECRET", "LOG_IP_SALT"],
+          "properties": {
+            "SESSION_SECRET": {"$ref": "#/$defs/secretContinuityRecord"},
+            "TOOL_CLIENT_SECRET_PEPPER": {"$ref": "#/$defs/secretContinuityRecord"},
+            "BACKUP_ENCRYPTION_KEY": {"$ref": "#/$defs/secretContinuityRecord"},
+            "GOOGLE_CLIENT_SECRET": {"$ref": "#/$defs/secretContinuityRecord"},
+            "LOG_IP_SALT": {"$ref": "#/$defs/secretContinuityRecord"}
+          }
+        }
+      }
+    },
+    "configuration": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_inventory", "observation", "environment_state", "effective_non_secret_config"],
+      "properties": {
+        "source_inventory": {
+          "type": "object", "additionalProperties": false, "required": ["derived_from", "variables"],
+          "properties": {
+            "derived_from": {"const": ["src/config.ts", "docker-compose.yaml", "docker/entrypoint.sh"]},
+            "variables": {"const": ["ACCESS_REQUEST_REOPEN_AFTER_DAYS", "ACCESS_TOKEN_TTL_SECONDS", "ADMIN_BOOTSTRAP_EMAILS", "APP_BASE_URL", "APP_ENV", "AUDIT_LOG_RAW_IP", "AUDIT_LOG_RETENTION_DAYS", "AUTH_ISSUER", "BACKUP_API_TOKEN", "BACKUP_ENCRYPTION_KEY", "CORS_ALLOWED_ORIGINS", "DATABASE_URL", "ENABLE_REFRESH_TOKENS", "GOOGLE_ALLOWED_HD", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_OIDC_SCOPE", "GOOGLE_REDIRECT_URI", "JWT_PRIVATE_KEY_PEM", "JWT_PRIVATE_KEY_PEM_PATH", "JWT_PUBLIC_KEY_ID", "LOG_IP_SALT", "LOG_LEVEL", "ONE_TIME_CODE_TTL_SECONDS", "PORT", "POSTGRES_DB", "POSTGRES_PASSWORD", "POSTGRES_USER", "PUBLIC_BASE_PATH", "REFRESH_TOKEN_TTL_SECONDS", "RETURN_URL_ALLOWED_SCHEMES", "RUN_MIGRATIONS_ON_START", "RUN_SEED_ON_START", "SEED_EXAMPLE_TOOLS", "SESSION_COOKIE_NAME", "SESSION_SECRET", "SIEM_EXPORT_ENABLED", "SIEM_EXPORT_ENDPOINT", "SIEM_EXPORT_TOKEN", "TOOL_CLIENT_SECRET_PEPPER", "TRUST_PROXY_HOPS"]}
+          }
+        },
+        "observation": {
+          "type": "object", "additionalProperties": false,
+          "required": ["observed_at", "observed_by", "evidence_reference", "runtime_config_validation_observed"],
+          "properties": {
+            "observed_at": {"$ref": "#/$defs/nullableDateTime"}, "observed_by": {"$ref": "#/$defs/nullableNonEmptyString"},
+            "evidence_reference": {"$ref": "#/$defs/nullableNonEmptyString"}, "runtime_config_validation_observed": {"type": "boolean"}
+          }
+        },
+        "environment_state": {"$ref": "#/$defs/environmentStateMap"},
+        "effective_non_secret_config": {"$ref": "#/$defs/effectiveConfig"}
+      }
+    },
+    "deployment_registry": {
+      "type": "object", "additionalProperties": false, "required": ["record_verified", "registry_identifier", "evidence_reference"],
+      "properties": {
+        "record_verified": {"type": "boolean"}, "registry_identifier": {"$ref": "#/$defs/nullableNonEmptyString"},
         "evidence_reference": {"$ref": "#/$defs/nullableNonEmptyString"}
       }
     },
     "ownership": {
-      "type": "object", "additionalProperties": false,
-      "required": ["owner_team", "technical_owner", "product_owner", "continuity_operator"],
+      "type": "object", "additionalProperties": false, "required": ["owner_team", "technical_owner", "product_owner", "continuity_operator"],
       "properties": {
         "owner_team": {"$ref": "#/$defs/nullableNonEmptyString"}, "technical_owner": {"$ref": "#/$defs/nullableNonEmptyString"},
         "product_owner": {"$ref": "#/$defs/nullableNonEmptyString"}, "continuity_operator": {"$ref": "#/$defs/nullableNonEmptyString"}
@@ -169,11 +191,13 @@
     },
     "approvals": {
       "type": "object", "additionalProperties": false,
-      "required": ["live_topology_verified", "storage_mapping_verified", "backup_policy_verified", "restore_test_verified", "environment_presence_verified", "ready_for_n_to_n_plus_1"],
+      "required": ["live_topology_verified", "postgres_storage_mapping_verified", "backup_policy_verified", "jwt_signing_material_verified", "secret_continuity_verified", "configuration_verified", "ready_for_isolated_restore", "restore_test_verified", "ready_for_n_to_n_plus_1"],
       "properties": {
-        "live_topology_verified": {"type": "boolean"}, "storage_mapping_verified": {"type": "boolean"},
-        "backup_policy_verified": {"type": "boolean"}, "restore_test_verified": {"type": "boolean"},
-        "environment_presence_verified": {"type": "boolean"}, "ready_for_n_to_n_plus_1": {"type": "boolean"}
+        "live_topology_verified": {"type": "boolean"}, "postgres_storage_mapping_verified": {"type": "boolean"},
+        "backup_policy_verified": {"type": "boolean"}, "jwt_signing_material_verified": {"type": "boolean"},
+        "secret_continuity_verified": {"type": "boolean"}, "configuration_verified": {"type": "boolean"},
+        "ready_for_isolated_restore": {"type": "boolean"}, "restore_test_verified": {"type": "boolean"},
+        "ready_for_n_to_n_plus_1": {"type": "boolean"}
       }
     }
   },
@@ -182,8 +206,31 @@
     "nullableDateTime": {"type": ["string", "null"], "format": "date-time"},
     "httpsOrigin": {"type": "string", "pattern": "^https://[^/?#]+$"},
     "nullableHttpsOrigin": {"type": ["string", "null"], "pattern": "^https://[^/?#]+$"},
+    "nullableUri": {"type": ["string", "null"], "format": "uri"},
     "nullableSha256Hex": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
-    "presence": {"type": ["boolean", "null"]},
+    "nullableStorageType": {"type": ["string", "null"], "enum": ["named_volume", "bind_mount", "managed_storage", "other", null]},
+    "environmentState": {"enum": ["UNOBSERVED", "ABSENT", "PRESENT_EMPTY", "PRESENT_NON_EMPTY"]},
+    "verificationMethod": {"type": ["string", "null"], "enum": ["secret_manager_version_reference", "operator_side_by_side_comparison", "controlled_injection_record", "public_key_comparison", "other_approved_method", null]},
+    "secretContinuityRecord": {
+      "type": "object", "additionalProperties": false,
+      "required": ["comparison_scope", "verified_same_value", "verification_method", "verified_by", "verified_at", "evidence_reference", "reusable_verifier_committed"],
+      "properties": {
+        "comparison_scope": {"const": "live_N_to_isolated_target"},
+        "verified_same_value": {"type": "boolean"}, "verification_method": {"$ref": "#/$defs/verificationMethod"},
+        "verified_by": {"$ref": "#/$defs/nullableNonEmptyString"}, "verified_at": {"$ref": "#/$defs/nullableDateTime"},
+        "evidence_reference": {"$ref": "#/$defs/nullableNonEmptyString"}, "reusable_verifier_committed": {"const": false}
+      }
+    },
+    "keyContinuityRecord": {
+      "type": "object", "additionalProperties": false,
+      "required": ["comparison_scope", "verified_same_key", "verification_method", "verified_by", "verified_at", "evidence_reference", "reusable_private_verifier_committed"],
+      "properties": {
+        "comparison_scope": {"const": "live_N_to_isolated_target"},
+        "verified_same_key": {"type": "boolean"}, "verification_method": {"$ref": "#/$defs/verificationMethod"},
+        "verified_by": {"$ref": "#/$defs/nullableNonEmptyString"}, "verified_at": {"$ref": "#/$defs/nullableDateTime"},
+        "evidence_reference": {"$ref": "#/$defs/nullableNonEmptyString"}, "reusable_private_verifier_committed": {"const": false}
+      }
+    },
     "observedService": {
       "type": "object", "additionalProperties": false,
       "required": ["service_name", "target_container_port", "public_host_port", "public_host_port_mapping_observed", "exposure"],
@@ -193,6 +240,60 @@
         "public_host_port": {"type": ["integer", "null"], "minimum": 1, "maximum": 65535},
         "public_host_port_mapping_observed": {"type": "boolean"},
         "exposure": {"type": ["string", "null"], "enum": ["public_via_proxy", "private", null]}
+      }
+    },
+    "environmentStateMap": {
+      "type": "object", "additionalProperties": false,
+      "required": ["ACCESS_REQUEST_REOPEN_AFTER_DAYS", "ACCESS_TOKEN_TTL_SECONDS", "ADMIN_BOOTSTRAP_EMAILS", "APP_BASE_URL", "APP_ENV", "AUDIT_LOG_RAW_IP", "AUDIT_LOG_RETENTION_DAYS", "AUTH_ISSUER", "BACKUP_API_TOKEN", "BACKUP_ENCRYPTION_KEY", "CORS_ALLOWED_ORIGINS", "DATABASE_URL", "ENABLE_REFRESH_TOKENS", "GOOGLE_ALLOWED_HD", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_OIDC_SCOPE", "GOOGLE_REDIRECT_URI", "JWT_PRIVATE_KEY_PEM", "JWT_PRIVATE_KEY_PEM_PATH", "JWT_PUBLIC_KEY_ID", "LOG_IP_SALT", "LOG_LEVEL", "ONE_TIME_CODE_TTL_SECONDS", "PORT", "POSTGRES_DB", "POSTGRES_PASSWORD", "POSTGRES_USER", "PUBLIC_BASE_PATH", "REFRESH_TOKEN_TTL_SECONDS", "RETURN_URL_ALLOWED_SCHEMES", "RUN_MIGRATIONS_ON_START", "RUN_SEED_ON_START", "SEED_EXAMPLE_TOOLS", "SESSION_COOKIE_NAME", "SESSION_SECRET", "SIEM_EXPORT_ENABLED", "SIEM_EXPORT_ENDPOINT", "SIEM_EXPORT_TOKEN", "TOOL_CLIENT_SECRET_PEPPER", "TRUST_PROXY_HOPS"],
+      "properties": {
+        "ACCESS_REQUEST_REOPEN_AFTER_DAYS": {"$ref": "#/$defs/environmentState"}, "ACCESS_TOKEN_TTL_SECONDS": {"$ref": "#/$defs/environmentState"},
+        "ADMIN_BOOTSTRAP_EMAILS": {"$ref": "#/$defs/environmentState"}, "APP_BASE_URL": {"$ref": "#/$defs/environmentState"},
+        "APP_ENV": {"$ref": "#/$defs/environmentState"}, "AUDIT_LOG_RAW_IP": {"$ref": "#/$defs/environmentState"},
+        "AUDIT_LOG_RETENTION_DAYS": {"$ref": "#/$defs/environmentState"}, "AUTH_ISSUER": {"$ref": "#/$defs/environmentState"},
+        "BACKUP_API_TOKEN": {"$ref": "#/$defs/environmentState"}, "BACKUP_ENCRYPTION_KEY": {"$ref": "#/$defs/environmentState"},
+        "CORS_ALLOWED_ORIGINS": {"$ref": "#/$defs/environmentState"}, "DATABASE_URL": {"$ref": "#/$defs/environmentState"},
+        "ENABLE_REFRESH_TOKENS": {"$ref": "#/$defs/environmentState"}, "GOOGLE_ALLOWED_HD": {"$ref": "#/$defs/environmentState"},
+        "GOOGLE_CLIENT_ID": {"$ref": "#/$defs/environmentState"}, "GOOGLE_CLIENT_SECRET": {"$ref": "#/$defs/environmentState"},
+        "GOOGLE_OIDC_SCOPE": {"$ref": "#/$defs/environmentState"}, "GOOGLE_REDIRECT_URI": {"$ref": "#/$defs/environmentState"},
+        "JWT_PRIVATE_KEY_PEM": {"$ref": "#/$defs/environmentState"}, "JWT_PRIVATE_KEY_PEM_PATH": {"$ref": "#/$defs/environmentState"},
+        "JWT_PUBLIC_KEY_ID": {"$ref": "#/$defs/environmentState"}, "LOG_IP_SALT": {"$ref": "#/$defs/environmentState"},
+        "LOG_LEVEL": {"$ref": "#/$defs/environmentState"}, "ONE_TIME_CODE_TTL_SECONDS": {"$ref": "#/$defs/environmentState"},
+        "PORT": {"$ref": "#/$defs/environmentState"}, "POSTGRES_DB": {"$ref": "#/$defs/environmentState"},
+        "POSTGRES_PASSWORD": {"$ref": "#/$defs/environmentState"}, "POSTGRES_USER": {"$ref": "#/$defs/environmentState"},
+        "PUBLIC_BASE_PATH": {"$ref": "#/$defs/environmentState"}, "REFRESH_TOKEN_TTL_SECONDS": {"$ref": "#/$defs/environmentState"},
+        "RETURN_URL_ALLOWED_SCHEMES": {"$ref": "#/$defs/environmentState"}, "RUN_MIGRATIONS_ON_START": {"$ref": "#/$defs/environmentState"},
+        "RUN_SEED_ON_START": {"$ref": "#/$defs/environmentState"}, "SEED_EXAMPLE_TOOLS": {"$ref": "#/$defs/environmentState"},
+        "SESSION_COOKIE_NAME": {"$ref": "#/$defs/environmentState"}, "SESSION_SECRET": {"$ref": "#/$defs/environmentState"},
+        "SIEM_EXPORT_ENABLED": {"$ref": "#/$defs/environmentState"}, "SIEM_EXPORT_ENDPOINT": {"$ref": "#/$defs/environmentState"},
+        "SIEM_EXPORT_TOKEN": {"$ref": "#/$defs/environmentState"}, "TOOL_CLIENT_SECRET_PEPPER": {"$ref": "#/$defs/environmentState"},
+        "TRUST_PROXY_HOPS": {"$ref": "#/$defs/environmentState"}
+      }
+    },
+    "effectiveConfig": {
+      "type": "object", "additionalProperties": false,
+      "required": ["app_env", "public_base_path", "app_base_url", "auth_issuer", "port", "log_level", "postgres_user", "postgres_database", "google_client_id", "google_redirect_uri", "google_allowed_hd", "google_oidc_scope", "jwt_public_key_id", "access_token_ttl_seconds", "refresh_token_ttl_seconds", "one_time_code_ttl_seconds", "enable_refresh_tokens", "session_cookie_name", "cors_allowed_origins", "return_url_allowed_schemes", "trust_proxy_hops", "audit_log_retention_days", "audit_log_raw_ip", "access_request_reopen_after_days", "run_migrations_on_start", "run_seed_on_start", "seed_example_tools", "siem_export_enabled", "siem_export_endpoint", "admin_bootstrap_email_count"],
+      "properties": {
+        "app_env": {"type": ["string", "null"], "enum": ["development", "staging", "production", "test", null]},
+        "public_base_path": {"type": ["string", "null"], "pattern": "^(|/[^?#\\\\]*)$"},
+        "app_base_url": {"$ref": "#/$defs/nullableUri"}, "auth_issuer": {"$ref": "#/$defs/nullableUri"},
+        "port": {"type": ["integer", "null"], "minimum": 1, "maximum": 65535}, "log_level": {"$ref": "#/$defs/nullableNonEmptyString"},
+        "postgres_user": {"$ref": "#/$defs/nullableNonEmptyString"}, "postgres_database": {"$ref": "#/$defs/nullableNonEmptyString"},
+        "google_client_id": {"$ref": "#/$defs/nullableNonEmptyString"}, "google_redirect_uri": {"$ref": "#/$defs/nullableUri"},
+        "google_allowed_hd": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z0-9.-]+$"}},
+        "google_oidc_scope": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "jwt_public_key_id": {"$ref": "#/$defs/nullableNonEmptyString"},
+        "access_token_ttl_seconds": {"type": ["integer", "null"], "minimum": 60, "maximum": 3600},
+        "refresh_token_ttl_seconds": {"type": ["integer", "null"], "minimum": 300, "maximum": 86400},
+        "one_time_code_ttl_seconds": {"type": ["integer", "null"], "minimum": 15, "maximum": 300},
+        "enable_refresh_tokens": {"type": ["boolean", "null"]}, "session_cookie_name": {"$ref": "#/$defs/nullableNonEmptyString"},
+        "cors_allowed_origins": {"type": "array", "uniqueItems": true, "items": {"type": "string", "format": "uri"}},
+        "return_url_allowed_schemes": {"type": "array", "uniqueItems": true, "items": {"enum": ["https", "http"]}},
+        "trust_proxy_hops": {"type": ["integer", "null"], "minimum": 0, "maximum": 5},
+        "audit_log_retention_days": {"type": ["integer", "null"], "minimum": 30}, "audit_log_raw_ip": {"type": ["boolean", "null"]},
+        "access_request_reopen_after_days": {"type": ["integer", "null"], "minimum": 0, "maximum": 3650},
+        "run_migrations_on_start": {"type": ["boolean", "null"]}, "run_seed_on_start": {"type": ["boolean", "null"]},
+        "seed_example_tools": {"type": ["boolean", "null"]}, "siem_export_enabled": {"type": ["boolean", "null"]},
+        "siem_export_endpoint": {"$ref": "#/$defs/nullableUri"}, "admin_bootstrap_email_count": {"type": ["integer", "null"], "minimum": 0}
       }
     }
   }

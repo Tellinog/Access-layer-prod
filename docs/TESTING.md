@@ -2,9 +2,9 @@
 
 ## Step 1.5 production-continuity evidence checks
 
-`scripts/validate_production_continuity.py` validates `operations/production-continuity.evidence.yml` against its v1 JSON Schema, rejects secret-bearing fields/values, and separately evaluates readiness. Exit codes are `0` (`READY`), `2` (`VALID_BUT_NOT_READY`) and `1` (`INVALID`). The committed bundle is expected to return exit `2` until live operator evidence and a later isolated restore exist.
+`scripts/validate_production_continuity.py` validates `operations/production-continuity.evidence.yml` against its v2 JSON Schema, rejects secret-bearing fields/values and reusable verifiers, and reports separate isolated-restore and N→N+1 gates. Exit codes are `0` (final `READY`), `2` (`VALID_BUT_NOT_READY`) and `1` (`INVALID`). The committed bundle is expected to return exit `2` with both gates false until live operator evidence and a later isolated restore exist.
 
-Python tests cover the committed incomplete state, false `READY` claims, secret rejection without value echoing, and a fully synthetic ready bundle. Vitest covers sensitive environment presence-only output, public-JWK fingerprint safety and PostgreSQL helper fail-closed source constraints. No test in Step 1.5 connects to production or runs a restore/upgrade.
+Python tests cover the committed incomplete state, staged gates, JWT source alternatives/persistence, secret sameness, false `READY` claims, unsafe evidence rejection without value echoing, and a fully synthetic ready bundle. Vitest covers state-only secret output, the source-derived configuration inventory, safe effective configuration, public-JWK fingerprint safety, PostgreSQL helper fail-closed constraints, and runtime-source invariance. No test in Step 1.5B connects to production or runs a restore/upgrade.
 
 ## Test strategy
 
@@ -244,3 +244,9 @@ Verification for the 2026-06-22 update: `npm run lint`, `npm run build` and `npm
 # Step 1 conformance
 
 `tests/legacy-contract-baseline.test.ts` verifies normalized source hashes, every observed `/v1/*` method/path, error/status mappings, migration hashes, the known Compose volume mismatch, absence of OAuth/OIDC runtime additions and synthetic golden shapes. Template conformance tests under `tests/platform-conformance/` validate the additive platform records. The future live-version procedure is `../N_TO_N_PLUS_1_SURVIVAL_PLAN.md`; it is not a passing test until two immutable images are exercised.
+
+## Step 1.5B evidence conformance
+
+`tests/test_production_continuity_evidence.py` exercises schema-v2 gate separation, inline/file-backed JWT alternatives, persistent key-mount proof, empty-secret rejection, valid empty `PUBLIC_BASE_PATH`, external secret-sameness proof, isolated-restore promotion, final restore gating, and unsafe-verifier/credential rejection. `tests/continuity-tools.test.ts` verifies the 41-variable source inventory, state classification, helper redaction, credential-bearing URL suppression, public-JWK-only behavior, and invariant hashes for `src/config.ts`, `docker-compose.yaml`, and `docker/entrypoint.sh`.
+
+The committed evidence template must validate as `VALID_BUT_NOT_READY` with both gates false. A synthetic test fixture may reach either gate; it is not production evidence and must use only `.invalid` identities and non-secret placeholders.

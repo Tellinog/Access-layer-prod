@@ -4,7 +4,7 @@
 
 Step 1.5 permits only read-only database/schema evidence without application row contents. `scripts/continuity/collect-postgres-metadata.mjs` uses a read-only transaction and emits PostgreSQL version, database name, a deterministic schema fingerprint, migration identifiers from `schema_migrations`, and metadata counts. It does not emit connection details or driver messages on failure.
 
-The actual live storage identity, backup policy and isolated restore outcome remain unverified. No migration or production restore is authorised by this workflow.
+The actual live storage identity, backup policy and isolated restore outcome remain unverified. Schema-v2 evidence separates readiness to begin a separately authorised isolated restore from readiness to begin N→N+1; the latter requires a recorded `PASSED` isolated restore. No migration or production restore is authorised by this workflow.
 
 ## Data storage overview
 

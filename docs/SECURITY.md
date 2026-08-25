@@ -2,7 +2,7 @@
 
 ## Production continuity evidence safety
 
-Continuity evidence may contain operational identifiers and public JWT key metadata, but never tokens, cookies, authorization codes, client secrets, private keys, passwords, database connection strings, session secrets, peppers, backup encryption keys or personal rows. Continuity-sensitive environment variables are represented only by presence booleans. Operator artifacts stay outside the repository or in ignored local evidence paths; committed evidence must be redacted and reviewed.
+Continuity evidence may contain operational identifiers, safe effective configuration, environment state enums, and public JWT key metadata, but never tokens, cookies, authorization codes, client secrets, private keys, passwords, database connection strings, session secrets, peppers, backup encryption keys, reusable secret verifiers, or personal rows. Operator artifacts stay outside the repository or in ignored local evidence paths; committed evidence must be redacted and reviewed.
 
 ## Authentication
 
@@ -187,3 +187,11 @@ To prevent spam and enumeration:
 # Step 1 compatibility freeze
 
 As of 2026-08-24, the repository-observed security contract is frozen in `../specs/legacy-contract-baseline.v1.json`. Step 1 adds no OAuth/OIDC surface, secret rotation, permission, token, cookie or session change. Copied template OAuth and SDK material is reference-only. Never log or store raw golden tokens; all new fixtures use synthetic `.invalid` identities and non-secret token strings.
+
+## Step 1.5B continuity evidence safety
+
+The production-continuity bundle records secret-bearing environment inputs only as `ABSENT`, `PRESENT_EMPTY`, or `PRESENT_NON_EMPTY`. Presence does not establish continuity: equality of `SESSION_SECRET`, `TOOL_CLIENT_SECRET_PEPPER`, `BACKUP_ENCRYPTION_KEY`, `GOOGLE_CLIENT_SECRET`, `LOG_IP_SALT`, and JWT signing material must be attested through access-controlled external evidence. Secret values, low-entropy hashes, HMACs, private-key fingerprints, and other reusable verifiers are forbidden in Git.
+
+For file-backed JWT signing, the public JWKS `kid`/fingerprint and the actual persistent `/run/secrets` mount identity are separate required observations. The runtime helper may stat the configured key file but never reads it. An absent file is continuity-sensitive because the current entrypoint can generate a new private key at startup.
+
+The intermediate `ready_for_isolated_restore` gate never authorises production changes. Final N→N+1 readiness additionally requires a proven `PASSED` isolated restore.

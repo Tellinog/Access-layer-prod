@@ -202,14 +202,22 @@ CREATE TABLE IF NOT EXISTS oauth_signing_keys (
   CONSTRAINT oauth_signing_keys_kid_nonempty CHECK (btrim(kid) <> '' AND length(kid) <= 255),
   CONSTRAINT oauth_signing_keys_algorithm CHECK (algorithm = 'RS256'),
   CONSTRAINT oauth_signing_keys_public_jwk_shape CHECK (
-    jsonb_typeof(public_jwk) = 'object' AND
-    public_jwk ->> 'kty' = 'RSA' AND
-    public_jwk ->> 'kid' = kid AND
-    public_jwk ->> 'alg' = 'RS256' AND
-    public_jwk ->> 'use' = 'sig' AND
-    public_jwk ? 'n' AND
-    public_jwk ? 'e' AND
-    NOT (public_jwk ?| ARRAY['d', 'p', 'q', 'dp', 'dq', 'qi', 'oth', 'k'])
+    COALESCE(
+      jsonb_typeof(public_jwk) = 'object' AND
+      public_jwk ?& ARRAY['kty', 'kid', 'alg', 'use', 'n', 'e'] AND
+      jsonb_typeof(public_jwk -> 'kty') = 'string' AND btrim(public_jwk ->> 'kty') <> '' AND
+      jsonb_typeof(public_jwk -> 'kid') = 'string' AND btrim(public_jwk ->> 'kid') <> '' AND
+      jsonb_typeof(public_jwk -> 'alg') = 'string' AND btrim(public_jwk ->> 'alg') <> '' AND
+      jsonb_typeof(public_jwk -> 'use') = 'string' AND btrim(public_jwk ->> 'use') <> '' AND
+      jsonb_typeof(public_jwk -> 'n') = 'string' AND btrim(public_jwk ->> 'n') <> '' AND
+      jsonb_typeof(public_jwk -> 'e') = 'string' AND btrim(public_jwk ->> 'e') <> '' AND
+      public_jwk ->> 'kty' = 'RSA' AND
+      public_jwk ->> 'kid' = kid AND
+      public_jwk ->> 'alg' = 'RS256' AND
+      public_jwk ->> 'use' = 'sig' AND
+      NOT (public_jwk ?| ARRAY['d', 'p', 'q', 'dp', 'dq', 'qi', 'oth', 'k']),
+      false
+    )
   ),
   CONSTRAINT oauth_signing_keys_public_fingerprint CHECK (
     public_key_fingerprint_sha256 ~ '^[0-9a-f]{64}$'
@@ -229,11 +237,31 @@ CREATE TABLE IF NOT EXISTS oauth_signing_keys (
     protected_private_key_ref !~* 'access-layer-jwt-private'
   ),
   CONSTRAINT oauth_signing_keys_status CHECK (status IN ('staged', 'published', 'active', 'retired', 'disabled')),
-  CONSTRAINT oauth_signing_keys_activation_order CHECK (
-    activates_at IS NULL OR published_at IS NULL OR activates_at >= published_at
+  CONSTRAINT oauth_signing_keys_activation_lead CHECK (
+    activates_at IS NULL OR (
+      published_at IS NOT NULL AND activates_at >= published_at + interval '300 seconds'
+    )
   ),
-  CONSTRAINT oauth_signing_keys_retirement_order CHECK (
-    retire_after IS NULL OR last_signed_at IS NULL OR retire_after >= last_signed_at
+  CONSTRAINT oauth_signing_keys_last_signed_order CHECK (
+    last_signed_at IS NULL OR (activates_at IS NOT NULL AND last_signed_at >= activates_at)
+  ),
+  CONSTRAINT oauth_signing_keys_retirement_grace CHECK (
+    retire_after IS NULL OR (
+      last_signed_at IS NOT NULL AND retire_after >= last_signed_at + interval '1260 seconds'
+    )
+  ),
+  CONSTRAINT oauth_signing_keys_retired_order CHECK (
+    retired_at IS NULL OR (retire_after IS NOT NULL AND retired_at >= retire_after)
+  ),
+  CONSTRAINT oauth_signing_keys_status_lifecycle CHECK (
+    (status = 'staged' AND published_at IS NULL AND activates_at IS NULL AND
+      last_signed_at IS NULL AND retire_after IS NULL AND retired_at IS NULL) OR
+    (status = 'published' AND published_at IS NOT NULL AND activates_at IS NOT NULL AND
+      last_signed_at IS NULL AND retire_after IS NULL AND retired_at IS NULL) OR
+    (status = 'active' AND published_at IS NOT NULL AND activates_at IS NOT NULL AND retired_at IS NULL) OR
+    (status = 'retired' AND published_at IS NOT NULL AND activates_at IS NOT NULL AND
+      last_signed_at IS NOT NULL AND retire_after IS NOT NULL AND retired_at IS NOT NULL) OR
+    (status = 'disabled' AND retired_at IS NULL)
   )
 );
 

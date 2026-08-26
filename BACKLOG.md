@@ -3,6 +3,7 @@
 ## BLOCKER
 
 - Confirm who receives bootstrap platform admin access after first deploy.
+- 2026-08-26 Step 3A hardening: before the first non-empty production OAuth registration or pilot, extend and prove backup/export/import/replace-restore coverage for all `oauth_*` state. The current legacy backup surfaces do not preserve these tables, and future `oauth_resource_entitlement_bindings` rows use `ON DELETE RESTRICT`, so a replace restore that runs `DELETE FROM tools` must use dependency-safe ordering. Do not register production OAuth state until this is implemented and restore-tested; no backup code changes are authorised in Step 3A hardening.
 - 2026-08-26 Step 2 hardening: production deployment remains blocked until the exact Coolify destination identity and central registry record are verified. Server `wx513ojqd80kdicevubog7`, project `xdihnb979tvyh9gdk72zfy7y`, environment `rd3mt4dkpqyghxlx9h96sdlo` and resource `u3cyw3y1obp88to9la0w8c75` are proven non-secret facts.
 - 2026-08-26 Step 2 hardening: Coolify visibly reported `Changes pending`. Before any future production deploy, an authorised operator must inspect the pending diff and resolve or explicitly accept it; this task does not apply it.
 - 2026-08-24 Step 1.5: `operations/production-continuity.evidence.yml` remains `NOT_READY`; verified backup and isolated restore results remain unproven. Do not deploy or begin N→N+1 execution.

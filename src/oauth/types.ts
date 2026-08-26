@@ -3,6 +3,12 @@ export type OAuthClientType = "confidential" | "public";
 export type OAuthTokenEndpointAuthMethod = "client_secret_basic" | "none";
 export type OAuthGrantType = "authorization_code" | "refresh_token";
 
+export interface OAuthClientCredentialLifecycle {
+  secretPresent: boolean;
+  rotatedAt: string | null;
+  expiresAt: string | null;
+}
+
 export interface OAuthClientRegistration {
   clientId: string;
   clientName: string;
@@ -11,6 +17,7 @@ export interface OAuthClientRegistration {
   grantTypes: OAuthGrantType[];
   redirectUris: string[];
   tokenEndpointAuthMethod: OAuthTokenEndpointAuthMethod;
+  credentialLifecycle: OAuthClientCredentialLifecycle;
   allowedResources: string[];
   allowedScopes: string[];
   ownerTeam: string;

@@ -6,14 +6,20 @@ import { OAuthFoundationRepository } from "../src/oauth/repository.js";
 import type {
   OAuthClientRegistration,
   OAuthRegistrationBundle,
-  OAuthResourceRegistration
+  OAuthResourceRegistration,
+  OAuthSigningKeyPublicMetadata
 } from "../src/oauth/types.js";
 import {
   OAuthRegistrationValidationError,
   assertValidOAuthRegistrationBundle,
   isCanonicalOAuthScope,
   isExactOAuthRedirectUri,
-  isExplicitlyAllowedClientResourceScope
+  isExactOAuthHttpsUri,
+  isExplicitlyAllowedClientResourceScope,
+  isValidOAuthPublicJwk,
+  validateOAuthClientRegistration,
+  validateOAuthResourceRegistration,
+  validateOAuthSigningKeyLifecycle
 } from "../src/oauth/validation.js";
 
 const migration = readFileSync(resolve(import.meta.dirname, "../migrations/003_oauth_dark_foundation.sql"), "utf8");
@@ -39,10 +45,34 @@ function clientFixture(): OAuthClientRegistration {
     grantTypes: ["authorization_code", "refresh_token"],
     redirectUris: ["https://client.invalid/oauth/callback"],
     tokenEndpointAuthMethod: "client_secret_basic",
+    credentialLifecycle: { secretPresent: true, rotatedAt: null, expiresAt: null },
     allowedResources: ["https://resource.invalid/api"],
     allowedScopes: ["synthetic:records:read", "synthetic:records:write"],
     ownerTeam: "synthetic-team",
     ownerContact: null
+  };
+}
+
+function signingKeyFixture(): OAuthSigningKeyPublicMetadata {
+  return {
+    id: "00000000-0000-4000-8000-000000000030",
+    kid: "synthetic-oauth-key",
+    algorithm: "RS256",
+    publicJwk: {
+      kty: "RSA",
+      kid: "synthetic-oauth-key",
+      alg: "RS256",
+      use: "sig",
+      n: "synthetic-modulus",
+      e: "AQAB"
+    },
+    publicKeyFingerprintSha256: "a".repeat(64),
+    status: "active",
+    publishedAt: new Date("2026-08-26T00:00:00Z"),
+    activatesAt: new Date("2026-08-26T00:05:00Z"),
+    lastSignedAt: new Date("2026-08-26T00:06:00Z"),
+    retireAfter: new Date("2026-08-26T00:27:00Z"),
+    retiredAt: null
   };
 }
 
@@ -111,12 +141,20 @@ describe("Step 3A expand-only migration", () => {
       "oauth_resource_credentials_auth_method",
       "oauth_signing_keys_namespace",
       "oauth_signing_keys_public_jwk_shape",
+      "oauth_signing_keys_activation_lead",
+      "oauth_signing_keys_retirement_grace",
+      "oauth_signing_keys_status_lifecycle",
       "oauth_signing_keys_reference_only",
       "oauth_signing_keys_not_legacy_reference"
     ]) {
       expect(migration).toContain(marker);
     }
     expect(migration).toContain("secret_hash text NOT NULL");
+    expect(migration).toContain("public_jwk ?& ARRAY['kty', 'kid', 'alg', 'use', 'n', 'e']");
+    expect(migration).toContain("jsonb_typeof(public_jwk -> 'n') = 'string'");
+    expect(migration).toContain("interval '300 seconds'");
+    expect(migration).toContain("interval '1260 seconds'");
+    expect(migration).toMatch(/oauth_signing_keys_public_jwk_shape CHECK \(\s*COALESCE\(/);
     expect(migration).not.toMatch(/\b(?:client_secret|resource_secret|secret_plaintext|private_key_pem|private_key_bytes)\b/i);
     expect(migration).not.toMatch(/oauth_(?:authorization|code|session|refresh|revocation)/i);
   });
@@ -135,6 +173,94 @@ describe("OAuth foundation registration validation", () => {
     expect(isExactOAuthRedirectUri("http://localhost:3000/oauth/callback")).toBe(true);
     expect(isExactOAuthRedirectUri("https://*.invalid/oauth/callback")).toBe(false);
     expect(isExactOAuthRedirectUri("http://127.0.0.1:3000/oauth/callback")).toBe(false);
+  });
+
+  it.each([
+    "https://client.invalid/callback with space",
+    "https://client.invalid/callback\twith-tab",
+    "https://client.invalid/callback\\path",
+    "https://client.invalid/%",
+    "https://client.invalid/%GG",
+    "https://client.invalid/%G0",
+    "https://client.invalid/%0G",
+    "https://user@client.invalid/callback",
+    "https://client.invalid/callback#fragment",
+    "https://client.invalid/*"
+  ])("rejects schema-invalid redirect URI %j", (uri) => {
+    expect(isExactOAuthRedirectUri(uri)).toBe(false);
+  });
+
+  it.each([
+    "https://resource.invalid/%GG",
+    "https://resource.invalid/path with space",
+    "https://resource.invalid/path\ncontrol",
+    "https://resource.invalid/path\\segment",
+    "https://user@resource.invalid/api",
+    "https://resource.invalid/api#fragment",
+    "https://resource.invalid/*"
+  ])("rejects schema-invalid resource or metadata URI %j", (uri) => {
+    expect(isExactOAuthHttpsUri(uri)).toBe(false);
+    const bundle = bundleFixture();
+    bundle.resources[0].registration.resourceId = uri;
+    expect(() => assertValidOAuthRegistrationBundle(bundle)).toThrow(OAuthRegistrationValidationError);
+    const resource = resourceFixture();
+    resource.protectedResourceMetadataUrl = uri;
+    expect(validateOAuthResourceRegistration(resource, bundleFixture().resources[0].legacyEntitlement))
+      .toContain("protected_resource_metadata_url_invalid");
+  });
+
+  it("accepts valid URI spellings without rewriting the registered values", () => {
+    const redirect = "https://client.invalid/callback%2Fexact?next=%2fvalue";
+    const resource = "https://resource.invalid/api%2Fv1?mode=exact";
+    expect(isExactOAuthRedirectUri(redirect)).toBe(true);
+    expect(isExactOAuthHttpsUri(resource)).toBe(true);
+    expect(redirect).toBe("https://client.invalid/callback%2Fexact?next=%2fvalue");
+    expect(resource).toBe("https://resource.invalid/api%2Fv1?mode=exact");
+  });
+
+  it("enforces confidential and public credential-presence lifecycle metadata", () => {
+    const confidential = clientFixture();
+    expect(validateOAuthClientRegistration(confidential)).toEqual([]);
+    confidential.credentialLifecycle.secretPresent = false;
+    expect(validateOAuthClientRegistration(confidential)).toContain("confidential_client_secret_presence_required");
+    confidential.credentialLifecycle.secretPresent = true;
+    confidential.tokenEndpointAuthMethod = "none";
+    expect(validateOAuthClientRegistration(confidential)).toContain("confidential_client_auth_method_invalid");
+
+    const publicClient = clientFixture();
+    publicClient.clientType = "public";
+    publicClient.tokenEndpointAuthMethod = "none";
+    publicClient.credentialLifecycle.secretPresent = false;
+    expect(validateOAuthClientRegistration(publicClient)).toEqual([]);
+    publicClient.credentialLifecycle.secretPresent = true;
+    expect(validateOAuthClientRegistration(publicClient)).toContain("public_client_secret_presence_forbidden");
+    publicClient.credentialLifecycle.secretPresent = false;
+    publicClient.tokenEndpointAuthMethod = "client_secret_basic";
+    expect(validateOAuthClientRegistration(publicClient)).toContain("public_client_auth_method_invalid");
+  });
+
+  it("fails closed when credential lifecycle metadata is absent, malformed, or extended", () => {
+    const absent = { ...clientFixture() } as Partial<OAuthClientRegistration>;
+    delete absent.credentialLifecycle;
+    expect(validateOAuthClientRegistration(absent as OAuthClientRegistration)).toContain("credential_lifecycle_required");
+
+    const malformed = clientFixture();
+    malformed.credentialLifecycle.rotatedAt = "not-a-date";
+    expect(validateOAuthClientRegistration(malformed)).toContain("credential_rotated_at_invalid");
+
+    const extended = clientFixture();
+    Object.assign(extended.credentialLifecycle, { unexpected: true });
+    expect(validateOAuthClientRegistration(extended)).toContain("credential_lifecycle_field_invalid");
+  });
+
+  it("keeps registration validation metadata free of credential and key material", () => {
+    const fixture = clientFixture() as unknown as Record<string, unknown>;
+    const lifecycle = fixture.credentialLifecycle as Record<string, unknown>;
+    expect(fixture).not.toHaveProperty("clientSecret");
+    expect(fixture).not.toHaveProperty("secretHash");
+    expect(lifecycle).not.toHaveProperty("clientSecret");
+    expect(lifecycle).not.toHaveProperty("secretHash");
+    expect(lifecycle).not.toHaveProperty("privateKey");
   });
 
   it.each([
@@ -177,6 +303,76 @@ describe("OAuth foundation registration validation", () => {
       expect((error as Error).message).not.toContain("wildcard-credential");
     }
   });
+});
+
+describe("OAuth signing-key foundation validation", () => {
+  it("accepts the frozen publication and retirement boundary intervals", () => {
+    expect(validateOAuthSigningKeyLifecycle(signingKeyFixture())).toEqual([]);
+  });
+
+  it.each([
+    ["activation before 300-second lead", (key: OAuthSigningKeyPublicMetadata) => {
+      key.activatesAt = new Date("2026-08-26T00:04:59Z");
+    }, "signing_key_publication_lead_invalid"],
+    ["retirement grace below 1260 seconds", (key: OAuthSigningKeyPublicMetadata) => {
+      key.retireAfter = new Date("2026-08-26T00:26:59Z");
+    }, "signing_key_retirement_grace_invalid"],
+    ["retirement before retire-after", (key: OAuthSigningKeyPublicMetadata) => {
+      key.status = "retired";
+      key.retiredAt = new Date("2026-08-26T00:26:59Z");
+    }, "signing_key_retired_at_order_invalid"],
+    ["active lifecycle missing activation", (key: OAuthSigningKeyPublicMetadata) => {
+      key.activatesAt = null;
+    }, "signing_key_activation_lifecycle_required"],
+    ["retired lifecycle missing last-sign timestamp", (key: OAuthSigningKeyPublicMetadata) => {
+      key.status = "retired";
+      key.lastSignedAt = null;
+      key.retiredAt = new Date("2026-08-26T00:27:00Z");
+    }, "retired_signing_key_lifecycle_required"],
+    ["staged lifecycle containing publication metadata", (key: OAuthSigningKeyPublicMetadata) => {
+      key.status = "staged";
+    }, "staged_signing_key_lifecycle_invalid"],
+    ["published lifecycle containing signing metadata", (key: OAuthSigningKeyPublicMetadata) => {
+      key.status = "published";
+    }, "published_signing_key_lifecycle_invalid"],
+    ["unknown lifecycle status", (key: OAuthSigningKeyPublicMetadata) => {
+      key.status = "unknown" as OAuthSigningKeyPublicMetadata["status"];
+    }, "signing_key_status_invalid"]
+  ] as const)("rejects %s", (_label, mutate, issue) => {
+    const key = signingKeyFixture();
+    mutate(key);
+    expect(validateOAuthSigningKeyLifecycle(key)).toContain(issue);
+  });
+
+  it("accepts only a complete non-empty RSA public JWK matching the row kid", () => {
+    const key = signingKeyFixture();
+    expect(isValidOAuthPublicJwk(key.publicJwk, key.kid)).toBe(true);
+    expect(isValidOAuthPublicJwk(key.publicJwk, "other-kid")).toBe(false);
+  });
+
+  it.each(["kty", "kid", "alg", "use", "n", "e"])(
+    "rejects a JWK with missing, null, wrong-type, or empty %s",
+    (member) => {
+      const valid = signingKeyFixture().publicJwk;
+      const missing: Record<string, unknown> = { ...valid };
+      delete missing[member];
+      expect(isValidOAuthPublicJwk(missing, "synthetic-oauth-key")).toBe(false);
+      expect(isValidOAuthPublicJwk({ ...valid, [member]: null }, "synthetic-oauth-key")).toBe(false);
+      expect(isValidOAuthPublicJwk({ ...valid, [member]: 1 }, "synthetic-oauth-key")).toBe(false);
+      expect(isValidOAuthPublicJwk({ ...valid, [member]: "" }, "synthetic-oauth-key")).toBe(false);
+      expect(isValidOAuthPublicJwk({ ...valid, [member]: "   " }, "synthetic-oauth-key")).toBe(false);
+    }
+  );
+
+  it.each(["d", "p", "q", "dp", "dq", "qi", "oth", "k"])(
+    "rejects private JWK member %s",
+    (member) => {
+      expect(isValidOAuthPublicJwk(
+        { ...signingKeyFixture().publicJwk, [member]: "forbidden" },
+        "synthetic-oauth-key"
+      )).toBe(false);
+    }
+  );
 });
 
 class RecordingDb implements Db {

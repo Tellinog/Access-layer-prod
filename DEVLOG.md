@@ -1,5 +1,39 @@
 # DEVLOG.md
 
+## 2026-08-26 - Step 3A OAuth Dark Foundation hardening
+
+Changed by: Codex
+Related task: Harden the local Step 3A candidate without changing frozen protocol or legacy runtime semantics.
+
+### Changed
+
+- Hardened exact redirect/resource/metadata URI validation against raw whitespace/control characters, backslashes, malformed percent escapes, userinfo, fragments and wildcards without rewriting stored/comparison values.
+- Added non-secret client credential lifecycle metadata and fail-closed confidential/public `secretPresent` enforcement; registration objects contain neither plaintext credential nor hash material.
+- Hardened unreleased migration `003` in place with frozen signing publication/retention/retirement timing, lifecycle status coherence and a NULL-safe required-string RSA public-JWK check.
+- Added pure signing-key lifecycle/public-JWK validation and synthetic negative coverage. Kept exactly ten foundation tables and zero OAuth runtime routes.
+- Recorded the pre-production OAuth backup/export/import/replace-restore blocker; backup code and production state were not changed.
+
+### Behavior
+
+- Legacy `/v1/*`, `src/app.ts`, Google/JWT/JWKS/session/refresh/grant/permission behavior, frozen Step-2 OAuth specs/schemas/OpenAPI, dependencies, consumers and SDKs changed: no.
+- OAuth routes, protocol tables, pilot/seed rows, admin registration APIs and production/Coolify actions added: no.
+
+### Tests/checks
+
+- `npm.cmd run lint` and `npm.cmd run build` passed.
+- Full Vitest passed: 14 files and 190 tests.
+- Full Python conformance passed: 62 tests with two expected pristine-template bootstrap skips.
+- Frozen OAuth P0 validator passed all 24 check groups.
+- Production continuity returned `VALID_BUT_NOT_READY` with both readiness gates false, as expected for the incomplete evidence bundle.
+- Non-strict platform checker passed 27 checks with the seven known warnings.
+- Migration inspection reports exactly ten tables, no destructive/legacy write statements and SHA-256 `96B3993FCFDB930597CBDECA37E86D51DF486FD9E951970D156A21C454F18EFE`.
+- Frozen-file diff audit and `git diff --check` passed.
+- Docker daemon/API remains unavailable and no PostgreSQL server listens on `127.0.0.1:5432`; disposable live migration application was not possible and is not claimed.
+
+### Decisions
+
+- D-039 received an implementation-hardening note only. No protocol decision was added.
+
 ## 2026-08-26 - Step 3A OAuth Dark Foundation
 
 Changed by: Codex

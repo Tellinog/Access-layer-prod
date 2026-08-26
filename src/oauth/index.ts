@@ -6,9 +6,12 @@ export {
   assertValidOAuthRegistrationBundle,
   isCanonicalOAuthScope,
   isExactOAuthRedirectUri,
+  isExactOAuthHttpsUri,
   isExplicitlyAllowedClientResourceScope,
+  isValidOAuthPublicJwk,
   validateOAuthClientRegistration,
   validateOAuthClientResourceScopeAllowances,
-  validateOAuthResourceRegistration
+  validateOAuthResourceRegistration,
+  validateOAuthSigningKeyLifecycle
 } from "./validation.js";
 export type * from "./types.js";

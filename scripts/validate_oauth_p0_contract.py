@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import re
 from pathlib import Path
@@ -211,14 +212,21 @@ def validate() -> list[str]:
     if not {"kty", "kid", "alg", "use", "n", "e"}.issubset(jwk_required):
         errors.append("target JWKS schema does not require the complete RSA verification-key shape")
     jwk_properties = jwk_item_schema.get("properties", {})
-    for member in ("n", "e"):
+    for member, expected_min_length in (("n", 342), ("e", 2)):
         member_schema = jwk_properties.get(member, {})
-        if member_schema.get("pattern") != BASE64URL_UINT_PATTERN or member_schema.get("minLength") != 2:
+        if member_schema.get("pattern") != BASE64URL_UINT_PATTERN or member_schema.get("minLength") != expected_min_length:
             errors.append(f"target JWKS schema does not enforce unpadded Base64urlUInt syntax for {member}")
-    valid_jwk = {"kty": "RSA", "kid": "synthetic-key", "alg": "RS256", "use": "sig", "n": "AQIDBA", "e": "AQAB"}
+    modulus_description = str(jwk_properties.get("n", {}).get("description", ""))
+    exponent_description = str(jwk_properties.get("e", {}).get("description", ""))
+    if "minimum-octet" not in modulus_description or "2048" not in modulus_description:
+        errors.append("target JWKS schema does not document runtime canonical/2048-bit modulus validation")
+    if "minimum-octet" not in exponent_description or "greater than or equal to 3" not in exponent_description or "less than n" not in exponent_description:
+        errors.append("target JWKS schema does not document runtime exponent validation")
+    synthetic_modulus = base64.urlsafe_b64encode(bytes([0x80]) + bytes(255)).rstrip(b"=").decode("ascii")
+    valid_jwk = {"kty": "RSA", "kid": "synthetic-key", "alg": "RS256", "use": "sig", "n": synthetic_modulus, "e": "AQAB"}
     if schema_errors({"keys": [valid_jwk]}, jwks_schema):
         errors.append("target JWKS schema rejects a syntactically valid RSA verification key")
-    for member, invalid_value in (("n", "***"), ("n", "AQIDBA=="), ("e", "!!!"), ("e", "AQ AB")):
+    for member, invalid_value in (("n", "***"), ("n", "AQIDBA=="), ("n", "AQIDBA"), ("e", "!!!"), ("e", "AQ AB")):
         invalid_jwk = {**valid_jwk, member: invalid_value}
         if not schema_errors({"keys": [invalid_jwk]}, jwks_schema):
             errors.append(f"target JWKS schema accepts invalid Base64urlUInt {member}={invalid_value!r}")

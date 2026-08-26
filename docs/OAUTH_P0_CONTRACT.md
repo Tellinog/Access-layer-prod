@@ -104,6 +104,8 @@ OAuth keys are isolated behind `/oauth/jwks`; legacy `/v1/.well-known/jwks.json`
 5. keep an old verification key for at least 1,260 seconds after its last signature (900-second token lifetime + 300-second JWKS cache + 60-second skew);
 6. keep all private key material out of Git, logs and evidence.
 
+Published RS256 verification keys additionally require RFC 7518 minimum-octet Base64urlUInt encoding. The RSA modulus is positive and at least 2048 bits; the public exponent is at least 3, odd and less than the modulus. Persisted rows are untrusted and fail closed before JWKS publication.
+
 ## Errors
 
 OAuth endpoints use interoperable OAuth fields: `error`, optional safe `error_description`, optional `error_uri`, and optional `correlation_id`. Supported names are `invalid_request`, `invalid_client`, `invalid_grant`, `unauthorized_client`, `unsupported_grant_type`, `invalid_scope`, RFC 8707 `invalid_target`, `access_denied`, `unsupported_response_type`, RFC 7009 `unsupported_token_type`, `server_error` and `temporarily_unavailable`. `invalid_client` uses HTTP 401 and an appropriate `WWW-Authenticate` challenge; other token endpoint protocol failures use HTTP 400.

@@ -18,6 +18,7 @@ const MALFORMED_PERCENT_ESCAPE_REGEX = /%(?![0-9a-f]{2})/i;
 const RFC3339_DATE_TIME_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
 const OAUTH_SIGNING_PUBLISH_LEAD_MS = 300_000;
 const OAUTH_SIGNING_RETIRE_GRACE_MS = 1_260_000;
+const OAUTH_RS256_MIN_MODULUS_BITS = 2_048;
 const PRIVATE_JWK_MEMBERS = ["d", "p", "q", "dp", "dq", "qi", "oth", "k"] as const;
 
 export class OAuthRegistrationValidationError extends Error {
@@ -75,14 +76,43 @@ function isNonEmptyJwkString(jwk: Record<string, unknown>, member: string): bool
   return typeof jwk[member] === "string" && (jwk[member] as string).trim().length > 0;
 }
 
-export function isUnpaddedBase64urlUInt(value: unknown): value is string {
-  if (typeof value !== "string" || !/^[A-Za-z0-9_-]+$/.test(value)) return false;
+function decodeUnpaddedBase64urlUInt(value: unknown): Buffer | null {
+  if (typeof value !== "string" || !/^[A-Za-z0-9_-]+$/.test(value)) return null;
   try {
     const decoded = Buffer.from(value, "base64url");
-    return decoded.length > 0 && decoded.toString("base64url") === value;
+    if (decoded.length === 0 || decoded.toString("base64url") !== value) return null;
+    if (decoded.length > 1 && decoded[0] === 0) return null;
+    return decoded;
   } catch {
-    return false;
+    return null;
   }
+}
+
+export function isUnpaddedBase64urlUInt(value: unknown): value is string {
+  return decodeUnpaddedBase64urlUInt(value) !== null;
+}
+
+function unsignedIntegerBitLength(value: Buffer): number {
+  const firstOctet = value[0] ?? 0;
+  if (firstOctet === 0) return 0;
+  return ((value.length - 1) * 8) + (32 - Math.clz32(firstOctet));
+}
+
+function unsignedIntegerLessThan(left: Buffer, right: Buffer): boolean {
+  if (left.length !== right.length) return left.length < right.length;
+  return Buffer.compare(left, right) < 0;
+}
+
+function hasValidOAuthRs256PublicNumbers(modulusValue: unknown, exponentValue: unknown): boolean {
+  const modulus = decodeUnpaddedBase64urlUInt(modulusValue);
+  const exponent = decodeUnpaddedBase64urlUInt(exponentValue);
+  if (modulus === null || exponent === null) return false;
+  if (unsignedIntegerBitLength(modulus) < OAUTH_RS256_MIN_MODULUS_BITS) return false;
+
+  const exponentLastOctet = exponent[exponent.length - 1] ?? 0;
+  const exponentAtLeastThree = exponent.length > 1 || (exponent[0] ?? 0) >= 3;
+  return exponentAtLeastThree && (exponentLastOctet & 1) === 1 &&
+    unsignedIntegerLessThan(exponent, modulus);
 }
 
 export function isCanonicalOAuthScope(scope: string): boolean {
@@ -296,7 +326,7 @@ export function isValidOAuthPublicJwk(publicJwk: unknown, rowKid: string): boole
     if (!isNonEmptyJwkString(jwk, member)) return false;
   }
   return jwk.kty === "RSA" && jwk.kid === rowKid && jwk.alg === "RS256" && jwk.use === "sig" &&
-    isUnpaddedBase64urlUInt(jwk.n) && isUnpaddedBase64urlUInt(jwk.e) &&
+    hasValidOAuthRs256PublicNumbers(jwk.n, jwk.e) &&
     !PRIVATE_JWK_MEMBERS.some((member) => Object.hasOwn(jwk, member));
 }
 

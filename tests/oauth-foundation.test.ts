@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -22,6 +23,10 @@ import {
   validateOAuthResourceRegistration,
   validateOAuthSigningKeyLifecycle
 } from "../src/oauth/validation.js";
+import {
+  SYNTHETIC_RSA_2048_PUBLIC_NUMBERS,
+  withRedundantLeadingZero
+} from "./oauth-jwk-fixture.js";
 
 const migration = readFileSync(resolve(import.meta.dirname, "../migrations/003_oauth_dark_foundation.sql"), "utf8");
 const requiredTables = [
@@ -64,8 +69,8 @@ function signingKeyFixture(): OAuthSigningKeyPublicMetadata {
       kid: "synthetic-oauth-key",
       alg: "RS256",
       use: "sig",
-      n: "AQIDBA",
-      e: "AQAB"
+      n: SYNTHETIC_RSA_2048_PUBLIC_NUMBERS.n,
+      e: SYNTHETIC_RSA_2048_PUBLIC_NUMBERS.e
     },
     publicKeyFingerprintSha256: "a".repeat(64),
     status: "active",
@@ -355,6 +360,7 @@ describe("OAuth signing-key foundation validation", () => {
     ["valid modulus", "AQIDBA", true],
     ["valid exponent", "AQAB", true],
     ["single zero byte", "AA", true],
+    ["redundant leading-zero integer", "AAE", false],
     ["padding", "AQAB=", false],
     ["whitespace", "AQ AB", false],
     ["non-base64url characters", "***", false],
@@ -363,6 +369,43 @@ describe("OAuth signing-key foundation validation", () => {
     ["non-canonical invalid length", "AAAAA", false]
   ] as const)("validates unpadded Base64urlUInt syntax for %s", (_label, value, expected) => {
     expect(isUnpaddedBase64urlUInt(value)).toBe(expected);
+  });
+
+  it.each([
+    ["redundant leading-zero modulus", (jwk: Record<string, unknown>) => {
+      jwk.n = withRedundantLeadingZero(jwk.n as string);
+    }],
+    ["redundant leading-zero exponent", (jwk: Record<string, unknown>) => {
+      jwk.e = withRedundantLeadingZero(jwk.e as string);
+    }],
+    ["sub-2048-bit modulus", (jwk: Record<string, unknown>) => {
+      jwk.n = Buffer.alloc(255, 0xff).toString("base64url");
+    }],
+    ["zero modulus", (jwk: Record<string, unknown>) => {
+      jwk.n = "AA";
+    }],
+    ["zero exponent", (jwk: Record<string, unknown>) => {
+      jwk.e = "AA";
+    }],
+    ["exponent one", (jwk: Record<string, unknown>) => {
+      jwk.e = "AQ";
+    }],
+    ["exponent two", (jwk: Record<string, unknown>) => {
+      jwk.e = "Ag";
+    }],
+    ["even exponent", (jwk: Record<string, unknown>) => {
+      jwk.e = "BA";
+    }],
+    ["exponent equal to modulus", (jwk: Record<string, unknown>) => {
+      jwk.e = jwk.n;
+    }],
+    ["exponent greater than modulus", (jwk: Record<string, unknown>) => {
+      jwk.e = Buffer.alloc(256, 0xff).toString("base64url");
+    }]
+  ] as const)("rejects %s for an RS256 public JWK", (_label, mutate) => {
+    const jwk = { ...signingKeyFixture().publicJwk };
+    mutate(jwk);
+    expect(isValidOAuthPublicJwk(jwk, "synthetic-oauth-key")).toBe(false);
   });
 
   it.each([

@@ -1,5 +1,29 @@
 # DEVLOG.md
 
+## 2026-08-26 - Step 3B final RSA/JWK hardening
+
+Changed by: Codex
+Related task: Close the final Step 3B OAuth JWKS public-key validation blocker without beginning Step 3C.
+
+### Changed
+
+- Enforced RFC 7518 minimum-octet Base64urlUInt encoding in the pure validator while retaining the one-octet zero representation for generic values.
+- Required RS256 public JWK moduli to be positive and at least 2048 bits; required exponents to be canonical, at least 3, odd and less than the modulus.
+- Replaced tiny publishable test moduli with a Node-core-generated, test-only 2048-bit public JWK. No private key is committed, serialized or logged.
+- Tightened the target JWKS OpenAPI modulus length/documentation and extended the OAuth validator and negative runtime/selector/HTTP coverage.
+
+### Behavior
+
+- Untrusted invalid signing-key rows are excluded. If no valid row remains, `/oauth/jwks` retains the sanitized HTTP 503 `temporarily_unavailable` response with `Cache-Control: no-store`.
+- Every earlier Step 3B route, flag, cache, metadata and legacy compatibility behavior remains unchanged. No migration, dependency, private-key loader, signing path, route, pilot or production action was added.
+
+### Tests/checks
+
+- `npm.cmd run lint`, `npm.cmd run build` and the full Vitest suite passed: 14 files and 231 tests.
+- Python conformance passed 60 tests with 2 expected skips (62 collected); the OAuth validator passed all 24 groups.
+- The non-strict platform checker passed 27 checks with seven known warnings; continuity remained schema-valid `VALID_BUT_NOT_READY` with both readiness gates false.
+- Frozen legacy/dependency/migration checks and `git diff --check` passed. No live PostgreSQL validation is claimed; this change adds no migration.
+
 ## 2026-08-26 - Step 3B metadata/JWKS hardening
 
 Changed by: Codex

@@ -380,13 +380,19 @@ components:
               alg: {type: string, const: RS256}
               n:
                 type: string
-                minLength: 2
+                minLength: 342
                 pattern: '^(?:[A-Za-z0-9_-]{4})*(?:[A-Za-z0-9_-]{2,3})?$'
-                description: RSA modulus encoded as an unpadded Base64urlUInt.
+                description: >-
+                  RSA modulus encoded as an unpadded Base64urlUInt. Runtime publication
+                  validation requires the minimum-octet representation, a positive value,
+                  and a bit length of at least 2048 for RS256.
               e:
                 type: string
                 minLength: 2
                 pattern: '^(?:[A-Za-z0-9_-]{4})*(?:[A-Za-z0-9_-]{2,3})?$'
-                description: RSA exponent encoded as an unpadded Base64urlUInt.
+                description: >-
+                  RSA exponent encoded as an unpadded Base64urlUInt. Runtime publication
+                  validation requires the minimum-octet representation, an odd integer
+                  greater than or equal to 3, and a value less than n.
             additionalProperties: true
       additionalProperties: false

@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -16,6 +17,10 @@ import type { OAuthSigningKeyPublicMetadata } from "../src/oauth/types.js";
 import type { Repositories } from "../src/repositories.js";
 import type { TokenService } from "../src/token-service.js";
 import type { Config } from "../src/types.js";
+import {
+  SYNTHETIC_RSA_2048_PUBLIC_NUMBERS,
+  withRedundantLeadingZero
+} from "./oauth-jwk-fixture.js";
 
 const root = resolve(import.meta.dirname, "..");
 const frozenAuthorizationServerMetadata = JSON.parse(readFileSync(
@@ -95,7 +100,11 @@ function signingKey(
     id: `synthetic-${kid}`,
     kid,
     algorithm: "RS256",
-    publicJwk: { kty: "RSA", kid, alg: "RS256", use: "sig", n: "AQIDBA", e: "AQAB" },
+    publicJwk: {
+      kty: "RSA", kid, alg: "RS256", use: "sig",
+      n: SYNTHETIC_RSA_2048_PUBLIC_NUMBERS.n,
+      e: SYNTHETIC_RSA_2048_PUBLIC_NUMBERS.e
+    },
     publicKeyFingerprintSha256: "a".repeat(64),
     status: "active",
     publishedAt: new Date("2026-08-26T00:00:00Z"),
@@ -226,7 +235,10 @@ describe("Step 3B OAuth JWKS selection", () => {
       publicJwk: { kty: "RSA", kid: "malformed-modulus", alg: "RS256", use: "sig", n: "***", e: "AQAB" }
     });
     const paddedExponent = signingKey("padded-exponent", {
-      publicJwk: { kty: "RSA", kid: "padded-exponent", alg: "RS256", use: "sig", n: "AQIDBA", e: "AQAB=" }
+      publicJwk: {
+        kty: "RSA", kid: "padded-exponent", alg: "RS256", use: "sig",
+        n: SYNTHETIC_RSA_2048_PUBLIC_NUMBERS.n, e: "AQAB="
+      }
     });
     const incoherent = signingKey("incoherent", {
       activatesAt: new Date("2026-08-26T00:04:59Z")
@@ -250,6 +262,42 @@ describe("Step 3B OAuth JWKS selection", () => {
       incoherent,
       futurePublished
     ], now)).toEqual({ keys: [] });
+  });
+
+  it.each([
+    ["redundant leading-zero modulus", (jwk: Record<string, unknown>) => {
+      jwk.n = withRedundantLeadingZero(jwk.n as string);
+    }],
+    ["redundant leading-zero exponent", (jwk: Record<string, unknown>) => {
+      jwk.e = withRedundantLeadingZero(jwk.e as string);
+    }],
+    ["sub-2048-bit modulus", (jwk: Record<string, unknown>) => {
+      jwk.n = "_".repeat(340);
+    }],
+    ["zero exponent", (jwk: Record<string, unknown>) => {
+      jwk.e = "AA";
+    }],
+    ["exponent one", (jwk: Record<string, unknown>) => {
+      jwk.e = "AQ";
+    }],
+    ["exponent two", (jwk: Record<string, unknown>) => {
+      jwk.e = "Ag";
+    }],
+    ["even exponent", (jwk: Record<string, unknown>) => {
+      jwk.e = "BA";
+    }],
+    ["exponent equal to modulus", (jwk: Record<string, unknown>) => {
+      jwk.e = jwk.n;
+    }],
+    ["exponent greater than modulus", (jwk: Record<string, unknown>) => {
+      jwk.e = Buffer.alloc(256, 0xff).toString("base64url");
+    }]
+  ] as const)("excludes an untrusted persisted key with %s", (_label, mutate) => {
+    const key = signingKey("invalid-rsa-number");
+    const publicJwk = { ...key.publicJwk };
+    mutate(publicJwk);
+    key.publicJwk = publicJwk;
+    expect(selectOAuthJwks([key], now)).toEqual({ keys: [] });
   });
 });
 
@@ -298,7 +346,9 @@ describe("Step 3B OAuth dark HTTP composition", () => {
   it("serves only valid OAuth public keys with exact caching and no private metadata", async () => {
     const active = signingKey("a-active", {
       publicJwk: {
-        kty: "RSA", kid: "a-active", alg: "RS256", use: "sig", n: "AQIDBA", e: "AQAB",
+        kty: "RSA", kid: "a-active", alg: "RS256", use: "sig",
+        n: SYNTHETIC_RSA_2048_PUBLIC_NUMBERS.n,
+        e: SYNTHETIC_RSA_2048_PUBLIC_NUMBERS.e,
         protected_private_key_ref: "must-not-be-serialized"
       },
       publishedAt: new Date("2020-01-01T00:00:00Z"),
@@ -322,7 +372,11 @@ describe("Step 3B OAuth dark HTTP composition", () => {
     expect(response.headers["cache-control"]).toBe("public, max-age=300");
     expect(response.json()).toEqual({
       keys: [
-        { kty: "RSA", kid: "a-active", alg: "RS256", use: "sig", n: "AQIDBA", e: "AQAB" },
+        {
+          kty: "RSA", kid: "a-active", alg: "RS256", use: "sig",
+          n: SYNTHETIC_RSA_2048_PUBLIC_NUMBERS.n,
+          e: SYNTHETIC_RSA_2048_PUBLIC_NUMBERS.e
+        },
         published.publicJwk
       ]
     });
@@ -338,7 +392,9 @@ describe("Step 3B OAuth dark HTTP composition", () => {
         keys: [signingKey("invalid-private", {
           publicJwk: {
             kty: "RSA", kid: "invalid-private", alg: "RS256", use: "sig",
-            n: "AQIDBA", e: "AQAB", d: "must-not-leak"
+            n: SYNTHETIC_RSA_2048_PUBLIC_NUMBERS.n,
+            e: SYNTHETIC_RSA_2048_PUBLIC_NUMBERS.e,
+            d: "must-not-leak"
           }
         })],
         failure: null
@@ -348,6 +404,15 @@ describe("Step 3B OAuth dark HTTP composition", () => {
           publicJwk: {
             kty: "RSA", kid: "invalid-encoding", alg: "RS256", use: "sig",
             n: "***", e: "!!!"
+          }
+        })],
+        failure: null
+      },
+      {
+        keys: [signingKey("invalid-small-rsa", {
+          publicJwk: {
+            kty: "RSA", kid: "invalid-small-rsa", alg: "RS256", use: "sig",
+            n: "_".repeat(340), e: SYNTHETIC_RSA_2048_PUBLIC_NUMBERS.e
           }
         })],
         failure: null

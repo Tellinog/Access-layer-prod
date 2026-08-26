@@ -17,7 +17,7 @@ export interface OAuthAuthorizationServerMetadata {
 export interface OAuthProtectedResourceMetadata {
   resource: string;
   authorization_servers: string[];
-  scopes_supported: string[];
+  scopes_supported?: string[];
   bearer_methods_supported: ["header"];
   resource_name: string;
 }
@@ -29,7 +29,7 @@ function withoutTrailingSlash(value: string): string {
 export function buildOAuthAuthorizationServerMetadata(issuer: string): OAuthAuthorizationServerMetadata {
   const baseUrl = withoutTrailingSlash(issuer);
   return {
-    issuer: baseUrl,
+    issuer,
     authorization_endpoint: `${baseUrl}/oauth/authorize`,
     token_endpoint: `${baseUrl}/oauth/token`,
     jwks_uri: `${baseUrl}/oauth/jwks`,
@@ -51,11 +51,14 @@ export function buildOAuthProtectedResourceMetadata(input: {
   scopesSupported: readonly string[];
   resourceName: string;
 }): OAuthProtectedResourceMetadata {
-  return {
+  const metadata: OAuthProtectedResourceMetadata = {
     resource: input.resource,
-    authorization_servers: [withoutTrailingSlash(input.authorizationServer)],
-    scopes_supported: [...input.scopesSupported],
+    authorization_servers: [input.authorizationServer],
     bearer_methods_supported: ["header"],
     resource_name: input.resourceName
   };
+  if (input.scopesSupported.length > 0) {
+    metadata.scopes_supported = [...input.scopesSupported];
+  }
+  return metadata;
 }

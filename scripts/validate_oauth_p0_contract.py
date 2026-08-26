@@ -40,6 +40,7 @@ PKCE_VERIFIER_PATTERN = r"^[A-Za-z0-9._~-]{43,128}$"
 PKCE_S256_CHALLENGE_PATTERN = r"^[A-Za-z0-9_-]{43}$"
 LEGACY_TOOL_SLUG_PATTERN = r"^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$"
 LEGACY_PERMISSION_KEY_PATTERN = r"^[a-z0-9-]+(?::[a-z0-9-]+)+$"
+BASE64URL_UINT_PATTERN = r"^(?:[A-Za-z0-9_-]{4})*(?:[A-Za-z0-9_-]{2,3})?$"
 
 
 def load_json(path: str) -> Any:
@@ -183,6 +184,44 @@ def validate() -> list[str]:
 
     metadata_schema = load_json("schemas/oauth-authorization-server-metadata.schema.json")
     errors.extend(f"metadata: {error}" for error in schema_errors(metadata, metadata_schema))
+
+    protected_metadata = load_json("examples/oauth/oauth-protected-resource-metadata.json")
+    protected_schema = load_json("schemas/oauth-protected-resource-metadata.schema.json")
+    protected_openapi_schema = openapi_schemas.get("ProtectedResourceMetadata", {})
+    if "scopes_supported" in protected_metadata:
+        errors.append("RFC 9728 no-pilot metadata must omit zero-valued scopes_supported")
+    if "scopes_supported" in protected_schema.get("required", []):
+        errors.append("RFC 9728 JSON Schema incorrectly requires scopes_supported")
+    if "scopes_supported" in protected_openapi_schema.get("required", []):
+        errors.append("RFC 9728 target OpenAPI incorrectly requires scopes_supported")
+    if protected_schema.get("properties", {}).get("scopes_supported", {}).get("minItems") != 1:
+        errors.append("RFC 9728 JSON Schema must reject an empty scopes_supported member")
+    if protected_openapi_schema.get("properties", {}).get("scopes_supported", {}).get("minItems") != 1:
+        errors.append("RFC 9728 target OpenAPI must reject an empty scopes_supported member")
+    protected_with_empty_scopes = {**protected_metadata, "scopes_supported": []}
+    if not schema_errors(protected_with_empty_scopes, protected_schema):
+        errors.append("RFC 9728 JSON Schema accepts an explicitly empty scopes_supported member")
+    protected_with_scope = {**protected_metadata, "scopes_supported": ["synthetic:records:read"]}
+    if schema_errors(protected_with_scope, protected_schema):
+        errors.append("RFC 9728 JSON Schema rejects a non-empty canonical scopes_supported member")
+
+    jwks_schema = openapi_schemas.get("Jwks", {})
+    jwk_item_schema = jwks_schema.get("properties", {}).get("keys", {}).get("items", {})
+    jwk_required = set(jwk_item_schema.get("required", []))
+    if not {"kty", "kid", "alg", "use", "n", "e"}.issubset(jwk_required):
+        errors.append("target JWKS schema does not require the complete RSA verification-key shape")
+    jwk_properties = jwk_item_schema.get("properties", {})
+    for member in ("n", "e"):
+        member_schema = jwk_properties.get(member, {})
+        if member_schema.get("pattern") != BASE64URL_UINT_PATTERN or member_schema.get("minLength") != 2:
+            errors.append(f"target JWKS schema does not enforce unpadded Base64urlUInt syntax for {member}")
+    valid_jwk = {"kty": "RSA", "kid": "synthetic-key", "alg": "RS256", "use": "sig", "n": "AQIDBA", "e": "AQAB"}
+    if schema_errors({"keys": [valid_jwk]}, jwks_schema):
+        errors.append("target JWKS schema rejects a syntactically valid RSA verification key")
+    for member, invalid_value in (("n", "***"), ("n", "AQIDBA=="), ("e", "!!!"), ("e", "AQ AB")):
+        invalid_jwk = {**valid_jwk, member: invalid_value}
+        if not schema_errors({"keys": [invalid_jwk]}, jwks_schema):
+            errors.append(f"target JWKS schema accepts invalid Base64urlUInt {member}={invalid_value!r}")
 
     openapi_examples = (
         ("examples/oauth/authorization-code-token.request.json", "AuthorizationCodeTokenRequest"),

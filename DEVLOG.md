@@ -1,5 +1,30 @@
 # DEVLOG.md
 
+## 2026-08-26 - Step 3B metadata/JWKS hardening
+
+Changed by: Codex
+Related task: Harden only the unreleased Step 3B read-only OAuth surface after independent audit.
+
+### Changed
+
+- Corrected the no-pilot RFC 9728 fixture, JSON Schema, target OpenAPI and builder so zero-valued `scopes_supported` is omitted and a present member requires at least one canonical scope.
+- Hardened RSA public-JWK validation so `n` and `e` must be canonical unpadded Base64urlUInt encodings that decode to non-empty bytes; aligned the target JWKS component and negative tests.
+- Disabled Fastify's automatic `HEAD` siblings for both Step 3B GET routes and preserved supplied issuer identity exactly while separately normalizing endpoint URL construction.
+- Updated current deployment/API/security/testing/status documentation and appended the D-040 standards-correction note. Stable RFCs remain normative over unreleased artifact mistakes.
+
+### Behavior
+
+- Absent/false `OAUTH_P0_ENABLED` remains exactly legacy. When true, exactly the two approved GET routes are reachable; their HEAD forms and every other OAuth path remain 404.
+- No migration, dependency, authorization/token flow, registration/pilot, key provisioning, consumer/SDK, production/Coolify or legacy runtime change was made.
+
+### Tests/checks
+
+- `npm.cmd run lint`, `npm.cmd run build` and the full Vitest suite passed: 14 files and 211 tests.
+- Python conformance passed 60 tests with 2 expected skips (62 collected); the OAuth validator passed all 24 groups.
+- Continuity remained schema-valid `VALID_BUT_NOT_READY`; the non-strict platform checker passed 27 checks with seven known warnings.
+- Frozen legacy/dependency/migration inspection and `git diff --check` passed.
+- Docker has no reachable daemon, `psql` is absent and port 5432 is closed; no live PostgreSQL or production connection occurred. Step 3B hardening adds no migration.
+
 ## 2026-08-26 - Step 3B read-only OAuth metadata/JWKS dark module
 
 Changed by: Codex

@@ -42,7 +42,7 @@ Minimum production variables:
 - `ENABLE_REFRESH_TOKENS` defaults to `true`
 - `ACCESS_TOKEN_TTL_SECONDS` defaults to `900`; `REFRESH_TOKEN_TTL_SECONDS` defaults to `28800` and acts as the sliding inactivity timeout after each authenticated refresh.
 - `ACCESS_REQUEST_REOPEN_AFTER_DAYS` defaults to `30`
-- `OAUTH_P0_ENABLED` is optional and defaults to `false`. Step 3A registers no OAuth route even when `true`; no OAuth key or credential input is accepted or required yet.
+- `OAUTH_P0_ENABLED` is optional and defaults to `false`; absent/false preserves the exact legacy route inventory. Step 3B registers only the GET-only `/oauth/jwks` and `/.well-known/oauth-protected-resource/v1` read surfaces when true. It accepts/requires no OAuth secret, private-key-loader or credential configuration, and production enablement remains prohibited.
 
 ## Infrastructure
 
@@ -94,7 +94,7 @@ When `RUN_SEED_ON_START=true`, the seed reconciles the reserved `access-admin` r
 9. Register pilot tool.
 10. Run end-to-end tests.
 
-Step 3A does not authorise this sequence for the OAuth foundation migration or any production environment change. Production remains blocked by the continuity/release gates below; no pilot OAuth registration or enablement exists.
+The historical Step 3A foundation did not authorise this sequence for OAuth or any production environment change. Step 3B adds only local default-off read-only metadata/JWKS routes and likewise authorises no production flag change, pilot, key provisioning or registration. Production remains blocked by the continuity/release gates below.
 
 ## Rollback
 

@@ -113,7 +113,7 @@ server -> buildApplication -> buildApp (unchanged legacy routes)
                                                   `-> public metadata repository -> JWKS selector
 ```
 
-`OAUTH_P0_ENABLED` still defaults to `false`. When false/absent, `buildApplication` returns the exact legacy route inventory. When true, only the dedicated OAuth JWKS and protected-resource metadata GET routes are registered. The RFC 8414 builder exists but is intentionally not mounted until its advertised protocol routes exist. No OAuth Google callback, token, credential-authentication, private-key loading/signing or authorization-decision code is present. The repository query exposes public/lifecycle metadata but never the protected private-key reference.
+`OAUTH_P0_ENABLED` still defaults to `false`. When false/absent, `buildApplication` returns the exact legacy route inventory. When true, only the dedicated OAuth JWKS and protected-resource metadata GET routes are registered; their automatic Fastify `HEAD` siblings are explicitly disabled. The RFC 8414 builder exists but is intentionally not mounted until its advertised protocol routes exist. Metadata preserves the configured issuer identifier exactly while using a separately trailing-slash-normalized base only for endpoint construction. No OAuth Google callback, token, credential-authentication, private-key loading/signing or authorization-decision code is present. The repository query exposes public/lifecycle metadata but never the protected private-key reference.
 
 ## Risks
 

@@ -31,9 +31,9 @@ These routes exist only when `OAUTH_P0_ENABLED=true`; absent/false returns 404 a
 | Method | Path | Result |
 |---|---|---|
 | GET | `/oauth/jwks` | Dedicated validated OAuth public verification keys; `Cache-Control: public, max-age=300`. Returns sanitized HTTP 503 `{ "error": "temporarily_unavailable" }` when no safe key exists. |
-| GET | `/.well-known/oauth-protected-resource/v1` | Frozen RFC 9728 metadata for `https://access-layer.unguess-internal.net/v1`, header-only Bearer transport and no pilot scopes. |
+| GET | `/.well-known/oauth-protected-resource/v1` | RFC 9728 metadata for `https://access-layer.unguess-internal.net/v1` and header-only Bearer transport; with no pilot scopes, `scopes_supported` is omitted. |
 
-`/.well-known/oauth-authorization-server` remains unregistered even with the flag true. Its exact frozen payload is built/tested but will not advertise authorize/token/revoke/introspect until those endpoints exist. All other `/oauth/*` protocol routes remain 404. The legacy `/v1/.well-known/jwks.json` endpoint is a separate unchanged key domain.
+Both Step 3B paths are GET-only; Fastify's automatic `HEAD` siblings are disabled and return 404. `/.well-known/oauth-authorization-server` remains unregistered even with the flag true. Its exact target payload is built/tested but will not advertise authorize/token/revoke/introspect until those endpoints exist. All other `/oauth/*` protocol routes remain 404. The legacy `/v1/.well-known/jwks.json` endpoint is a separate unchanged key domain.
 
 ## Endpoints
 
@@ -101,7 +101,7 @@ See:
 
 ## Additive OAuth P0 target
 
-The target-only OAuth surface is documented separately in `../schemas/access-layer-oauth-v1.openapi.yaml` and `OAUTH_P0_CONTRACT.md`. It is not registered by the runtime. Step 3A's optional flag and foundation repository expose no HTTP API, including when the flag is true. Future target paths remain RFC 8414 metadata, `/oauth/authorize`, `/oauth/token`, `/oauth/revoke`, access-token-only `/oauth/introspect`, `/oauth/jwks`, and RFC 9728 protected-resource metadata. The future internal upstream Google return path `/oauth/upstream/google/callback` is not an advertised OAuth protocol endpoint and is not implemented. The historical `../schemas/openapi.yaml` and frozen `/v1/auth/google/callback` remain unchanged.
+The complete target-only OAuth surface is documented separately in `../schemas/access-layer-oauth-v1.openapi.yaml` and `OAUTH_P0_CONTRACT.md`. The current runtime registers only the two GET-only Step 3B read surfaces above when the optional flag is true; absent/false remains fully dark. RFC 8414 metadata, `/oauth/authorize`, `/oauth/token`, `/oauth/revoke`, access-token-only `/oauth/introspect` and the internal `/oauth/upstream/google/callback` remain unregistered. Step 3A's zero-route statement is historical and applies to that completed foundation step, not the current Step 3B composer. The historical `../schemas/openapi.yaml` and frozen `/v1/auth/google/callback` remain unchanged.
 # Step 1 machine baseline
 
 The exhaustive repository-observed route and wire-contract freeze is `../specs/legacy-contract-baseline.v1.json`. It records one known documentation drift: runtime registers `GET /v1/admin/backup/secret-material`, while the historical `../schemas/openapi.yaml` omits it. Step 1 changes neither side.

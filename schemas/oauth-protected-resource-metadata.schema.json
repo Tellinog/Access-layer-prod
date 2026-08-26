@@ -6,7 +6,6 @@
   "required": [
     "resource",
     "authorization_servers",
-    "scopes_supported",
     "bearer_methods_supported"
   ],
   "properties": {
@@ -25,6 +24,7 @@
     },
     "scopes_supported": {
       "type": "array",
+      "minItems": 1,
       "uniqueItems": true,
       "items": {
         "type": "string",

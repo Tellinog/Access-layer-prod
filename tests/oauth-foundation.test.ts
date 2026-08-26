@@ -16,6 +16,7 @@ import {
   isExactOAuthRedirectUri,
   isExactOAuthHttpsUri,
   isExplicitlyAllowedClientResourceScope,
+  isUnpaddedBase64urlUInt,
   isValidOAuthPublicJwk,
   validateOAuthClientRegistration,
   validateOAuthResourceRegistration,
@@ -63,7 +64,7 @@ function signingKeyFixture(): OAuthSigningKeyPublicMetadata {
       kid: "synthetic-oauth-key",
       alg: "RS256",
       use: "sig",
-      n: "synthetic-modulus",
+      n: "AQIDBA",
       e: "AQAB"
     },
     publicKeyFingerprintSha256: "a".repeat(64),
@@ -348,6 +349,36 @@ describe("OAuth signing-key foundation validation", () => {
     const key = signingKeyFixture();
     expect(isValidOAuthPublicJwk(key.publicJwk, key.kid)).toBe(true);
     expect(isValidOAuthPublicJwk(key.publicJwk, "other-kid")).toBe(false);
+  });
+
+  it.each([
+    ["valid modulus", "AQIDBA", true],
+    ["valid exponent", "AQAB", true],
+    ["single zero byte", "AA", true],
+    ["padding", "AQAB=", false],
+    ["whitespace", "AQ AB", false],
+    ["non-base64url characters", "***", false],
+    ["empty", "", false],
+    ["empty-decoded invalid length", "A", false],
+    ["non-canonical invalid length", "AAAAA", false]
+  ] as const)("validates unpadded Base64urlUInt syntax for %s", (_label, value, expected) => {
+    expect(isUnpaddedBase64urlUInt(value)).toBe(expected);
+  });
+
+  it.each([
+    ["n", "***"],
+    ["n", "AQIDBA=="],
+    ["n", "AQ IDBA"],
+    ["n", "A"],
+    ["e", "!!!"],
+    ["e", "AQAB="],
+    ["e", "AQ\tAB"],
+    ["e", "A"]
+  ] as const)("rejects malformed RSA %s value %j", (member, value) => {
+    expect(isValidOAuthPublicJwk(
+      { ...signingKeyFixture().publicJwk, [member]: value },
+      "synthetic-oauth-key"
+    )).toBe(false);
   });
 
   it.each(["kty", "kid", "alg", "use", "n", "e"])(

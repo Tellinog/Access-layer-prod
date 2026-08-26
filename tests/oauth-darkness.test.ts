@@ -24,6 +24,9 @@ const frozenAuthorizationServerMetadata = JSON.parse(readFileSync(
 const frozenProtectedResourceMetadata = JSON.parse(readFileSync(
   resolve(root, "examples/oauth/oauth-protected-resource-metadata.json"), "utf8"
 ));
+const protectedResourceMetadataSchema = JSON.parse(readFileSync(
+  resolve(root, "schemas/oauth-protected-resource-metadata.schema.json"), "utf8"
+));
 
 const baseConfig: Config = {
   appEnv: "test",
@@ -92,7 +95,7 @@ function signingKey(
     id: `synthetic-${kid}`,
     kid,
     algorithm: "RS256",
-    publicJwk: { kty: "RSA", kid, alg: "RS256", use: "sig", n: `n-${kid}`, e: "AQAB" },
+    publicJwk: { kty: "RSA", kid, alg: "RS256", use: "sig", n: "AQIDBA", e: "AQAB" },
     publicKeyFingerprintSha256: "a".repeat(64),
     status: "active",
     publishedAt: new Date("2026-08-26T00:00:00Z"),
@@ -157,6 +160,40 @@ describe("Step 3B OAuth metadata builders", () => {
       scopesSupported: [],
       resourceName: "Access Layer API target metadata (OAuth disabled)"
     })).toEqual(frozenProtectedResourceMetadata);
+    expect(frozenProtectedResourceMetadata).not.toHaveProperty("scopes_supported");
+  });
+
+  it("emits scopes_supported only when at least one canonical scope is supplied", () => {
+    const metadata = buildOAuthProtectedResourceMetadata({
+      resource: `${baseConfig.appBaseUrl}/v1`,
+      authorizationServer: baseConfig.authIssuer,
+      scopesSupported: ["synthetic:records:read"],
+      resourceName: "Synthetic Resource"
+    });
+    expect(metadata.scopes_supported).toEqual(["synthetic:records:read"]);
+    expect(protectedResourceMetadataSchema.required).not.toContain("scopes_supported");
+    expect(protectedResourceMetadataSchema.properties.scopes_supported.minItems).toBe(1);
+  });
+
+  it("preserves exact trailing-slash issuer identity while normalizing only endpoint construction", () => {
+    const issuer = "https://issuer.invalid/";
+    expect(buildOAuthAuthorizationServerMetadata(issuer)).toMatchObject({
+      issuer,
+      authorization_endpoint: "https://issuer.invalid/oauth/authorize",
+      token_endpoint: "https://issuer.invalid/oauth/token",
+      jwks_uri: "https://issuer.invalid/oauth/jwks"
+    });
+    expect(buildOAuthProtectedResourceMetadata({
+      resource: "https://resource.invalid/api",
+      authorizationServer: issuer,
+      scopesSupported: [],
+      resourceName: "Synthetic Resource"
+    })).toEqual({
+      resource: "https://resource.invalid/api",
+      authorization_servers: [issuer],
+      bearer_methods_supported: ["header"],
+      resource_name: "Synthetic Resource"
+    });
   });
 });
 
@@ -185,6 +222,12 @@ describe("Step 3B OAuth JWKS selection", () => {
     const malformedJwk = signingKey("malformed-jwk", {
       publicJwk: { kty: "RSA", kid: "malformed-jwk", alg: "RS256", use: "sig", e: "AQAB" }
     });
+    const malformedModulus = signingKey("malformed-modulus", {
+      publicJwk: { kty: "RSA", kid: "malformed-modulus", alg: "RS256", use: "sig", n: "***", e: "AQAB" }
+    });
+    const paddedExponent = signingKey("padded-exponent", {
+      publicJwk: { kty: "RSA", kid: "padded-exponent", alg: "RS256", use: "sig", n: "AQIDBA", e: "AQAB=" }
+    });
     const incoherent = signingKey("incoherent", {
       activatesAt: new Date("2026-08-26T00:04:59Z")
     });
@@ -202,6 +245,8 @@ describe("Step 3B OAuth JWKS selection", () => {
       signingKey("disabled", { status: "disabled" }),
       retired,
       malformedJwk,
+      malformedModulus,
+      paddedExponent,
       incoherent,
       futurePublished
     ], now)).toEqual({ keys: [] });
@@ -233,6 +278,14 @@ describe("Step 3B OAuth dark HTTP composition", () => {
     }
   });
 
+  it("exposes no automatic HEAD sibling for either enabled Step 3B GET route", async () => {
+    const { app } = await applicationWithFlag(true, [signingKey("active")]);
+    for (const url of ["/oauth/jwks", "/.well-known/oauth-protected-resource/v1"]) {
+      expect((await app.inject({ method: "HEAD", url })).statusCode).toBe(404);
+      expect((await app.inject({ method: "GET", url })).statusCode).toBe(200);
+    }
+  });
+
   it("leaves the frozen legacy JWKS response untouched for both flag states", async () => {
     for (const flag of [false, true]) {
       const { app } = await applicationWithFlag(flag);
@@ -245,7 +298,7 @@ describe("Step 3B OAuth dark HTTP composition", () => {
   it("serves only valid OAuth public keys with exact caching and no private metadata", async () => {
     const active = signingKey("a-active", {
       publicJwk: {
-        kty: "RSA", kid: "a-active", alg: "RS256", use: "sig", n: "n-a-active", e: "AQAB",
+        kty: "RSA", kid: "a-active", alg: "RS256", use: "sig", n: "AQIDBA", e: "AQAB",
         protected_private_key_ref: "must-not-be-serialized"
       },
       publishedAt: new Date("2020-01-01T00:00:00Z"),
@@ -269,7 +322,7 @@ describe("Step 3B OAuth dark HTTP composition", () => {
     expect(response.headers["cache-control"]).toBe("public, max-age=300");
     expect(response.json()).toEqual({
       keys: [
-        { kty: "RSA", kid: "a-active", alg: "RS256", use: "sig", n: "n-a-active", e: "AQAB" },
+        { kty: "RSA", kid: "a-active", alg: "RS256", use: "sig", n: "AQIDBA", e: "AQAB" },
         published.publicJwk
       ]
     });
@@ -285,7 +338,16 @@ describe("Step 3B OAuth dark HTTP composition", () => {
         keys: [signingKey("invalid-private", {
           publicJwk: {
             kty: "RSA", kid: "invalid-private", alg: "RS256", use: "sig",
-            n: "public-n", e: "AQAB", d: "must-not-leak"
+            n: "AQIDBA", e: "AQAB", d: "must-not-leak"
+          }
+        })],
+        failure: null
+      },
+      {
+        keys: [signingKey("invalid-encoding", {
+          publicJwk: {
+            kty: "RSA", kid: "invalid-encoding", alg: "RS256", use: "sig",
+            n: "***", e: "!!!"
           }
         })],
         failure: null

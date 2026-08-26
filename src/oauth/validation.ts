@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { PERMISSION_KEY_REGEX, TOOL_SLUG_REGEX } from "../validation.js";
 import type {
   LegacyEntitlementSnapshot,
@@ -72,6 +73,16 @@ function validDate(value: Date | null): value is Date {
 
 function isNonEmptyJwkString(jwk: Record<string, unknown>, member: string): boolean {
   return typeof jwk[member] === "string" && (jwk[member] as string).trim().length > 0;
+}
+
+export function isUnpaddedBase64urlUInt(value: unknown): value is string {
+  if (typeof value !== "string" || !/^[A-Za-z0-9_-]+$/.test(value)) return false;
+  try {
+    const decoded = Buffer.from(value, "base64url");
+    return decoded.length > 0 && decoded.toString("base64url") === value;
+  } catch {
+    return false;
+  }
 }
 
 export function isCanonicalOAuthScope(scope: string): boolean {
@@ -285,6 +296,7 @@ export function isValidOAuthPublicJwk(publicJwk: unknown, rowKid: string): boole
     if (!isNonEmptyJwkString(jwk, member)) return false;
   }
   return jwk.kty === "RSA" && jwk.kid === rowKid && jwk.alg === "RS256" && jwk.use === "sig" &&
+    isUnpaddedBase64urlUInt(jwk.n) && isUnpaddedBase64urlUInt(jwk.e) &&
     !PRIVATE_JWK_MEMBERS.some((member) => Object.hasOwn(jwk, member));
 }
 

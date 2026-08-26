@@ -3,7 +3,6 @@
   "authorization_servers": [
     "https://access-layer.unguess-internal.net"
   ],
-  "scopes_supported": [],
   "bearer_methods_supported": [
     "header"
   ],

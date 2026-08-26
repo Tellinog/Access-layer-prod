@@ -13,7 +13,7 @@ export function registerOAuthReadOnlyHttp(
 ): void {
   if (!input.config.oauthP0Enabled) return;
 
-  app.get("/oauth/jwks", async (_request, reply) => {
+  app.get("/oauth/jwks", { exposeHeadRoute: false }, async (_request, reply) => {
     try {
       const jwks = selectOAuthJwks(await input.repository.listSigningKeyPublicMetadata());
       if (jwks.keys.length === 0) {
@@ -31,7 +31,7 @@ export function registerOAuthReadOnlyHttp(
     }
   });
 
-  app.get("/.well-known/oauth-protected-resource/v1", async () =>
+  app.get("/.well-known/oauth-protected-resource/v1", { exposeHeadRoute: false }, async () =>
     buildOAuthProtectedResourceMetadata({
       resource: `${input.config.appBaseUrl.replace(/\/+$/, "")}/v1`,
       authorizationServer: input.config.authIssuer,

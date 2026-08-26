@@ -93,7 +93,7 @@ P0 discloses an RFC 9068 Bearer access token as active only when its exact `aud`
 
 ## Metadata and key rotation
 
-RFC 8414 metadata is at `/.well-known/oauth-authorization-server` and advertises only P0 protocol endpoints. The internal Google callback is not advertised. RFC 9728 protected-resource metadata identifies the exact resource, Access Layer issuer, registered scopes and header-only bearer method. OIDC discovery and UserInfo are not advertised.
+RFC 8414 metadata is at `/.well-known/oauth-authorization-server` and advertises only P0 protocol endpoints. The internal Google callback is not advertised. RFC 9728 protected-resource metadata identifies the exact resource, Access Layer issuer and header-only bearer method; `scopes_supported` lists registered scopes only when at least one exists and is omitted at zero values as required by RFC 9728. OIDC discovery and UserInfo are not advertised. Stable published RFC requirements remain normative over unreleased example-artifact mistakes.
 
 OAuth keys are isolated behind `/oauth/jwks`; legacy `/v1/.well-known/jwks.json` and its key material remain untouched. Rotation rules are:
 

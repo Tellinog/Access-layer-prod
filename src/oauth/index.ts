@@ -14,6 +14,7 @@ export {
   isExactOAuthRedirectUri,
   isExactOAuthHttpsUri,
   isExplicitlyAllowedClientResourceScope,
+  isUnpaddedBase64urlUInt,
   isValidOAuthPublicJwk,
   validateOAuthClientRegistration,
   validateOAuthClientResourceScopeAllowances,

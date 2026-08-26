@@ -10,6 +10,16 @@
     "example-project:records:read",
     "example-project:records:write"
   ],
+  "scope_entitlement_mappings": [
+    {
+      "scope": "example-project:records:read",
+      "legacy_permission_key": "records:read"
+    },
+    {
+      "scope": "example-project:records:write",
+      "legacy_permission_key": "example-project:records:write"
+    }
+  ],
   "audience_policy": "exact_single_resource",
   "protected_resource_metadata_url": "https://example-resource.invalid/.well-known/oauth-protected-resource/api",
   "entitlement_binding": {

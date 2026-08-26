@@ -95,7 +95,7 @@ The normative P0 contract, token transport, errors, registrations, refresh-famil
 
 ## Introspection policy
 
-Default: local JWT validation plus a bounded introspection cache. P0 introspection requires separately authorised resource-server credentials and discloses only RFC 9068 access tokens as active; refresh tokens and other non-disclosable tokens return exactly `{"active":false}`. Online introspection is mandatory for:
+Default: local JWT validation plus a bounded introspection cache. P0 introspection uses `client_secret_basic` with a separately authorised credential owned by one OAuth resource, not an OAuth client or legacy tool client. It discloses an RFC 9068 access token as active only when the token's exact `aud` equals that credential's resource; audience mismatches, refresh tokens and other non-disclosable tokens return exactly `{"active":false}`. Online introspection is mandatory for:
 
 - administrative mutations;
 - sensitive data export;

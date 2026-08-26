@@ -14,9 +14,10 @@ The first future OAuth migration must be expand-only and readable by the current
 | `oauth_client_credentials` | Client FK, non-reversible secret hash or future key metadata, status, created/activated/expires/retired timestamps and rotation lineage. Never stores plaintext secrets. |
 | `oauth_client_redirect_uris` | Client FK and exact normalized-for-storage-but-exactly-compared redirect URI; unique per client. No wildcard/pattern column. |
 | `oauth_resources` | Canonical HTTPS `resource_id`, display name, status, owner, protected-resource metadata URL and `exact_single_resource` audience policy. It is not an OAuth client. |
+| `oauth_resource_credentials` | Resource FK, stable `credential_id` used as the HTTP Basic username, non-reversible secret hash, status, created/activated/rotated/expires/retired timestamps and rotation-parent lineage. P0 supports only `client_secret_basic`. The credential belongs to one OAuth resource and is neither an OAuth client credential nor a legacy `tool_clients` row. |
 | `oauth_resource_entitlement_bindings` | Resource FK plus the mandatory P0 legacy `tool_id`/slug bridge. Exactly one active `legacy_tool` entitlement domain exists per P0 resource. It may read legacy grants/permissions without changing their meaning and never identifies the OAuth client or resource. Native OAuth entitlement domains are deferred beyond P0. |
 | `oauth_scopes` | Canonical `project:domain:action`, description, status and audit metadata. Scope aliases, if ever approved, are separate versioned records. |
-| `oauth_resource_scopes` | Resource/scope registration and status. Only these scopes may appear in that resource's metadata or tokens. |
+| `oauth_resource_scopes` | Resource/scope registration, required exact `legacy_permission_key` and status. Each resource scope has exactly one explicit mapping to a legacy permission registered for the resource's bound tool. Only these scopes may appear in that resource's metadata or tokens. |
 | `oauth_client_resource_scopes` | Client/resource/scope allow-list. Prevents a client registration from implying access to every resource or scope. |
 | `oauth_authorization_transactions` | Exact downstream client state in short-lived reversible protected storage (for example, an encrypted-at-rest value) until the response is emitted, plus an optional lookup hash; separate upstream Google state/nonce hashes; client, exact redirect, requested resource/scopes, PKCE challenge/method, correlation, expiry and consumed/decision timestamps. Downstream state is never logged. |
 | `oauth_authorizations` | Human `user_id`, client, resource, effective scope set, explicit legacy grant references used for the decision, status and timestamps. P0 has no newly invented consent row. |
@@ -33,6 +34,9 @@ OAuth audit events continue through the append-only legacy `audit_logs` facility
 
 - Client and resource identities are separate foreign-key domains.
 - Every P0 resource has exactly one active `legacy_tool` entitlement binding; the bound tool is entitlement-only and never becomes the OAuth client or resource.
+- Every registered P0 resource scope has exactly one explicit `legacy_permission_key`. The resource-scope mapping set covers the declared scopes exactly, with no missing, extra or duplicate scope, and never derives a permission by prefix, segment rewriting or alias inference.
+- Each mapped permission key must exist for the bound legacy tool and be present in the human's effective active grant. A missing, stale, unknown or ungranted mapping fails closed as `invalid_scope`/deny; legacy permissions and grants are not changed.
+- Resource introspection credentials are separate from OAuth client credentials and legacy tool clients. An authenticated resource credential may receive `active=true` only when the token's exact `aud` equals that credential's resource; every audience mismatch receives exactly `{"active":false}`.
 - Resource IDs and client IDs are immutable after activation.
 - Redirect comparison is exact; wildcard redirect records are impossible.
 - Every authorization transaction contains exactly one resource and `S256` PKCE.
@@ -47,7 +51,7 @@ OAuth audit events continue through the append-only legacy `audit_logs` facility
 ## Future migration sequence
 
 1. Add the tables and constraints without changing existing tables or runtime reads.
-2. Seed reviewed client/resource/scope registrations through a controlled administrative path.
+2. Seed reviewed client/resource/scope/mapping registrations and resource credentials through a controlled administrative path.
 3. Verify the frozen legacy suite and rollback with OAuth globally disabled.
 4. Enable OAuth for an explicit pilot client/resource only.
 5. Observe compatibility, replay, key, audit and rollback gates.

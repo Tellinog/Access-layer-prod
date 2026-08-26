@@ -6,13 +6,17 @@ V1 implementation scaffold complete, with local dependency, typecheck, build and
 
 ## Step 2 OAuth P0 hardening, 2026-08-26
 
+- Final hardening aligns the OAuth resource bridge with the exact legacy tool-slug grammar and aligns `specs/validation.v1.yml` with the runtime's two-or-more-segment legacy permission grammar. Runtime validation is unchanged.
+- Every declared P0 resource scope now has exactly one explicit `legacy_permission_key` mapping. Coverage must be exact with no missing, extra or duplicate scope; inferred conversion is forbidden, and missing/stale/unknown/ungranted mappings fail closed.
+- Proposed `oauth_resource_credentials` are owned by one OAuth resource, use `client_secret_basic`, store only a non-reversible secret hash plus lifecycle/rotation metadata, and are separate from OAuth client credentials and legacy tool clients. `active=true` requires the token's exact `aud` to equal the credential's resource.
 - The target contract is hardened without runtime implementation: shared RequestContext v1 again accepts canonical hierarchical identifiers with two or more segments, while OAuth P0 alone retains exact `project:domain:action` scope grammar.
 - PKCE now enforces 43–128 RFC 7636 unreserved verifier characters and an exact 43-character unpadded base64url S256 challenge; `plain` remains forbidden.
 - Every P0 resource now requires exactly one legacy-tool entitlement-only binding. OAuth client, resource and legacy tool identities remain separate; native OAuth entitlement domains are deferred beyond P0.
-- P0 introspection discloses only audience-authorised RFC 9068 Bearer access tokens as active to separately authorised resource-server credentials. Refresh, inactive, unknown and otherwise non-disclosable tokens return exactly `{"active":false}`.
+- P0 introspection discloses only RFC 9068 Bearer access tokens whose exact audience matches the authenticated resource-owned credential. Refresh, audience-mismatched, inactive, unknown and otherwise non-disclosable tokens return exactly `{"active":false}`.
 - Future OAuth-to-Google transactions use the separate internal `/oauth/upstream/google/callback`, which is neither advertised nor implemented and never reuses the frozen legacy callback. Future production Google registration adds it without removing the legacy URI.
 - The additive transaction proposal retains exact downstream client state in short-lived reversible protected storage, with an optional hash and no logging; upstream Google state and nonce remain hash-only. No migration exists.
-- Verification passes: lint, build, 113 Vitest tests, 57 Python tests with two expected template-bootstrap skips, 18 OAuth validator groups, schema/OpenAPI/reference checks, legacy baseline tests, resolved Compose continuity and working-tree whitespace checks. Non-strict platform conformance passes 27 checks with seven known warnings; strict release conformance still reports the same five external operational gates.
+- After Step 2 approval, generic Step 3 work may proceed locally/dark with OAuth globally disabled. Pilot registration details are required before enablement/production registration, not before generic implementation. Production deploy/enable remains blocked by `Changes pending`, backup/restore, destination, registry, ownership, deployed revision/image, secret/key continuity and later N→N+1 gates.
+- Final-hardening verification results are recorded in `DEVLOG.md`; no concrete pilot mapping or resource credential was seeded.
 
 ## Step 2 production evidence reconciliation, 2026-08-25
 

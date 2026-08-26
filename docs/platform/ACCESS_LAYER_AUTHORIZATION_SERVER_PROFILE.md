@@ -35,11 +35,12 @@ Resource servers publish RFC 9728 protected-resource metadata.
 - RFC 9068 JWT access-token profile;
 - RFC 7009 revocation;
 - RFC 7662 introspection;
-- access-token-only active introspection for separately authorised resource-server credentials;
+- access-token-only active introspection through separate resource-owned `client_secret_basic` credentials, with exact token-audience matching;
 - RFC 9700 security BCP controls;
 - refresh-token rotation and token-family replay detection;
 - pre-registered first-party clients and resources;
 - exactly one legacy-tool entitlement-only binding for every P0 resource;
+- exactly one explicit legacy permission mapping for every registered resource scope, with no inferred rewriting;
 - key rotation without invalidating still-valid tokens.
 
 The Access Layer-specific normative profile is `../../specs/oauth-p0.v1.yml`; `../OAUTH_P0_CONTRACT.md` is its human-readable design. Human token `sub` is Google `sub`, OAuth signing keys are isolated from legacy keys, and browser applications retain BFF/server-side token storage. The internal upstream Google callback is `/oauth/upstream/google/callback`; it is not advertised as a protocol endpoint and never reuses the frozen legacy callback.

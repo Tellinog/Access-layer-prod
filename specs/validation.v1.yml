@@ -20,4 +20,4 @@ validation:
     min_entropy_bits: 128
     max_length: 512
   permission_key:
-    regex: "^[a-z0-9-]+:[a-z0-9-]+$"
+    regex: "^[a-z0-9-]+(?::[a-z0-9-]+)+$"

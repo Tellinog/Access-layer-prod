@@ -38,8 +38,8 @@
 - 2026-08-24 Step 1.5: provide the exact remaining Coolify destination identifier, deployed revision/image identity, replica/deploy facts and named continuity operator; server/project/environment/resource IDs, current live domain and auto-deploy state are now observed.
 - 2026-08-24 Step 1.5: identify the authoritative central deployment registry location and the Access Layer record identifier/evidence reference.
 - 2026-08-25 Step 1.5B: identify the approved access-controlled evidence system and authorised operators for secret-manager version references, side-by-side comparisons, or controlled binding records. No secret value or reusable verifier may be stored in Git.
-- 2026-08-25 Step 2: identify the first approved P0 pilot client, resource, exact redirects, entitlement-domain binding and registered capability scopes before Step 3 implementation or any production registration.
-- 2026-08-25 Step 2: define the operational owner and protected storage mechanism for the dedicated OAuth signing key ring before implementation; the legacy key ring cannot be reused.
+- 2026-08-26 Step 2: before OAuth enablement or production registration, approve the first P0 pilot client, resource, exact redirects, mandatory legacy-tool entitlement binding, canonical scopes, exact legacy-permission mappings and resource introspection credentials. These details do not block generic Step 3 local/dark implementation with OAuth globally disabled.
+- 2026-08-26 Step 2: define the operational owner and protected production storage mechanism for the dedicated OAuth signing key ring before OAuth enablement or production deployment; the legacy key ring cannot be reused. This does not block generic Step 3 local/dark implementation with synthetic local-only material.
 
 ## ASSUMPTION_TO_VALIDATE
 
@@ -70,7 +70,7 @@
 - Full SIEM integration.
 - Dedicated SDK packages per framework.
 - Immutable append-only log storage with WORM retention.
-- OAuth runtime endpoints, discovery handlers, additive authorization-server tables/migrations and production client/resource/scope registrations. The P0 contract is frozen; runtime remains deferred.
+- OAuth runtime endpoints, discovery handlers and additive authorization-server tables/migrations remain outside Step 2. After Step 2 approval, they may be developed only as generic Step 3 local/dark work with OAuth globally disabled. Production client/resource/scope/mapping/credential registration and any enablement remain deferred until the release gates pass.
 - OAuth P1 features: service principals, `client_credentials`, token exchange, `private_key_jwt`, downstream OIDC ID Token/UserInfo/discovery and dynamic client registration.
 - Native OAuth entitlement domains; every P0 resource instead requires exactly one existing `legacy_tool` entitlement-only binding.
 - UNGUESS Platform SDK dependency adoption and telemetry SDK integration.

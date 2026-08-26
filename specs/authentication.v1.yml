@@ -60,7 +60,15 @@ oauth_profile:
   oidc_provider_p0_enabled: false
   dedicated_oauth_signing_keys: true
   introspection_token_class: access_token_only
+  introspection_authentication:
+    method: client_secret_basic
+    credential_owner: oauth_resource
+    credential_model: oauth_resource_credentials
+    exact_audience_required_for_active_disclosure: true
+    oauth_client_credential_reused: false
+    legacy_tool_client_reused: false
   p0_resource_entitlement_binding: exactly_one_legacy_tool
+  p0_scope_entitlement_mapping: exactly_one_explicit_legacy_permission_per_resource_scope
   forbidden:
     - implicit_grant
     - password_grant

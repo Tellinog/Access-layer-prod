@@ -149,10 +149,12 @@ paths:
       operationId: oauthIntrospect
       summary: Introspect an RFC 9068 access token per RFC 7662
       description: >-
-        Restricted to separately authorised resource-server credentials. Only
-        audience-authorised RFC 9068 Bearer access tokens may be disclosed as
-        active. Refresh tokens and every unknown, inactive or non-disclosable
-        token receive exactly active=false. Invalid caller credentials use 401.
+        Restricted to separately authorised credentials owned by one OAuth
+        resource. Only an RFC 9068 Bearer access token whose exact aud equals
+        the authenticated credential's resource may be disclosed as active.
+        Refresh tokens, audience mismatches and every unknown, inactive or
+        non-disclosable token receive exactly active=false. Invalid caller
+        credentials use 401.
       security:
         - introspectionClientBasic: []
       requestBody:
@@ -197,7 +199,15 @@ components:
     introspectionClientBasic:
       type: http
       scheme: basic
-      description: Separately authorised resource-server credential for access-token introspection.
+      description: >-
+        client_secret_basic using a stable oauth_resource_credentials credential_id
+        as username. The credential belongs to one OAuth resource; it is neither
+        an OAuth client credential nor a legacy tool client credential.
+      x-credential-owner: oauth_resource
+      x-credential-model: oauth_resource_credentials
+      x-active-audience-match: exact
+      x-oauth-client-credential-reused: false
+      x-legacy-tool-client-reused: false
   responses:
     OAuthError:
       description: Standard OAuth protocol error
@@ -321,7 +331,7 @@ components:
             active: {const: false}
           additionalProperties: false
         - type: object
-          description: Metadata for an audience-authorised RFC 9068 Bearer access token.
+          description: Metadata for an RFC 9068 Bearer access token whose exact aud equals the authenticated resource credential's resource.
           required: [active, iss, sub, aud, client_id, scope, exp, iat, jti, token_type]
           properties:
             active: {const: true}

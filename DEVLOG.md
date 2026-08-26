@@ -1,5 +1,39 @@
 # DEVLOG.md
 
+## 2026-08-26 - Final Step 2 OAuth P0 contract hardening
+
+Changed by: Codex
+Related task: Resolve the final contract blockers without starting Step 3.
+
+### Changed
+
+- Aligned the target OAuth resource bridge to the exact legacy tool-slug grammar and reconciled the legacy permission machine spec to the runtime's two-or-more-segment grammar without changing runtime validation.
+- Required an explicit one-to-one canonical OAuth scope to legacy permission mapping for every declared resource scope; exact coverage, no inferred rewriting and fail-closed entitlement evaluation are machine validated.
+- Added the target-only `oauth_resource_credentials` data contract for `client_secret_basic` introspection and bound active disclosure to an exact match between token `aud` and the credential's resource.
+- Restored the gate distinction: after Step 2 approval, generic Step 3 may proceed locally/dark with OAuth globally disabled; pilot registration and all operational continuity gates still block enablement/production registration/deploy.
+
+### Behavior
+
+- OAuth runtime endpoints, migrations, dependencies, production configuration, secrets, SDKs and consumers changed: no.
+- Legacy `/v1/*`, Google callback, JWT/JWKS, sessions, refresh tokens, grants, permissions, tool clients, cookies and Admin UI behavior changed: no.
+- Compose and the approved logical-volume correction changed: no. No pilot mapping or resource credential was seeded.
+
+### Tests/checks
+
+- `npm.cmd run lint` and `npm.cmd run build` passed.
+- Full Vitest passed: 12 files, 113 tests; targeted frozen legacy baseline passed: one file, six tests.
+- Full Python conformance passed: 61 tests with two expected pristine-template bootstrap skips.
+- OAuth P0 validator passed all 24 check groups, including exact legacy grammars, scope-mapping coverage, resource credential ownership, OpenAPI references and schema/example validation.
+- Production-continuity evidence remains `VALID_BUT_NOT_READY` with zero errors: isolated-restore false with 167 missing facts; N→N+1 false with 175 missing facts.
+- Non-strict platform check passed 27 checks with seven known warnings. Strict platform release validation remains intentionally non-passing only on five external gates and four legacy-migration warnings.
+- Resolved Compose reports exactly `access_layer_postgres_data_v2` and `access_layer_jwt_secrets` as logical volumes.
+- `git diff --check` passed, and the final-hardening range has no changes under runtime, migrations, dependencies, frozen legacy OpenAPI or Compose.
+
+### Decisions and follow-up
+
+- Recorded D-038 for exact entitlement mappings, resource-owned introspection credentials and separate local-development/production-release gates.
+- Stop before Step 3. Production release blockers remain in `BACKLOG.md`.
+
 ## 2026-08-26 - Step 2 OAuth P0 contract hardening
 
 Changed by: Codex
@@ -39,7 +73,7 @@ Related task: Resolve independent-audit blockers without starting OAuth runtime 
 ### Decisions and follow-up
 
 - Recorded D-037 for the hardening rules above.
-- Do not start Step 3 or deploy. Resolve the `Changes pending` review, destination, backup/restore, registry, ownership, deployed-image and secret/key continuity gates first.
+- Superseded by D-038's gate distinction: after Step 2 approval, generic Step 3 may proceed locally/dark with OAuth globally disabled. Do not enable or deploy until the `Changes pending` review, destination, backup/restore, registry, ownership, deployed-image and secret/key continuity gates pass.
 
 ## 2026-08-25 - Step 2 OAuth vNext P0 contract freeze
 

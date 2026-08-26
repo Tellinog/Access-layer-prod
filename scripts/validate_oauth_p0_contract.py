@@ -38,6 +38,8 @@ CAPABILITY_PATTERN = re.compile(
 REQUEST_CONTEXT_IDENTIFIER_PATTERN = r"^[a-z][a-z0-9-]+(?::[a-z][a-z0-9-]+){1,}$"
 PKCE_VERIFIER_PATTERN = r"^[A-Za-z0-9._~-]{43,128}$"
 PKCE_S256_CHALLENGE_PATTERN = r"^[A-Za-z0-9_-]{43}$"
+LEGACY_TOOL_SLUG_PATTERN = r"^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$"
+LEGACY_PERMISSION_KEY_PATTERN = r"^[a-z0-9-]+(?::[a-z0-9-]+)+$"
 
 
 def load_json(path: str) -> Any:
@@ -74,11 +76,42 @@ def resolve_json_pointer(document: Any, reference: str) -> Any:
     return current
 
 
+def resource_scope_mapping_errors(resource: dict[str, Any]) -> list[str]:
+    """Validate exact one-to-one declared-scope coverage beyond JSON Schema."""
+    declared_scopes = resource.get("scopes", [])
+    mappings = resource.get("scope_entitlement_mappings", [])
+    mapping_scopes = [mapping.get("scope") for mapping in mappings if isinstance(mapping, dict)]
+    errors: list[str] = []
+    if len(mapping_scopes) != len(set(mapping_scopes)):
+        errors.append("resource scope entitlement mappings contain a duplicate scope")
+    missing = sorted(set(declared_scopes) - set(mapping_scopes))
+    extra = sorted(set(mapping_scopes) - set(declared_scopes))
+    if missing:
+        errors.append(f"resource scope entitlement mappings are missing declared scopes: {', '.join(missing)}")
+    if extra:
+        errors.append(f"resource scope entitlement mappings contain undeclared scopes: {', '.join(extra)}")
+    if len(mappings) != len(declared_scopes):
+        errors.append("resource scope entitlement mappings must contain exactly one entry per declared scope")
+    return errors
+
+
 def validate() -> list[str]:
     errors: list[str] = []
     spec = load_yaml("specs/oauth-p0.v1.yml")
     openapi = load_yaml("schemas/access-layer-oauth-v1.openapi.yaml")
     metadata = load_json("examples/oauth/authorization-server-metadata.expected.json")
+
+    validation_spec = load_yaml("specs/validation.v1.yml")
+    legacy_validation = validation_spec.get("validation", {})
+    if legacy_validation.get("tool_slug", {}).get("regex") != LEGACY_TOOL_SLUG_PATTERN:
+        errors.append("legacy tool-slug machine grammar differs from the frozen runtime contract")
+    if legacy_validation.get("permission_key", {}).get("regex") != LEGACY_PERMISSION_KEY_PATTERN:
+        errors.append("legacy permission-key machine grammar differs from the frozen runtime contract")
+    runtime_validation = (ROOT / "src/validation.ts").read_text(encoding="utf-8")
+    if "TOOL_SLUG_REGEX = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/" not in runtime_validation:
+        errors.append("runtime legacy tool-slug grammar no longer matches the frozen machine contract")
+    if "PERMISSION_KEY_REGEX = /^[a-z0-9-]+(?::[a-z0-9-]+)+$/" not in runtime_validation:
+        errors.append("runtime legacy permission-key grammar no longer matches the frozen machine contract")
 
     if spec.get("status") != "contract_frozen_not_implemented" or spec.get("runtime_enabled") is not False:
         errors.append("OAuth P0 machine profile must remain frozen and runtime-disabled")
@@ -204,6 +237,26 @@ def validate() -> list[str]:
         errors.append("client schema accepts a wildcard redirect URI")
 
     resource_schema = load_json("schemas/oauth-resource-registration.schema.json")
+    resource_properties = resource_schema.get("properties", {})
+    resource_slug_pattern = (
+        resource_properties.get("entitlement_binding", {})
+        .get("properties", {})
+        .get("legacy_tool_slug", {})
+        .get("pattern")
+    )
+    mapping_permission_pattern = (
+        resource_properties.get("scope_entitlement_mappings", {})
+        .get("items", {})
+        .get("properties", {})
+        .get("legacy_permission_key", {})
+        .get("pattern")
+    )
+    if resource_slug_pattern != LEGACY_TOOL_SLUG_PATTERN:
+        errors.append("OAuth resource schema legacy-tool bridge grammar differs from runtime")
+    if mapping_permission_pattern != LEGACY_PERMISSION_KEY_PATTERN:
+        errors.append("OAuth resource schema legacy-permission mapping grammar differs from runtime")
+    resource_registration = load_json("examples/oauth/resource-registration.json")
+    errors.extend(resource_scope_mapping_errors(resource_registration))
     resource_without_binding = load_json("examples/oauth/resource-registration.json")
     resource_without_binding.pop("entitlement_binding")
     if not schema_errors(resource_without_binding, resource_schema):
@@ -215,8 +268,48 @@ def validate() -> list[str]:
         errors.append("machine profile conflates OAuth client and resource identity")
     if registration.get("native_oauth_entitlement_domains") != "deferred_beyond_p0":
         errors.append("native OAuth entitlement domains are not explicitly deferred beyond P0")
+    if registration.get("legacy_tool_slug_pattern") != LEGACY_TOOL_SLUG_PATTERN:
+        errors.append("OAuth resource binding does not freeze the exact legacy tool-slug grammar")
+    if registration.get("scope_entitlement_mappings") != "exactly_one_explicit_legacy_permission_per_resource_scope":
+        errors.append("machine profile does not require explicit per-resource-scope entitlement mappings")
+    mapping_contract = spec.get("scope", {}).get("entitlement_mapping", {})
+    if mapping_contract.get("legacy_permission_pattern") != LEGACY_PERMISSION_KEY_PATTERN:
+        errors.append("OAuth entitlement mapping does not freeze the exact legacy permission grammar")
+    if mapping_contract.get("exact_declared_scope_coverage") != "required":
+        errors.append("OAuth entitlement mapping does not require exact declared-scope coverage")
+    if mapping_contract.get("inferred_prefix_segment_or_alias_rewriting") != "forbidden":
+        errors.append("OAuth entitlement mapping permits inferred rewriting")
+    if mapping_contract.get("mapped_permission_registered_for_bound_legacy_tool") != "required":
+        errors.append("OAuth entitlement mapping does not require a permission registered for the bound tool")
+    if mapping_contract.get("missing_stale_unknown_or_ungranted_mapping") != "invalid_scope_and_deny":
+        errors.append("OAuth entitlement mapping is not fail-closed")
 
     introspection = spec.get("introspection", {})
+    introspection_auth = introspection.get("authentication", {})
+    if introspection_auth.get("method") != "client_secret_basic":
+        errors.append("P0 introspection does not freeze client_secret_basic")
+    if introspection_auth.get("credential_owner") != "oauth_resource" or introspection_auth.get("credential_model") != "oauth_resource_credentials":
+        errors.append("P0 introspection credentials are not owned by the OAuth resource model")
+    if introspection_auth.get("oauth_client_credential_reused") is not False or introspection_auth.get("legacy_tool_client_reused") is not False:
+        errors.append("P0 introspection credential contract conflates client, resource or legacy tool identities")
+    required_resource_credential_fields = {
+        "resource_id",
+        "credential_id",
+        "secret_hash",
+        "status",
+        "created_at",
+        "activated_at",
+        "rotated_at",
+        "expires_at",
+        "retired_at",
+        "rotation_parent_id",
+    }
+    if set(introspection.get("credential_lifecycle_fields", [])) != required_resource_credential_fields:
+        errors.append("P0 resource credential model lacks the frozen ownership, secret-hash or lifecycle fields")
+    if introspection.get("active_disclosure_audience_rule") != "exact_token_aud_equals_authenticated_credential_resource":
+        errors.append("P0 introspection active disclosure is not bound to the credential resource's exact audience")
+    if introspection.get("audience_mismatch_response") != "active_false_only":
+        errors.append("P0 introspection audience mismatch does not return active=false only")
     if introspection.get("token_class_disclosed_active") != "access_token_only":
         errors.append("P0 introspection active disclosure is not limited to access tokens")
     if introspection.get("refresh_token_active_disclosure") != "forbidden_return_active_false":
@@ -229,6 +322,11 @@ def validate() -> list[str]:
         errors.append("target OpenAPI rejects the exact inactive introspection response")
     if not schema_errors({"active": False, "reason": "hidden"}, introspection_response):
         errors.append("target OpenAPI permits inactive introspection reason leakage")
+    introspection_security = openapi.get("components", {}).get("securitySchemes", {}).get("introspectionClientBasic", {})
+    if introspection_security.get("x-credential-owner") != "oauth_resource" or introspection_security.get("x-credential-model") != "oauth_resource_credentials":
+        errors.append("target OpenAPI introspection credential ownership differs from the machine profile")
+    if introspection_security.get("x-active-audience-match") != "exact":
+        errors.append("target OpenAPI introspection credential lacks exact-audience disclosure restriction")
 
     upstream = spec.get("upstream_identity", {})
     if upstream.get("callback_path") != "/oauth/upstream/google/callback":
@@ -244,6 +342,28 @@ def validate() -> list[str]:
         errors.append("downstream client state is not assigned reversible protected storage")
     if downstream_state.get("logging") != "forbidden":
         errors.append("machine profile does not forbid downstream client-state logging")
+
+    gates = spec.get("development_and_release_gates", {})
+    if gates.get("step_3_local_dark_development_after_step_2_approval") != "allowed":
+        errors.append("machine profile blocks approved generic Step 3 local/dark development")
+    if gates.get("oauth_globally_disabled_by_default") is not True:
+        errors.append("machine profile does not keep OAuth globally disabled by default")
+    if gates.get("pilot_registration_required_before_generic_step_3_implementation") is not False:
+        errors.append("machine profile incorrectly requires pilot registration before generic Step 3 implementation")
+    if gates.get("pilot_registration_required_before_enable_or_production_registration") is not True:
+        errors.append("machine profile does not require pilot registration before enablement/production registration")
+    expected_release_gates = {
+        "coolify_changes_pending_review",
+        "verified_backup_restore",
+        "destination_identity",
+        "central_registry",
+        "named_ownership",
+        "deployed_revision_or_image_identity",
+        "secret_and_key_continuity",
+        "later_n_to_n_plus_1_gates",
+    }
+    if set(gates.get("production_deploy_or_enable_blocked_until", [])) != expected_release_gates:
+        errors.append("machine profile production release gates differ from the frozen Step 2 decision")
 
     operation_ids: list[str] = []
     for node in iter_nodes(openapi):
@@ -288,7 +408,7 @@ def main() -> int:
     parser.add_argument("--json", action="store_true", help="Emit a JSON result.")
     args = parser.parse_args()
     errors = validate()
-    result = {"result": "PASS" if not errors else "FAIL", "errors": errors, "checks": 18}
+    result = {"result": "PASS" if not errors else "FAIL", "errors": errors, "checks": 24}
     if args.json:
         print(json.dumps(result, indent=2))
     elif errors:
@@ -296,7 +416,7 @@ def main() -> int:
         for error in errors:
             print(f"- {error}")
     else:
-        print("OAuth P0 contract validation passed (18 check groups).")
+        print("OAuth P0 contract validation passed (24 check groups).")
     return 0 if not errors else 1
 
 

@@ -98,6 +98,57 @@ class OAuthP0ContractTests(unittest.TestCase):
         self.assertTrue(registration["client_and_resource_identity_separate"])
         self.assertEqual("deferred_beyond_p0", registration["native_oauth_entitlement_domains"])
 
+    def test_legacy_tool_slug_bridge_uses_exact_runtime_grammar(self) -> None:
+        schema = validator.load_json("schemas/oauth-resource-registration.schema.json")
+        base = validator.load_json("examples/oauth/resource-registration.json")
+        slug_schema = schema["properties"]["entitlement_binding"]["properties"]["legacy_tool_slug"]
+        self.assertEqual(validator.LEGACY_TOOL_SLUG_PATTERN, slug_schema["pattern"])
+        for slug in ("1ab", "a" * 64):
+            resource = copy.deepcopy(base)
+            resource["entitlement_binding"]["legacy_tool_slug"] = slug
+            self.assertEqual([], validator.schema_errors(resource, schema), slug)
+        for slug in ("ab", "abc-"):
+            resource = copy.deepcopy(base)
+            resource["entitlement_binding"]["legacy_tool_slug"] = slug
+            self.assertTrue(validator.schema_errors(resource, schema), slug)
+
+    def test_legacy_permission_machine_spec_matches_runtime_hierarchy(self) -> None:
+        pattern = validator.load_yaml("specs/validation.v1.yml")["validation"]["permission_key"]["regex"]
+        self.assertEqual(validator.LEGACY_PERMISSION_KEY_PATTERN, pattern)
+        compiled = validator.re.compile(pattern)
+        for permission in ("crm:read", "admin:tools:read", "petyr:read:all"):
+            self.assertIsNotNone(compiled.fullmatch(permission), permission)
+        self.assertIsNone(compiled.fullmatch("read"))
+
+    def test_scope_entitlement_mappings_cover_declared_scopes_exactly(self) -> None:
+        schema = validator.load_json("schemas/oauth-resource-registration.schema.json")
+        resource = validator.load_json("examples/oauth/resource-registration.json")
+        self.assertEqual([], validator.schema_errors(resource, schema))
+        self.assertEqual([], validator.resource_scope_mapping_errors(resource))
+
+        missing = copy.deepcopy(resource)
+        missing["scope_entitlement_mappings"].pop()
+        self.assertTrue(validator.resource_scope_mapping_errors(missing))
+
+        extra = copy.deepcopy(resource)
+        extra["scope_entitlement_mappings"].append(
+            {"scope": "example-project:records:delete", "legacy_permission_key": "records:delete"}
+        )
+        self.assertTrue(validator.resource_scope_mapping_errors(extra))
+
+        duplicate = copy.deepcopy(resource)
+        duplicate["scope_entitlement_mappings"][1]["scope"] = duplicate["scope_entitlement_mappings"][0]["scope"]
+        self.assertTrue(validator.resource_scope_mapping_errors(duplicate))
+
+        invalid_permission = copy.deepcopy(resource)
+        invalid_permission["scope_entitlement_mappings"][0]["legacy_permission_key"] = "read"
+        self.assertTrue(validator.schema_errors(invalid_permission, schema))
+
+        contract = validator.load_yaml("specs/oauth-p0.v1.yml")["scope"]["entitlement_mapping"]
+        self.assertEqual("forbidden", contract["inferred_prefix_segment_or_alias_rewriting"])
+        self.assertEqual("required", contract["mapped_permission_registered_for_bound_legacy_tool"])
+        self.assertEqual("invalid_scope_and_deny", contract["missing_stale_unknown_or_ungranted_mapping"])
+
     def test_introspection_discloses_only_access_tokens_as_active(self) -> None:
         openapi = validator.load_yaml("schemas/access-layer-oauth-v1.openapi.yaml")
         request_schema = openapi["components"]["schemas"]["IntrospectionRequest"]
@@ -113,6 +164,32 @@ class OAuthP0ContractTests(unittest.TestCase):
         contract = validator.load_yaml("specs/oauth-p0.v1.yml")["introspection"]
         self.assertEqual("access_token_only", contract["token_class_disclosed_active"])
         self.assertEqual("forbidden_return_active_false", contract["refresh_token_active_disclosure"])
+        self.assertEqual(
+            "exact_token_aud_equals_authenticated_credential_resource",
+            contract["active_disclosure_audience_rule"],
+        )
+        self.assertEqual("active_false_only", contract["audience_mismatch_response"])
+        auth = contract["authentication"]
+        self.assertEqual("client_secret_basic", auth["method"])
+        self.assertEqual("oauth_resource", auth["credential_owner"])
+        self.assertEqual("oauth_resource_credentials", auth["credential_model"])
+        self.assertFalse(auth["oauth_client_credential_reused"])
+        self.assertFalse(auth["legacy_tool_client_reused"])
+        self.assertEqual(
+            {
+                "resource_id",
+                "credential_id",
+                "secret_hash",
+                "status",
+                "created_at",
+                "activated_at",
+                "rotated_at",
+                "expires_at",
+                "retired_at",
+                "rotation_parent_id",
+            },
+            set(contract["credential_lifecycle_fields"]),
+        )
 
     def test_google_upstream_callback_is_separate_unadvertised_and_not_implemented(self) -> None:
         spec = validator.load_yaml("specs/oauth-p0.v1.yml")
@@ -131,6 +208,15 @@ class OAuthP0ContractTests(unittest.TestCase):
         self.assertEqual("short_lived_reversible_protected", state["storage"])
         self.assertEqual("allowed", state["optional_lookup_hash"])
         self.assertEqual("forbidden", state["logging"])
+
+    def test_step_3_dark_development_is_separate_from_production_release(self) -> None:
+        gates = validator.load_yaml("specs/oauth-p0.v1.yml")["development_and_release_gates"]
+        self.assertEqual("allowed", gates["step_3_local_dark_development_after_step_2_approval"])
+        self.assertTrue(gates["oauth_globally_disabled_by_default"])
+        self.assertFalse(gates["pilot_registration_required_before_generic_step_3_implementation"])
+        self.assertTrue(gates["pilot_registration_required_before_enable_or_production_registration"])
+        self.assertIn("coolify_changes_pending_review", gates["production_deploy_or_enable_blocked_until"])
+        self.assertIn("later_n_to_n_plus_1_gates", gates["production_deploy_or_enable_blocked_until"])
 
     def test_metadata_advertises_only_p0(self) -> None:
         metadata = validator.load_json("examples/oauth/authorization-server-metadata.expected.json")

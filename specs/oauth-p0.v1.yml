@@ -106,6 +106,17 @@ scope:
     - centrally_allowed_by_policy
   unknown_or_unauthorised: invalid_scope
   implicit_alias_rewriting: forbidden
+  entitlement_mapping:
+    cardinality: exactly_one_per_registered_resource_scope
+    oauth_scope_field: scope
+    legacy_permission_field: legacy_permission_key
+    legacy_permission_pattern: ^[a-z0-9-]+(?::[a-z0-9-]+)+$
+    exact_declared_scope_coverage: required
+    duplicate_missing_or_extra_mapping: invalid_registration
+    inferred_prefix_segment_or_alias_rewriting: forbidden
+    mapped_permission_registered_for_bound_legacy_tool: required
+    mapped_permission_in_effective_active_grant: required
+    missing_stale_unknown_or_ungranted_mapping: invalid_scope_and_deny
 access_token:
   profile: rfc9068
   format: jwt
@@ -167,9 +178,30 @@ revocation:
   self_contained_access_token_offline_window: until_expiry_unless_online_policy_required
 introspection:
   standard: rfc7662
-  authentication: separately_authorised_resource_server_credentials
+  authentication:
+    method: client_secret_basic
+    credential_owner: oauth_resource
+    credential_model: oauth_resource_credentials
+    basic_username: credential_id
+    secret_storage: required_non_reversible_hash
+    separately_authorised: true
+    oauth_client_credential_reused: false
+    legacy_tool_client_reused: false
+  credential_lifecycle_fields:
+    - resource_id
+    - credential_id
+    - secret_hash
+    - status
+    - created_at
+    - activated_at
+    - rotated_at
+    - expires_at
+    - retired_at
+    - rotation_parent_id
   token_class_disclosed_active: access_token_only
   active_token_profile: rfc9068_bearer_access_token
+  active_disclosure_audience_rule: exact_token_aud_equals_authenticated_credential_resource
+  audience_mismatch_response: active_false_only
   token_type_hint_values: [access_token]
   refresh_token_active_disclosure: forbidden_return_active_false
   non_disclosable_token_response_fields: [active]
@@ -194,7 +226,23 @@ registration:
   client_and_resource_identity_separate: true
   p0_resource_entitlement_binding: exactly_one_legacy_tool
   transitional_entitlement_bridge: required_resource_to_legacy_tool
+  legacy_tool_slug_pattern: ^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$
+  scope_entitlement_mappings: exactly_one_explicit_legacy_permission_per_resource_scope
   native_oauth_entitlement_domains: deferred_beyond_p0
+development_and_release_gates:
+  step_3_local_dark_development_after_step_2_approval: allowed
+  oauth_globally_disabled_by_default: true
+  pilot_registration_required_before_generic_step_3_implementation: false
+  pilot_registration_required_before_enable_or_production_registration: true
+  production_deploy_or_enable_blocked_until:
+    - coolify_changes_pending_review
+    - verified_backup_restore
+    - destination_identity
+    - central_registry
+    - named_ownership
+    - deployed_revision_or_image_identity
+    - secret_and_key_continuity
+    - later_n_to_n_plus_1_gates
 authorization:
   deny_by_default: true
   human_consent_screen_p0: none_centrally_administered_first_party_grants

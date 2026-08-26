@@ -393,3 +393,17 @@ P0 introspection requires separately authorised resource-server credentials and 
 Future OAuth vNext Google transactions return to `/oauth/upstream/google/callback`. It is an internal, non-advertised path, is not implemented in Step 2 and never reuses `/v1/auth/google/callback`. A later production Google registration must add the new URI without removing the legacy URI. Exact downstream client state is retained only in short-lived reversible protected storage, optionally indexed by a hash and never logged; upstream Google state and nonce may remain hash-only.
 
 Rationale: these rules remove incompatible shared-schema semantics and underspecified security behavior before implementation while preserving all frozen legacy contracts and keeping Step 2 contract-only.
+
+## D-038 - Freeze explicit entitlement mappings, resource introspection ownership and separate release gates
+
+Status: accepted
+
+Confirmed: 2026-08-26
+
+Decision: an OAuth P0 resource's mandatory `legacy_tool` binding uses the exact frozen runtime tool-slug grammar. Every canonical resource scope has exactly one explicit `legacy_permission_key` mapping, and the mapping set covers the resource's declared scopes exactly. The key may equal the canonical scope, but no prefix, segment or alias conversion is inferred. The exact mapped key must be registered for the bound tool and present in the human's effective active grant; missing, duplicate, extra, stale, unknown or ungranted mappings fail closed as `invalid_scope`/deny. Legacy permission and grant data remain unchanged.
+
+P0 introspection authenticates with `client_secret_basic` credentials owned by one OAuth resource. The proposed `oauth_resource_credentials` model stores a resource FK, stable credential ID, non-reversible secret hash, status and lifecycle/rotation metadata. It is not an OAuth client credential or legacy tool client. `active=true` may be disclosed only when the access token's exact `aud` equals the authenticated credential's resource; every audience mismatch returns exactly `{"active":false}`.
+
+After Step 2 approval, generic Step 3 implementation may proceed locally/dark with OAuth globally disabled. A concrete pilot registration is required before enablement or production registration, not before generic implementation. Production deploy/enable remains blocked by the Coolify `Changes pending` review, verified backup/restore, destination, central registry, named ownership, deployed revision/image identity, secret/key continuity and later N→N+1 gates.
+
+Rationale: exact mappings prevent Step 3 from inventing authorization conversions, resource-owned credentials preserve identity separation, and distinct development/release gates allow safe dark implementation without weakening operational continuity requirements.

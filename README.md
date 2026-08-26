@@ -2,7 +2,7 @@
 
 > Platform status (2026-08-25): Template v2.1 is adopted in `legacy-migration` mode. Live evidence resolved the source Compose PostgreSQL logical-volume mismatch without renaming the live volume. Deployment remains blocked by the backup/restore, ownership, registry and remaining continuity gates in `BACKLOG.md`.
 
-> OAuth vNext status: the additive P0 contract is frozen and hardened in `specs/oauth-p0.v1.yml` and `docs/OAUTH_P0_CONTRACT.md`; no OAuth runtime endpoint, table, migration or client registration exists yet.
+> OAuth vNext status: Step 3A implements only the disabled, additive registration/signing foundation in `migrations/003_oauth_dark_foundation.sql` and `src/oauth/`. No OAuth runtime endpoint, protocol transaction table, client/resource seed or production registration exists; `specs/oauth-p0.v1.yml` remains frozen and runtime-disabled.
 
 Layer di accesso condiviso per tool web interni aziendali.
 

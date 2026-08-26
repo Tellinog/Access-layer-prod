@@ -30,6 +30,18 @@ afterEach(() => {
 });
 
 describe("loadConfig", () => {
+  it("defaults the dark OAuth P0 foundation flag to false when the old environment omits it", () => {
+    vi.stubEnv("OAUTH_P0_ENABLED", undefined);
+
+    expect(loadConfig().oauthP0Enabled).toBe(false);
+  });
+
+  it("parses the optional OAuth P0 foundation flag without requiring any OAuth key or credential input", () => {
+    vi.stubEnv("OAUTH_P0_ENABLED", "true");
+
+    expect(loadConfig().oauthP0Enabled).toBe(true);
+  });
+
   it("loads comma-separated Workspace hosted domains in normalized form", () => {
     vi.stubEnv("GOOGLE_ALLOWED_HD", "UNGUESS.IO,nuotounostiledivita.it");
 
@@ -71,5 +83,6 @@ describe("loadConfig", () => {
     expect(config.publicBasePath).toBe("");
     expect(config.appBaseUrl).toBe("https://access-layer.unguess-internal.net");
     expect(config.googleRedirectUri).toBe("https://access-layer.unguess-internal.net/v1/auth/google/callback");
+    expect(config.oauthP0Enabled).toBe(false);
   });
 });

@@ -38,7 +38,7 @@ The target standard profile includes:
 
 The frozen P0 contract is `OAUTH_P0_CONTRACT.md`. OpenID Provider discovery, ID Tokens and UserInfo are P1/deferred and must not appear in P0 metadata.
 
-Every P0 resource requires exactly one legacy-tool entitlement-only binding while OAuth client and resource identities remain separate. The future internal Google callback is `/oauth/upstream/google/callback`, additive to and distinct from the frozen legacy callback. Neither it nor any OAuth runtime path is implemented in Step 2.
+Every P0 resource requires exactly one legacy-tool entitlement-only binding while OAuth client and resource identities remain separate. The future internal Google callback is `/oauth/upstream/google/callback`, additive to and distinct from the frozen legacy callback. Step 3A adds disabled foundation storage/validation only; neither the callback nor any OAuth runtime path is implemented or registered.
 
 ## Legacy compatibility invariant
 

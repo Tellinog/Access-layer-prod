@@ -17,6 +17,7 @@ Main data categories:
 - grants and permissions;
 - sessions and one-time codes;
 - audit logs.
+- disabled OAuth P0 registration/signing foundation metadata in additive `oauth_*` tables.
 
 ## Tables / collections
 
@@ -83,9 +84,28 @@ Default retention:
 - revoked sessions: keep 90 days unless compliance requires longer;
 - users: keep while account or logs require linkage, then pseudonymize if needed.
 
-## OAuth vNext additive proposal
+## Step 3A OAuth dark foundation
 
-`OAUTH_ADDITIVE_DATA_MODEL.md` defines future independent `oauth_*` client, resource, scope, authorization-code, session, refresh-family and signing-key entities. It is a design proposal only. Step 2 adds no migration and does not rename, reuse or reinterpret any table above.
+`migrations/003_oauth_dark_foundation.sql` is expand-only and creates exactly these independent tables:
+
+| Table | Step 3A purpose |
+|---|---|
+| `oauth_clients` | Separate stable OAuth client identity, P0 grants/auth method, owner and lifecycle status |
+| `oauth_client_credentials` | Confidential-client non-reversible secret hashes and rotation lifecycle only |
+| `oauth_client_redirect_uris` | Exact per-client redirect strings; wildcard and fragment records are constrained out |
+| `oauth_resources` | Separate canonical HTTPS resource/audience identity and protected-resource metadata URL |
+| `oauth_resource_credentials` | Resource-owned `client_secret_basic` introspection credential ID, hash and lifecycle |
+| `oauth_resource_entitlement_bindings` | Entitlement-only FK to one existing legacy tool, with at most one active binding per resource |
+| `oauth_scopes` | Canonical exact `project:domain:action` scope registry |
+| `oauth_resource_scopes` | Exactly one explicit legacy permission key per resource/scope mapping |
+| `oauth_client_resource_scopes` | Explicit client/resource/scope allow-list constrained to a registered resource mapping |
+| `oauth_signing_keys` | Dedicated OAuth namespace, public JWK/fingerprint/lifecycle and protected private-key reference only |
+
+The migration contains no legacy `ALTER`, rename, drop, data rewrite, trigger or seed. Its only legacy FK is the entitlement bridge to `tools`, using `ON DELETE RESTRICT`; application repository access to `tools`/`tool_permissions` is read-only. No authorization transaction, authorization, code, OAuth session, refresh family/token or revocation table exists yet.
+
+PostgreSQL constraints prevent ambiguous active bindings, duplicate mappings/allowances, wildcard redirects, non-canonical scopes, plaintext-oriented secret columns, private JWK members and legacy/OAuth key-namespace reuse. Exact mapping coverage and proof that every mapped permission is registered for the bound tool cross multiple tables, so `src/oauth/validation.ts` enforces those rules fail closed without inferred rewriting.
+
+`OAUTH_ADDITIVE_DATA_MODEL.md` continues to define the later transaction entities as a frozen proposal. Step 3A implements only the ten foundation tables above and does not rename, reuse or reinterpret any legacy table.
 # Step 2 continuity note
 
 Live Coolify evidence proves that logical volume `access_layer_postgres_data_v2` backs `/var/lib/postgresql/data` and resolves to the recorded UUID-prefixed physical volume. The source top-level declaration now matches the unchanged service mount. Do not add an explicit physical name, rename the logical/live volume, migrate data or deploy. Backup/restore evidence and the other release gates remain open. The machine database baseline is `../specs/legacy-contract-baseline.v1.json`.

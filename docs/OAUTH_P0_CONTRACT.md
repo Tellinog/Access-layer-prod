@@ -1,12 +1,12 @@
 # OAuth vNext P0 contract
 
-Status: frozen target contract; not implemented or enabled
+Status: frozen target contract; Step 3A foundation only; protocol runtime not implemented or enabled
 Machine source: `../specs/oauth-p0.v1.yml`
 Target OpenAPI: `../schemas/access-layer-oauth-v1.openapi.yaml`
 
 ## Boundary and compatibility
 
-P0 is an additive OAuth authorization-server contract. It creates no runtime endpoint, table, migration, dependency, client registration or production configuration in Step 2. The frozen `access-layer-legacy-v1` contract remains authoritative for `/v1/*`, Google callback, JWT/JWKS, sessions, refresh tokens, grants, permissions, cookies, tool clients, Admin UI and current consumers. OAuth failure must never silently fall back to legacy credentials, and no consumer is forced to migrate.
+P0 is an additive OAuth authorization-server contract. Step 2 created no runtime endpoint, table, migration, dependency, client registration or production configuration. The separately approved Step 3A adds only disabled foundation tables/config/types/repository/validation; it adds no protocol route, transaction table, credential issuance/authentication, token runtime, registration API, seed or production configuration. The frozen `access-layer-legacy-v1` contract remains authoritative for `/v1/*`, Google callback, JWT/JWKS, sessions, refresh tokens, grants, permissions, cookies, tool clients, Admin UI and current consumers. OAuth failure must never silently fall back to legacy credentials, and no consumer is forced to migrate.
 
 Stable RFCs are normative: RFC 6749 where applicable, RFC 6750, RFC 7636, RFC 7009, RFC 7662, RFC 8414, RFC 8707, RFC 9068, RFC 9207, RFC 9700, RFC 9728 and RFC 10017. OAuth 2.1 is an aligned work-in-progress draft profile, not a published RFC.
 

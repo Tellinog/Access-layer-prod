@@ -44,6 +44,8 @@ TRUST_PROXY_HOPS=1
 
 The dashboard is at `/admin`; admin and tool-management APIs are under `/v1/admin/*`.
 
+`OAUTH_P0_ENABLED` is optional and defaults to `false`. Step 3A does not wire any OAuth route for either value and requires no OAuth signing key or client/resource credential configuration. Do not use the flag as an enablement mechanism until a later approved runtime step defines one.
+
 ## Local Docker Compose
 
 For local development, Docker Compose can start both PostgreSQL and the Access Layer service.

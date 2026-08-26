@@ -27,7 +27,7 @@ SOURCE_ENVIRONMENT_NAMES = (
     "BACKUP_API_TOKEN", "BACKUP_ENCRYPTION_KEY", "CORS_ALLOWED_ORIGINS", "DATABASE_URL",
     "ENABLE_REFRESH_TOKENS", "GOOGLE_ALLOWED_HD", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET",
     "GOOGLE_OIDC_SCOPE", "GOOGLE_REDIRECT_URI", "JWT_PRIVATE_KEY_PEM", "JWT_PRIVATE_KEY_PEM_PATH",
-    "JWT_PUBLIC_KEY_ID", "LOG_IP_SALT", "LOG_LEVEL", "ONE_TIME_CODE_TTL_SECONDS", "PORT",
+    "JWT_PUBLIC_KEY_ID", "LOG_IP_SALT", "LOG_LEVEL", "OAUTH_P0_ENABLED", "ONE_TIME_CODE_TTL_SECONDS", "PORT",
     "POSTGRES_DB", "POSTGRES_PASSWORD", "POSTGRES_USER", "PUBLIC_BASE_PATH",
     "REFRESH_TOKEN_TTL_SECONDS", "RETURN_URL_ALLOWED_SCHEMES", "RUN_MIGRATIONS_ON_START",
     "RUN_SEED_ON_START", "SEED_EXAMPLE_TOOLS", "SESSION_COOKIE_NAME", "SESSION_SECRET",
@@ -235,7 +235,7 @@ def _configuration_gaps(data: dict[str, Any]) -> list[str]:
         "app_env", "public_base_path", "app_base_url", "auth_issuer", "port", "log_level", "postgres_user",
         "postgres_database", "google_client_id", "google_redirect_uri", "jwt_public_key_id",
         "access_token_ttl_seconds", "refresh_token_ttl_seconds", "one_time_code_ttl_seconds",
-        "enable_refresh_tokens", "session_cookie_name", "trust_proxy_hops", "audit_log_retention_days",
+        "enable_refresh_tokens", "oauth_p0_enabled", "session_cookie_name", "trust_proxy_hops", "audit_log_retention_days",
         "audit_log_raw_ip", "access_request_reopen_after_days", "run_migrations_on_start", "run_seed_on_start",
         "seed_example_tools", "siem_export_enabled", "admin_bootstrap_email_count",
     )
@@ -250,6 +250,7 @@ def _configuration_gaps(data: dict[str, Any]) -> list[str]:
     _require(missing, effective.get("refresh_token_ttl_seconds") == 28800, "configuration.effective_non_secret_config.refresh_token_ttl_seconds=28800")
     _require(missing, effective.get("one_time_code_ttl_seconds") == 60, "configuration.effective_non_secret_config.one_time_code_ttl_seconds=60")
     _require(missing, effective.get("enable_refresh_tokens") is True, "configuration.effective_non_secret_config.enable_refresh_tokens=true")
+    _require(missing, effective.get("oauth_p0_enabled") is False, "configuration.effective_non_secret_config.oauth_p0_enabled=false")
     _require(missing, effective.get("session_cookie_name") == "access_layer_admin_session", "configuration.effective_non_secret_config.session_cookie_name=access_layer_admin_session")
     _require(missing, {"openid", "email", "profile"}.issubset(set(effective.get("google_oidc_scope", []))), "configuration.effective_non_secret_config.google_oidc_scope includes openid,email,profile")
     _require(missing, effective.get("jwt_public_key_id") == data["jwt_signing_material"]["public_key"].get("kid"), "configuration.effective_non_secret_config.jwt_public_key_id matches public kid")

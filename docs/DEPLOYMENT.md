@@ -42,6 +42,7 @@ Minimum production variables:
 - `ENABLE_REFRESH_TOKENS` defaults to `true`
 - `ACCESS_TOKEN_TTL_SECONDS` defaults to `900`; `REFRESH_TOKEN_TTL_SECONDS` defaults to `28800` and acts as the sliding inactivity timeout after each authenticated refresh.
 - `ACCESS_REQUEST_REOPEN_AFTER_DAYS` defaults to `30`
+- `OAUTH_P0_ENABLED` is optional and defaults to `false`. Step 3A registers no OAuth route even when `true`; no OAuth key or credential input is accepted or required yet.
 
 ## Infrastructure
 
@@ -92,6 +93,8 @@ When `RUN_SEED_ON_START=true`, the seed reconciles the reserved `access-admin` r
 8. Create admin grant and remove bootstrap env after verification.
 9. Register pilot tool.
 10. Run end-to-end tests.
+
+Step 3A does not authorise this sequence for the OAuth foundation migration or any production environment change. Production remains blocked by the continuity/release gates below; no pilot OAuth registration or enablement exists.
 
 ## Rollback
 

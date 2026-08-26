@@ -407,3 +407,15 @@ P0 introspection authenticates with `client_secret_basic` credentials owned by o
 After Step 2 approval, generic Step 3 implementation may proceed locally/dark with OAuth globally disabled. A concrete pilot registration is required before enablement or production registration, not before generic implementation. Production deploy/enable remains blocked by the Coolify `Changes pending` review, verified backup/restore, destination, central registry, named ownership, deployed revision/image identity, secret/key continuity and later N→N+1 gates.
 
 Rationale: exact mappings prevent Step 3 from inventing authorization conversions, resource-owned credentials preserve identity separation, and distinct development/release gates allow safe dark implementation without weakening operational continuity requirements.
+
+## D-039 - Isolate the Step 3A OAuth dark foundation from legacy request handling
+
+Status: accepted
+
+Confirmed: 2026-08-26
+
+Decision: implement Step 3A through one expand-only `003_oauth_dark_foundation.sql` migration and a standalone `src/oauth/` module. The migration creates only the ten approved registration, entitlement-bridge, allow-list, credential-hash and signing-metadata tables. Cross-table registration facts that cannot be represented safely by PostgreSQL `CHECK` constraints are validated by pure fail-closed domain helpers before any future persistence path. Repository primitives resolve foundation metadata from `oauth_*` tables and may read only `tools` and `tool_permissions` for the frozen entitlement bridge.
+
+`OAUTH_P0_ENABLED` is an optional default-false configuration input. Step 3A intentionally does not branch on it in `buildApp`, so neither `false` nor `true` registers a protocol route. The module exposes no HTTP registration API, secret issuance, credential authentication, token signing or authorization decision path.
+
+Rationale: a separate schema/module boundary makes the additive storage reviewable and old-binary compatible, prevents accidental coupling to the frozen legacy path, and leaves all protocol behavior for a later separately approved step. This decision records implementation structure only; D-036, D-037, D-038 and `specs/oauth-p0.v1.yml` remain the protocol semantics.

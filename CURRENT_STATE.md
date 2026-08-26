@@ -2,7 +2,18 @@
 
 ## Phase
 
-V1 implementation scaffold complete, with local dependency, typecheck, build and automated test verification complete. Environment-backed integration verification remains pending.
+V1 legacy implementation complete. Step 3A OAuth Dark Foundation is implemented locally as an additive, disabled persistence/domain layer. OAuth protocol runtime and environment-backed integration verification remain pending.
+
+## Step 3A OAuth Dark Foundation, 2026-08-26
+
+- Added the expand-only `migrations/003_oauth_dark_foundation.sql` after the two frozen legacy migrations. It creates exactly the ten approved `oauth_*` client, redirect, resource, entitlement bridge, scope allow-list, credential and signing-metadata tables without altering or writing any legacy table.
+- Added `OAUTH_P0_ENABLED`, default `false`. An environment that omits it continues to load with the legacy requirements only. The value is deliberately not consumed by `buildApp`; setting it to `true` registers no OAuth route in Step 3A.
+- Added isolated `src/oauth/` types, read-only foundation repository resolution and pure fail-closed controlled-registration validation. Repository SQL is limited to `oauth_*` tables plus read-only `tools`/`tool_permissions` entitlement lookups; it performs no inferred scope-to-permission conversion.
+- Database constraints enforce separate client/resource identity domains, exact non-wildcard redirect records, at most one active legacy-tool binding per resource, canonical three-segment scopes, one explicit resource/scope mapping, explicit client/resource/scope allow-list rows, resource-owned introspection credential metadata, hash-only credential columns and OAuth-only public signing metadata/private-key references. Exact bound-tool permission membership and complete registration coverage are additionally fail-closed domain validations because they cross table boundaries.
+- No authorization transaction, authorization, code, OAuth session, refresh family/token or revocation table exists. No metadata, authorize, token, revoke, introspect, OAuth JWKS or upstream Google callback route exists. No seed, pilot, production/Coolify action, legacy data migration, key provisioning or secret rotation occurred.
+- `specs/oauth-p0.v1.yml`, target OAuth schemas/OpenAPI/examples, legacy `/v1/*` runtime, legacy OpenAPI, legacy migrations, dependencies, consumers and Platform SDK remain semantically unchanged.
+- The production-continuity inventory now includes the optional `OAUTH_P0_ENABLED` input as its 42nd source-derived variable; the committed production evidence remains `NOT_READY` and the optional flag is `UNOBSERVED` there.
+- Verification passes: TypeScript lint/build; 145 Vitest tests across 14 files; 62 Python tests with two expected skips; 24 OAuth validator check groups; non-strict platform check with 27 passes/seven known warnings; continuity schema validation as `VALID_BUT_NOT_READY`; environment-template parity; and `git diff --check`. Live migration application remains unverified because the Docker daemon and local PostgreSQL are unavailable; deterministic migration tests cover the shape and the limitation is in `BACKLOG.md`.
 
 ## Step 2 OAuth P0 hardening, 2026-08-26
 
@@ -27,7 +38,7 @@ V1 implementation scaffold complete, with local dependency, typecheck, build and
 
 ## Step 2 OAuth vNext P0 contract freeze, 2026-08-25
 
-- The additive P0 OAuth contract is frozen in `specs/oauth-p0.v1.yml`, `docs/OAUTH_P0_CONTRACT.md` and the target-only OAuth OpenAPI/schemas/examples. It is not implemented or enabled.
+- The additive P0 OAuth contract is frozen in `specs/oauth-p0.v1.yml`, `docs/OAUTH_P0_CONTRACT.md` and the target-only OAuth OpenAPI/schemas/examples. Protocol runtime remains unimplemented and disabled; the later Step 3A foundation does not change these semantics.
 - P0 defines RFC 8414 metadata, Authorization Code and Refresh Token, PKCE `S256`, exact redirects, one RFC 8707 resource/audience, RFC 9068 `typ=at+jwt`, RFC 9207 `iss`, revocation, introspection, RFC 9700 controls, RFC 9728 metadata, OAuth errors, controlled registration, refresh-family replay, dedicated key rotation and audit requirements.
 - Human OAuth `sub` remains Google `sub`; access tokens are PII-minimised. OAuth clients/resources are separate, and every P0 resource has exactly one legacy-tool entitlement-only binding. Browser applications remain BFF/server-side-token based.
 - `client_credentials`, token exchange, `private_key_jwt`, downstream OIDC ID Token/UserInfo/discovery and dynamic registration remain P1/deferred. No OAuth handler, migration, dependency, production registration or deploy was added.
@@ -35,7 +46,7 @@ V1 implementation scaffold complete, with local dependency, typecheck, build and
 
 ## Step 1.5B continuity evidence hardening, 2026-08-25
 
-- Production-continuity evidence is schema v2 and remains deliberately redacted and `NOT_READY`. It now distinguishes absent, empty, and non-empty environment states, preserves an empty production `PUBLIC_BASE_PATH` as valid, and inventories all 41 configuration inputs derived from `src/config.ts`, `docker-compose.yaml`, and `docker/entrypoint.sh`.
+- Production-continuity evidence is schema v2 and remains deliberately redacted and `NOT_READY`. It distinguishes absent, empty, and non-empty environment states, preserves an empty production `PUBLIC_BASE_PATH` as valid, and now inventories all 42 configuration inputs derived from `src/config.ts`, `docker-compose.yaml`, and `docker/entrypoint.sh`, including Step 3A's optional default-false flag.
 - File-backed and inline JWT signing modes are explicit. File-backed readiness requires proof of the actual persistent `/run/secrets` storage/mount as well as public `kid`/public-key fingerprint evidence; private key material and private verifiers remain forbidden.
 - `SESSION_SECRET`, `TOOL_CLIENT_SECRET_PEPPER`, `BACKUP_ENCRYPTION_KEY`, `GOOGLE_CLIENT_SECRET`, and `LOG_IP_SALT` require external, secret-safe sameness proof. Presence alone is insufficient, and no secret value or reusable verifier may be committed.
 - Validation exposes separate `ready_for_isolated_restore` and `ready_for_n_to_n_plus_1` gates. The final gate still requires a `PASSED` isolated restore. The committed template has both gates false; no restore, live collection, or upgrade exercise was performed.

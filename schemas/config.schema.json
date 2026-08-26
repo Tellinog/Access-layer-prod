@@ -95,6 +95,11 @@
     "ENABLE_REFRESH_TOKENS": {
       "type": "boolean"
     },
+    "OAUTH_P0_ENABLED": {
+      "type": "boolean",
+      "default": false,
+      "description": "Dark OAuth P0 foundation flag. Step 3A registers no OAuth routes even when true."
+    },
     "SESSION_COOKIE_NAME": {
       "type": "string"
     },

@@ -32,6 +32,7 @@ const config: Config = {
   accessTokenTtlSeconds: 900,
   refreshTokenTtlSeconds: 28800,
   oneTimeCodeTtlSeconds: 60,
+  oauthP0Enabled: false,
   sessionCookieName: "access_layer_admin_session",
   sessionSecret: "session-secret",
   toolClientSecretPepper: "pepper",

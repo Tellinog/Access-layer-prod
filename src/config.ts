@@ -117,6 +117,7 @@ export function loadConfig(): Config {
     accessTokenTtlSeconds: readInt("ACCESS_TOKEN_TTL_SECONDS", 900, 60, 3600),
     refreshTokenTtlSeconds: readInt("REFRESH_TOKEN_TTL_SECONDS", 28800, 300, 86400),
     oneTimeCodeTtlSeconds: readInt("ONE_TIME_CODE_TTL_SECONDS", 60, 15, 300),
+    oauthP0Enabled: readBoolean("OAUTH_P0_ENABLED", false),
     sessionCookieName: readOptional("SESSION_COOKIE_NAME", "access_layer_admin_session") ?? "access_layer_admin_session",
     sessionSecret: readRequired("SESSION_SECRET"),
     toolClientSecretPepper: readRequired("TOOL_CLIENT_SECRET_PEPPER"),

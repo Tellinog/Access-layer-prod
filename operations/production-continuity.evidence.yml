@@ -187,6 +187,7 @@ configuration:
       - JWT_PUBLIC_KEY_ID
       - LOG_IP_SALT
       - LOG_LEVEL
+      - OAUTH_P0_ENABLED
       - ONE_TIME_CODE_TTL_SECONDS
       - PORT
       - POSTGRES_DB
@@ -234,6 +235,7 @@ configuration:
     JWT_PUBLIC_KEY_ID: UNOBSERVED
     LOG_IP_SALT: UNOBSERVED
     LOG_LEVEL: UNOBSERVED
+    OAUTH_P0_ENABLED: UNOBSERVED
     ONE_TIME_CODE_TTL_SECONDS: UNOBSERVED
     PORT: UNOBSERVED
     POSTGRES_DB: UNOBSERVED
@@ -269,6 +271,7 @@ configuration:
     access_token_ttl_seconds: null
     refresh_token_ttl_seconds: null
     one_time_code_ttl_seconds: null
+    oauth_p0_enabled: null
     enable_refresh_tokens: null
     session_cookie_name: null
     cors_allowed_origins: []

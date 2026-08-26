@@ -12,6 +12,8 @@
 
 ## RESOLVED
 
+- 2026-08-26 Step 3A: the generic OAuth dark foundation is implemented locally through one expand-only migration, a default-false optional flag, an isolated `src/oauth/` module and deterministic darkness/migration/validation tests. No protocol route, pilot, seed, transaction table, production action or legacy behavior change was introduced.
+- 2026-08-26 Step 3A: `.env.example` and `.env.production.example` expose the same 42 variable names, with optional `OAUTH_P0_ENABLED=false`; absence remains valid and requires no additional OAuth key or credential configuration.
 - 2026-08-25 Step 2: Coolify evidence proves PostgreSQL logical volume `access_layer_postgres_data_v2` resolves to `u3cyw3y1obp88to9la0w8c75_access-layer-postgres-data-v2`; the source top-level declaration now matches the unchanged service mount. JWT logical volume `access_layer_jwt_secrets` is also proven as the named volume `u3cyw3y1obp88to9la0w8c75_access-layer-jwt-secrets`. No explicit physical name was added and no live volume was renamed.
 - 2026-08-25 Step 2: confirmed Coolify server `agentic-unguess-prod`, project `agentic-unguess`, environment `production`, resource `access-layer-prod` (`u3cyw3y1obp88to9la0w8c75`), resource type `application`, managed Docker Compose, `main` branch, deploy-on-push, disabled previews, isolated predefined-network setting, public app port 8080 without a shown host mapping, and private PostgreSQL port 5432.
 - 2026-08-24: restored root `.env.example` as a compatibility copy with the same 41 variable names as `.env.production.example`; production values and secret handling remain unchanged.
@@ -43,6 +45,7 @@
 
 ## ASSUMPTION_TO_VALIDATE
 
+- 2026-08-26 Step 3A: apply `001`→`003` to a disposable PostgreSQL 16 database and run the legacy binary/schema-consumer smoke test on a host with an available daemon. This workspace has the Docker CLI but no reachable Docker API and no PostgreSQL listener on `127.0.0.1:5432`; deterministic migration-shape/constraint tests are green, but live SQL application is not claimed.
 - 2026-08-05: the relationship tables reuse the current v1 Admin list endpoints, which return at most 200 users/grants per request. Confirm and design server-side pagination before the registered-user directory or a tool's grant set can exceed that operational limit.
 - The current SVG favicon is a project-created interim mark based on the documented UI palette. Replace it if an approved company logo/favicons system becomes available.
 - `prod.env` generation used `.env.docker` as the available local env source because no root `.env` file was present in the workspace; validate whether a separate canonical `.env` should exist for future production-env generation tasks.
@@ -59,7 +62,7 @@
 - 2026-08-24: Nancy, Test Generator and Goodman in-memory refresh locks are sufficient only for their observed single-replica assumptions; multi-replica safety is not proven.
 - 2026-08-24: Petyr's supplied registration and code are deployed as inspected. Evidence contains a superseded Access Layer origin and a permission used in code but absent from the supplied tool registration.
 - 2026-08-24 Step 1.5: repository expectations (app `8080`, PostgreSQL `5432` private, no shown public host-port mapping, target domain) are now verified by the 2026-08-25 Step 2 evidence.
-- 2026-08-25 Step 1.5B: current live safe effective configuration matches the frozen production defaults and intended values. All 41 source-derived variables remain `UNOBSERVED` in the committed evidence template until an operator supplies state/effective-value proof.
+- 2026-08-25 Step 1.5B / 2026-08-26 Step 3A: current live safe effective configuration is still unproven. All 42 source-derived variables, including optional `OAUTH_P0_ENABLED`, remain `UNOBSERVED` in the committed evidence template until an operator supplies state/effective-value proof.
 
 ## DEFERRED_SCOPE
 
@@ -70,7 +73,7 @@
 - Full SIEM integration.
 - Dedicated SDK packages per framework.
 - Immutable append-only log storage with WORM retention.
-- OAuth runtime endpoints, discovery handlers and additive authorization-server tables/migrations remain outside Step 2. After Step 2 approval, they may be developed only as generic Step 3 local/dark work with OAuth globally disabled. Production client/resource/scope/mapping/credential registration and any enablement remain deferred until the release gates pass.
+- OAuth protocol endpoints, discovery/JWKS handlers, upstream Google runtime, authorization/code/session/refresh/revocation transaction tables, token signing/authentication, registration/admin HTTP APIs and pilot records remain outside Step 3A. Production client/resource/scope/mapping/credential registration and any enablement remain deferred until separately approved steps and the release gates pass.
 - OAuth P1 features: service principals, `client_credentials`, token exchange, `private_key_jwt`, downstream OIDC ID Token/UserInfo/discovery and dynamic client registration.
 - Native OAuth entitlement domains; every P0 resource instead requires exactly one existing `legacy_tool` entitlement-only binding.
 - UNGUESS Platform SDK dependency adoption and telemetry SDK integration.

@@ -40,6 +40,12 @@
 
 The additive OAuth vNext P0 protocol and proposed data model are in scope as design contracts only. OAuth handlers, discovery responses, SQL migrations/tables, production registrations, downstream OIDC, machine grants, token exchange and deployment remain out of scope until a separately approved implementation step.
 
+## Step 3A dark-foundation boundary
+
+The separately approved Step 3A scope implements one expand-only ten-table registration/signing foundation migration, an optional default-false flag, isolated OAuth types/repository/validation primitives and deterministic darkness/compatibility tests.
+
+Still out of scope are every OAuth protocol or metadata route, upstream Google callback runtime, authorization transaction/code/session/refresh/revocation tables, token signing/verification, credential authentication, registration/admin HTTP API, pilot/seed data, production enablement/deploy and consumer or Platform SDK changes.
+
 ## Personas
 
 | Persona | Goal | Main needs | Notes |

@@ -1,10 +1,12 @@
 # Proposed additive OAuth data model
 
-Status: design proposal only; no Step 2 migration or runtime table exists.
+Status: Step 3A foundation partially implemented; protocol transaction model remains a proposal.
 
 ## Migration boundary
 
-The first future OAuth migration must be expand-only and readable by the currently deployed legacy binary. It may add new `oauth_*` tables and explicit read-only bridges, but must not rename, drop, reinterpret or reuse legacy `users`, `tools`, `tool_clients`, `tool_permissions`, `authorization_grants`, `auth_requests`, `one_time_codes`, `sessions` or `refresh_tokens`. Legacy rows remain authoritative for legacy traffic.
+Step 3A implements the first OAuth migration as `../migrations/003_oauth_dark_foundation.sql`. It is expand-only and readable by the currently deployed legacy binary. It adds only the ten foundation `oauth_*` tables and the read-only entitlement bridge; it does not rename, drop, reinterpret or reuse legacy `users`, `tools`, `tool_clients`, `tool_permissions`, `authorization_grants`, `auth_requests`, `one_time_codes`, `sessions` or `refresh_tokens`. Legacy rows remain authoritative for legacy traffic.
+
+The implemented subset ends at `oauth_signing_keys` in the table below. Every later authorization transaction, authorization, code, session, refresh and revocation entity remains unimplemented and must not be inferred from the presence of foundation tables.
 
 ## Proposed entities
 
@@ -19,14 +21,14 @@ The first future OAuth migration must be expand-only and readable by the current
 | `oauth_scopes` | Canonical `project:domain:action`, description, status and audit metadata. Scope aliases, if ever approved, are separate versioned records. |
 | `oauth_resource_scopes` | Resource/scope registration, required exact `legacy_permission_key` and status. Each resource scope has exactly one explicit mapping to a legacy permission registered for the resource's bound tool. Only these scopes may appear in that resource's metadata or tokens. |
 | `oauth_client_resource_scopes` | Client/resource/scope allow-list. Prevents a client registration from implying access to every resource or scope. |
-| `oauth_authorization_transactions` | Exact downstream client state in short-lived reversible protected storage (for example, an encrypted-at-rest value) until the response is emitted, plus an optional lookup hash; separate upstream Google state/nonce hashes; client, exact redirect, requested resource/scopes, PKCE challenge/method, correlation, expiry and consumed/decision timestamps. Downstream state is never logged. |
-| `oauth_authorizations` | Human `user_id`, client, resource, effective scope set, explicit legacy grant references used for the decision, status and timestamps. P0 has no newly invented consent row. |
-| `oauth_authorization_codes` | Non-reversible code hash; transaction/authorization/client/resource/redirect/subject/PKCE/scope bindings; issued, expires and consumed timestamps. Single-use with atomic consumption. |
-| `oauth_sessions` | Human, client, resource, authorization, status, issued/idle-expiry/revoked timestamps and correlation. Separate from legacy `sessions`. |
-| `oauth_refresh_token_families` | Authorization/session/client/resource/subject invariants, original/current scope ceiling, status, replay timestamp and revocation reason. |
-| `oauth_refresh_tokens` | Family FK, non-reversible token hash, generation/parent, status, issued/expires/consumed/revoked timestamps. One atomic current member per active family. |
+| `oauth_authorization_transactions` *(not implemented)* | Exact downstream client state in short-lived reversible protected storage (for example, an encrypted-at-rest value) until the response is emitted, plus an optional lookup hash; separate upstream Google state/nonce hashes; client, exact redirect, requested resource/scopes, PKCE challenge/method, correlation, expiry and consumed/decision timestamps. Downstream state is never logged. |
+| `oauth_authorizations` *(not implemented)* | Human `user_id`, client, resource, effective scope set, explicit legacy grant references used for the decision, status and timestamps. P0 has no newly invented consent row. |
+| `oauth_authorization_codes` *(not implemented)* | Non-reversible code hash; transaction/authorization/client/resource/redirect/subject/PKCE/scope bindings; issued, expires and consumed timestamps. Single-use with atomic consumption. |
+| `oauth_sessions` *(not implemented)* | Human, client, resource, authorization, status, issued/idle-expiry/revoked timestamps and correlation. Separate from legacy `sessions`. |
+| `oauth_refresh_token_families` *(not implemented)* | Authorization/session/client/resource/subject invariants, original/current scope ceiling, status, replay timestamp and revocation reason. |
+| `oauth_refresh_tokens` *(not implemented)* | Family FK, non-reversible token hash, generation/parent, status, issued/expires/consumed/revoked timestamps. One atomic current member per active family. |
 | `oauth_signing_keys` | Public `kid`, algorithm, public-JWK fingerprint/reference, lifecycle state, publish/activate/retire timestamps and protected private-key reference only. No private key bytes. |
-| `oauth_revocations` | Token/family/session/authorization target type and opaque internal target ID, client/resource context, reason code, actor and timestamp. |
+| `oauth_revocations` *(not implemented)* | Token/family/session/authorization target type and opaque internal target ID, client/resource context, reason code, actor and timestamp. |
 
 OAuth audit events continue through the append-only legacy `audit_logs` facility initially, using only non-secret OAuth identifiers and event names. A separate audit table is unnecessary unless later scale or retention evidence requires it.
 

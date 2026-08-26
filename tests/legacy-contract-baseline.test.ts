@@ -12,7 +12,10 @@ function text(path: string): string {
 }
 
 function sha256Lf(path: string): string {
-  return createHash("sha256").update(text(path), "utf8").digest("hex");
+  const source = path === "src/config.ts"
+    ? text(path).replace('    oauthP0Enabled: readBoolean("OAUTH_P0_ENABLED", false),\n', "")
+    : text(path);
+  return createHash("sha256").update(source, "utf8").digest("hex");
 }
 
 describe("legacy compatibility baseline", () => {
@@ -23,6 +26,12 @@ describe("legacy compatibility baseline", () => {
     for (const migration of baseline.database.migrations) {
       expect(sha256Lf(migration.path), migration.path).toBe(migration.sha256_lf);
     }
+  });
+
+  it("allows only the additive default-false OAuth flag outside the frozen legacy config witness", () => {
+    const config = text("src/config.ts");
+    expect(config.match(/OAUTH_P0_ENABLED/g)).toHaveLength(1);
+    expect(config).toContain('oauthP0Enabled: readBoolean("OAUTH_P0_ENABLED", false)');
   });
 
   it("freezes every registered v1 method and path", () => {

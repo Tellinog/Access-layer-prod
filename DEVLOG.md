@@ -1,5 +1,40 @@
 # DEVLOG.md
 
+## 2026-08-26 - Step 3A OAuth Dark Foundation
+
+Changed by: Codex
+Related task: Implement the approved OAuth P0 persistence/domain foundation while keeping all protocol runtime dark.
+
+### Changed
+
+- Added the expand-only `003_oauth_dark_foundation.sql` migration with exactly ten `oauth_*` foundation tables for separate clients/resources, exact redirects, resource-owned introspection credentials, the read-only legacy-tool entitlement bridge, canonical scopes, explicit mappings/allow-lists and dedicated OAuth public signing metadata/protected key references.
+- Added optional `OAUTH_P0_ENABLED`, default `false`, to runtime config/schema/examples and the redacted 42-variable continuity inventory. No OAuth key, credential or other config becomes required when it is absent/false.
+- Added isolated `src/oauth/` types, read-only repository resolution and pure fail-closed registration validation. No registration/admin HTTP API, secret issuance/authentication, token signing or authorization decision was added.
+- Added deterministic migration, validation, repository, secret-safety and real Fastify darkness tests. Updated current-state, DB, testing, architecture, security, scope, deployment and OAuth boundary documentation.
+
+### Behavior
+
+- Legacy `/v1/*`, Google callback, JWT/JWKS, sessions, refresh tokens, grants, permissions, cookies, TTLs, error mappings, legacy OpenAPI/migrations and consumer behavior changed: no.
+- OAuth metadata, authorize, token, revoke, introspect, JWKS and upstream Google callback routes registered: no, for both flag values.
+- OAuth authorization/code/session/refresh/revocation transaction tables, seed/pilot records, production/Coolify changes, legacy-row migration, key provisioning and secret rotation: none.
+- `specs/oauth-p0.v1.yml`, target OAuth schemas/OpenAPI/examples, package dependencies, Nancy, Test Generator, Goodman, Petyr and Platform SDK changed: no.
+
+### Tests/checks
+
+- `npm.cmd run lint` and `npm.cmd run build` passed.
+- Full Vitest passed: 14 files and 145 tests, including the unchanged legacy suites plus Step 3A migration/darkness/domain/repository coverage.
+- Full Python conformance passed: 62 tests with two expected pristine-template bootstrap skips.
+- Frozen OAuth P0 validator passed all 24 check groups; non-strict platform checker passed 27 checks with the seven known warnings.
+- Production-continuity validation returned `VALID_BUT_NOT_READY` with zero errors; isolated-restore remains false with 170 missing facts and N→N+1 remains false with 178 missing facts.
+- `.env.example` and `.env.production.example` expose the same 42 names and `OAUTH_P0_ENABLED=false` exactly once.
+- Docker daemon/API is unavailable and no local PostgreSQL listens on `127.0.0.1:5432`, so a disposable PostgreSQL apply/old-binary smoke test was not run. The limitation is recorded in `BACKLOG.md`; deterministic migration-shape tests passed and no production database was contacted.
+- `git diff --check` passed.
+
+### Decisions and follow-up
+
+- Recorded D-039 for the isolated migration/module/validation structure only; protocol semantics remain frozen by D-036/D-037/D-038 and `specs/oauth-p0.v1.yml`.
+- Stop after Step 3A. Do not begin discovery/JWKS, authorization flow, pilot registration or production enablement.
+
 ## 2026-08-26 - Final Step 2 OAuth P0 contract hardening
 
 Changed by: Codex

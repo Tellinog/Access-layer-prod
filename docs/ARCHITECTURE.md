@@ -89,9 +89,22 @@ A request is allowed only if all checks pass:
 - DB write path for audit logs must be available before accepting auth traffic.
 - Avoid browser-delivered long-lived tokens.
 
-## Additive OAuth vNext target
+## Additive OAuth vNext target and Step 3A boundary
 
-P0 adds a future authorization-server adapter beside, not inside, the legacy flow. OAuth clients and resources are separate identities. Every P0 resource requires exactly one existing legacy tool/grant entitlement-only binding; each canonical resource scope maps explicitly one-to-one to an exact permission registered for that tool, with no inferred conversion. The bound tool never becomes the OAuth client or resource, and native OAuth entitlement domains are deferred. Introspection uses separate resource-owned credentials and discloses active state only for an exact matching token audience; it never reuses OAuth client or legacy tool credentials. The future Google return path is the separate internal `/oauth/upstream/google/callback`, never the frozen `/v1/auth/google/callback`, and is not advertised as a protocol endpoint. Exact downstream client state uses short-lived reversible protected storage; upstream Google state/nonce remain separately hashed. OAuth protocol state uses proposed independent `oauth_*` entities and a dedicated signing key ring/JWKS. See `OAUTH_P0_CONTRACT.md` and `OAUTH_ADDITIVE_DATA_MODEL.md`; neither is runtime-implemented.
+P0 adds a future authorization-server adapter beside, not inside, the legacy flow. OAuth clients and resources are separate identities. Every P0 resource requires exactly one existing legacy tool/grant entitlement-only binding; each canonical resource scope maps explicitly one-to-one to an exact permission registered for that tool, with no inferred conversion. The bound tool never becomes the OAuth client or resource, and native OAuth entitlement domains are deferred. Introspection uses separate resource-owned credentials and discloses active state only for an exact matching token audience; it never reuses OAuth client or legacy tool credentials. The future Google return path is the separate internal `/oauth/upstream/google/callback`, never the frozen `/v1/auth/google/callback`, and is not advertised as a protocol endpoint. Exact downstream client state uses short-lived reversible protected storage; upstream Google state/nonce remain separately hashed.
+
+Step 3A implements only the dark foundation below:
+
+```text
+src/oauth/ pure validation + read repository
+                    |
+                    v
+oauth_* foundation tables ----read-only----> tools + tool_permissions
+
+buildApp / legacy /v1/* --------------------> unchanged legacy repositories
+```
+
+`OAUTH_P0_ENABLED` defaults to `false` and is intentionally not a route-wiring input in Step 3A. The OAuth repository is not injected into `buildApp`; it contains no HTTP, Google callback, token, credential-authentication or authorization-decision code. The dedicated signing table exposes public/lifecycle metadata through repository types but does not expose the protected private-key reference. See `OAUTH_P0_CONTRACT.md` and `OAUTH_ADDITIVE_DATA_MODEL.md`; protocol runtime remains unimplemented.
 
 ## Risks
 

@@ -97,7 +97,7 @@ class ProductionContinuityEvidenceTests(unittest.TestCase):
             google_allowed_hd=["example.test"], google_oidc_scope=["openid", "email", "profile"],
             jwt_public_key_id="synthetic-kid", access_token_ttl_seconds=900,
             refresh_token_ttl_seconds=28800, one_time_code_ttl_seconds=60,
-            enable_refresh_tokens=True, session_cookie_name="access_layer_admin_session",
+            enable_refresh_tokens=True, oauth_p0_enabled=False, session_cookie_name="access_layer_admin_session",
             cors_allowed_origins=["https://access-layer.example.test"], return_url_allowed_schemes=["https"],
             trust_proxy_hops=1, audit_log_retention_days=365, audit_log_raw_ip=False,
             access_request_reopen_after_days=30, run_migrations_on_start=True,
@@ -195,6 +195,16 @@ class ProductionContinuityEvidenceTests(unittest.TestCase):
         self.assertEqual("", evidence["configuration"]["effective_non_secret_config"]["public_base_path"])
         report = self.write_and_validate(evidence)
         self.assertTrue(report.ready_for_isolated_restore, report.missing_for_isolated_restore)
+
+    def test_step_3a_oauth_foundation_flag_must_remain_false_for_restore_gate(self) -> None:
+        evidence = self.restore_ready_evidence()
+        evidence["configuration"]["effective_non_secret_config"]["oauth_p0_enabled"] = True
+        report = self.write_and_validate(evidence)
+        self.assertFalse(report.ready_for_isolated_restore)
+        self.assertIn(
+            "configuration.effective_non_secret_config.oauth_p0_enabled=false",
+            report.missing_for_isolated_restore,
+        )
 
     def test_jwt_pem_or_path_alternatives_both_work(self) -> None:
         self.assertTrue(self.write_and_validate(self.restore_ready_evidence("inline_env")).ready_for_isolated_restore)

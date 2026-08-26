@@ -21,7 +21,11 @@ Do not trust the email domain alone.
 
 ## OAuth vNext P0 target security
 
-The additive OAuth target is frozen but not implemented. `OAUTH_P0_CONTRACT.md` and `../specs/oauth-p0.v1.yml` require Authorization Code plus Refresh Token only, PKCE `S256` for every code flow, exact redirects, one RFC 8707 resource, exact single audience, RFC 9068 `typ=at+jwt`, RFC 9207 response issuer, header-only bearer transport, OAuth-standard errors, refresh-family replay revocation and a dedicated OAuth key ring. Human OAuth `sub` remains Google `sub`; email, hosted domain, role and legacy permission arrays are excluded from OAuth access tokens by default.
+The additive OAuth target is frozen but not implemented. `OAUTH_P0_CONTRACT.md` and `../specs/oauth-p0.v1.yml` require Authorization Code plus Refresh Token only, PKCE `S256` for every code flow, RFC 7636 verifier grammar and exact unpadded S256 challenge grammar, exact redirects, one RFC 8707 resource, exact single audience, RFC 9068 `typ=at+jwt`, RFC 9207 response issuer, header-only bearer transport, OAuth-standard errors, refresh-family replay revocation and a dedicated OAuth key ring. Human OAuth `sub` remains Google `sub`; email, hosted domain, role and legacy permission arrays are excluded from OAuth access tokens by default.
+
+Every P0 resource requires exactly one legacy-tool entitlement-only binding. Client, resource and legacy-tool identities remain separate; native OAuth entitlement domains are deferred. P0 introspection uses separately authorised resource-server credentials and discloses only RFC 9068 access tokens as active. Refresh, inactive, unknown and otherwise non-disclosable tokens receive exactly `{"active":false}`; invalid caller credentials fail authentication.
+
+OAuth vNext uses the future internal Google callback `/oauth/upstream/google/callback`; it never extends the frozen legacy callback and is not implemented or advertised in Step 2. Exact downstream client state is kept only in short-lived reversible protected storage until returned and is never logged. Upstream Google state and nonce may remain hash-only.
 
 First-party browser clients remain BFF/server-side-token applications. Public-client rollout, SPA bearer-token storage, downstream OIDC, service principals, `client_credentials`, token exchange, `private_key_jwt` and dynamic registration are disabled/deferred.
 

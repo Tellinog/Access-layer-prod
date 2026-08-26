@@ -3,7 +3,8 @@
 ## BLOCKER
 
 - Confirm who receives bootstrap platform admin access after first deploy.
-- 2026-08-24: production deployment remains blocked until exact Coolify server/project/resource/destination identifiers and the central registry record are verified.
+- 2026-08-26 Step 2 hardening: production deployment remains blocked until the exact Coolify destination identity and central registry record are verified. Server `wx513ojqd80kdicevubog7`, project `xdihnb979tvyh9gdk72zfy7y`, environment `rd3mt4dkpqyghxlx9h96sdlo` and resource `u3cyw3y1obp88to9la0w8c75` are proven non-secret facts.
+- 2026-08-26 Step 2 hardening: Coolify visibly reported `Changes pending`. Before any future production deploy, an authorised operator must inspect the pending diff and resolve or explicitly accept it; this task does not apply it.
 - 2026-08-24 Step 1.5: `operations/production-continuity.evidence.yml` remains `NOT_READY`; verified backup and isolated restore results remain unproven. Do not deploy or begin N→N+1 execution.
 - 2026-08-25 Step 1.5B: observe whether live JWT signing uses inline PEM or a file and prove same-key continuity using public-key/external evidence. The live `/run/secrets` named-volume identity is proven, but key source/state and continuity are not. Do not read, hash, copy, rotate, or regenerate the private key.
 - 2026-08-25 Step 1.5B: the isolated-restore gate is blocked until external secret-safe sameness evidence exists for `SESSION_SECRET`, `TOOL_CLIENT_SECRET_PEPPER`, `BACKUP_ENCRYPTION_KEY`, `GOOGLE_CLIENT_SECRET`, and `LOG_IP_SALT`. Presence/state alone is not proof.
@@ -34,7 +35,7 @@
 - 2026-08-24: confirm Nancy's production callback and live registration; only its local callback was present in the supplied evidence.
 - 2026-08-24: approve measurable availability, latency, correctness, error-budget and alert-window SLO targets; repository evidence does not define them.
 - 2026-08-24: export the live tool, callback and permission catalogue before asserting that the repository-only capability inventory is operationally complete.
-- 2026-08-24 Step 1.5: provide the exact Coolify server/project/environment/resource/destination identifiers, current live domain, deployed revision/image identity, replica/deploy/auto-deploy facts and named continuity operator.
+- 2026-08-24 Step 1.5: provide the exact remaining Coolify destination identifier, deployed revision/image identity, replica/deploy facts and named continuity operator; server/project/environment/resource IDs, current live domain and auto-deploy state are now observed.
 - 2026-08-24 Step 1.5: identify the authoritative central deployment registry location and the Access Layer record identifier/evidence reference.
 - 2026-08-25 Step 1.5B: identify the approved access-controlled evidence system and authorised operators for secret-manager version references, side-by-side comparisons, or controlled binding records. No secret value or reusable verifier may be stored in Git.
 - 2026-08-25 Step 2: identify the first approved P0 pilot client, resource, exact redirects, entitlement-domain binding and registered capability scopes before Step 3 implementation or any production registration.
@@ -71,6 +72,7 @@
 - Immutable append-only log storage with WORM retention.
 - OAuth runtime endpoints, discovery handlers, additive authorization-server tables/migrations and production client/resource/scope registrations. The P0 contract is frozen; runtime remains deferred.
 - OAuth P1 features: service principals, `client_credentials`, token exchange, `private_key_jwt`, downstream OIDC ID Token/UserInfo/discovery and dynamic client registration.
+- Native OAuth entitlement domains; every P0 resource instead requires exactly one existing `legacy_tool` entitlement-only binding.
 - UNGUESS Platform SDK dependency adoption and telemetry SDK integration.
 - Tool Observatory registration and synthetic monitor deployment.
 - MCP exposure and stable platform capability/OAuth-scope mapping.

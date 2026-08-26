@@ -4,7 +4,9 @@
 
 This runbook prepares evidence required before an isolated restore exercise or any vNext runtime, deployment, database, or authentication work. Step 2 reconciled only the supplied non-secret Coolify facts. Do not deploy, restart services, alter environment variables, create or rename volumes, run migrations, restore a database, rotate secrets, or change Coolify configuration.
 
-The committed `production-continuity.evidence.yml` is an incomplete, redacted schema-v2 record with status `NOT_READY`. It contains the non-secret live topology and named-volume observations supplied on 2026-08-25; every other repository expectation remains distinct from an observation.
+The committed `production-continuity.evidence.yml` is an incomplete, redacted schema-v2 record with status `NOT_READY`. It contains the non-secret live topology and named-volume observations supplied on 2026-08-25, including server ID `wx513ojqd80kdicevubog7`, project ID `xdihnb979tvyh9gdk72zfy7y` and environment ID `rd3mt4dkpqyghxlx9h96sdlo`; the destination remains unresolved. Every other repository expectation remains distinct from an observation.
+
+The supplied Coolify UI visibly reported `Changes pending`. Treat that as a pre-production-deploy review blocker: an authorised operator must inspect and resolve or explicitly accept the pending diff before any future deployment. It is evidence of UI state only and does not authorise a runtime, environment or deployment change.
 
 When live collection is separately authorised, first create the ignored working copy:
 
@@ -18,7 +20,8 @@ Do not commit screenshots, environment dumps, tokens, secret values, reusable se
 
 An authorised operator must observe and record each item separately:
 
-- server, project, environment, resource, and destination identifiers/names;
+- the already observed server/project/environment/resource identifiers and the still-unresolved destination identifier/name;
+- whether Coolify still reports `Changes pending`, and the reviewed non-secret disposition of that state;
 - resource type and auto-deploy setting;
 - live/current configured domain and the screen from which it was read;
 - intended target domain, kept separate even if it equals the current domain;

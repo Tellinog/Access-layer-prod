@@ -46,6 +46,8 @@ authorization_code:
     required_for_every_code_flow: true
     supported_methods: [S256]
     plain_forbidden: true
+    code_verifier_pattern: ^[A-Za-z0-9._~-]{43,128}$
+    s256_code_challenge_pattern: ^[A-Za-z0-9_-]{43}$
   resource_parameter:
     standard: rfc8707
     cardinality: exactly_one
@@ -53,6 +55,11 @@ authorization_code:
   success_response_query: [code, state, iss]
   error_response_iss_required_when_redirected: true
   upstream_google_state_and_nonce_separate: true
+  downstream_client_state:
+    response_round_trip: exact_original_value
+    storage: short_lived_reversible_protected
+    optional_lookup_hash: allowed
+    logging: forbidden
   binding:
     - client_id
     - redirect_uri
@@ -60,6 +67,14 @@ authorization_code:
     - granted_scopes
     - human_subject
     - code_challenge
+upstream_identity:
+  provider: google_oidc
+  callback_path: /oauth/upstream/google/callback
+  advertised_as_oauth_protocol_endpoint: false
+  legacy_callback_reused: false
+  runtime_implemented: false
+  production_registration_required_before_enable: true
+  legacy_production_callback_must_remain_registered: true
 token_endpoint:
   content_type: application/x-www-form-urlencoded
   grant_types_p0: [authorization_code, refresh_token]
@@ -152,7 +167,13 @@ revocation:
   self_contained_access_token_offline_window: until_expiry_unless_online_policy_required
 introspection:
   standard: rfc7662
-  authentication: separately_authorised_confidential_client_or_resource_server
+  authentication: separately_authorised_resource_server_credentials
+  token_class_disclosed_active: access_token_only
+  active_token_profile: rfc9068_bearer_access_token
+  token_type_hint_values: [access_token]
+  refresh_token_active_disclosure: forbidden_return_active_false
+  non_disclosable_token_response_fields: [active]
+  caller_authentication_failure_status: 401
   inactive_response_fields: [active]
   inactive_reason_disclosure: forbidden
 signing_keys:
@@ -171,7 +192,9 @@ registration:
   client_schema: ../schemas/oauth-client-registration.schema.json
   resource_schema: ../schemas/oauth-resource-registration.schema.json
   client_and_resource_identity_separate: true
-  transitional_entitlement_bridge: explicit_resource_to_legacy_tool
+  p0_resource_entitlement_binding: exactly_one_legacy_tool
+  transitional_entitlement_bridge: required_resource_to_legacy_tool
+  native_oauth_entitlement_domains: deferred_beyond_p0
 authorization:
   deny_by_default: true
   human_consent_screen_p0: none_centrally_administered_first_party_grants

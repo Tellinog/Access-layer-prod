@@ -90,7 +90,7 @@ See:
 
 ## Additive OAuth P0 target
 
-The target-only OAuth surface is documented separately in `../schemas/access-layer-oauth-v1.openapi.yaml` and `OAUTH_P0_CONTRACT.md`. It is not registered by the runtime. Target paths are RFC 8414 metadata, `/oauth/authorize`, `/oauth/token`, `/oauth/revoke`, `/oauth/introspect`, `/oauth/jwks`, and RFC 9728 protected-resource metadata. The historical `../schemas/openapi.yaml` remains the unchanged legacy `/v1/*` contract.
+The target-only OAuth surface is documented separately in `../schemas/access-layer-oauth-v1.openapi.yaml` and `OAUTH_P0_CONTRACT.md`. It is not registered by the runtime. Advertised target paths are RFC 8414 metadata, `/oauth/authorize`, `/oauth/token`, `/oauth/revoke`, access-token-only `/oauth/introspect`, `/oauth/jwks`, and RFC 9728 protected-resource metadata. The future internal upstream Google return path `/oauth/upstream/google/callback` is not an advertised OAuth protocol endpoint and is not implemented. The historical `../schemas/openapi.yaml` and frozen `/v1/auth/google/callback` remain unchanged.
 # Step 1 machine baseline
 
 The exhaustive repository-observed route and wire-contract freeze is `../specs/legacy-contract-baseline.v1.json`. It records one known documentation drift: runtime registers `GET /v1/admin/backup/secret-material`, while the historical `../schemas/openapi.yaml` omits it. Step 1 changes neither side.

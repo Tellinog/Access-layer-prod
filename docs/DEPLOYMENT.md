@@ -6,6 +6,8 @@ Deployment remains prohibited while `operations/production-continuity.evidence.y
 
 Live evidence has resolved the source mismatch in favour of `access_layer_postgres_data_v2`. Do not rename that logical volume or `access_layer_jwt_secrets`, add explicit physical volume names, create replacement production volumes, alter Coolify configuration, or deploy as part of evidence collection.
 
+The observed non-secret Coolify IDs are server `wx513ojqd80kdicevubog7`, project `xdihnb979tvyh9gdk72zfy7y`, environment `rd3mt4dkpqyghxlx9h96sdlo` and resource `u3cyw3y1obp88to9la0w8c75`; destination remains unresolved. The visible `Changes pending` state is a pre-production-deploy review blocker, not an instruction to apply runtime or environment changes.
+
 ## Environments
 
 | Environment | Purpose | URL pattern |

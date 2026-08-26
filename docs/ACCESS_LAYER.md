@@ -31,11 +31,14 @@ The target standard profile includes:
 - JWT access tokens following the selected platform profile;
 - refresh rotation and replay detection;
 - revocation and introspection;
+- active introspection only for RFC 9068 access tokens presented by separately authorised resource servers;
 - protected-resource metadata for MCP/API resources;
 - client credentials for service principals after the core release;
 - token exchange only after explicit platform approval.
 
 The frozen P0 contract is `OAUTH_P0_CONTRACT.md`. OpenID Provider discovery, ID Tokens and UserInfo are P1/deferred and must not appear in P0 metadata.
+
+Every P0 resource requires exactly one legacy-tool entitlement-only binding while OAuth client and resource identities remain separate. The future internal Google callback is `/oauth/upstream/google/callback`, additive to and distinct from the frozen legacy callback. Neither it nor any OAuth runtime path is implemented in Step 2.
 
 ## Legacy compatibility invariant
 

@@ -68,7 +68,8 @@ paths:
         - in: query
           name: code_challenge
           required: true
-          schema: {type: string, minLength: 43, maxLength: 128}
+          description: Unpadded base64url SHA-256 output for the ASCII code verifier.
+          schema: {type: string, pattern: '^[A-Za-z0-9_-]{43}$'}
         - in: query
           name: code_challenge_method
           required: true
@@ -146,8 +147,12 @@ paths:
   /oauth/introspect:
     post:
       operationId: oauthIntrospect
-      summary: Introspect a token per RFC 7662
-      description: Restricted to separately authorised confidential clients or resource servers.
+      summary: Introspect an RFC 9068 access token per RFC 7662
+      description: >-
+        Restricted to separately authorised resource-server credentials. Only
+        audience-authorised RFC 9068 Bearer access tokens may be disclosed as
+        active. Refresh tokens and every unknown, inactive or non-disclosable
+        token receive exactly active=false. Invalid caller credentials use 401.
       security:
         - introspectionClientBasic: []
       requestBody:
@@ -157,7 +162,9 @@ paths:
             schema: {$ref: '#/components/schemas/IntrospectionRequest'}
       responses:
         '200':
-          description: Active token metadata or exactly active=false for unknown/inactive tokens
+          description: >-
+            Active RFC 9068 Bearer access-token metadata, or exactly
+            active=false for an unknown, inactive or non-disclosable token.
           headers:
             Cache-Control:
               required: true
@@ -190,7 +197,7 @@ components:
     introspectionClientBasic:
       type: http
       scheme: basic
-      description: Separately authorised confidential client or resource-server credential.
+      description: Separately authorised resource-server credential for access-token introspection.
   responses:
     OAuthError:
       description: Standard OAuth protocol error
@@ -263,7 +270,7 @@ components:
         code: {type: string, minLength: 1}
         redirect_uri: {type: string, format: uri}
         client_id: {type: string, minLength: 1}
-        code_verifier: {type: string, minLength: 43, maxLength: 128}
+        code_verifier: {type: string, pattern: '^[A-Za-z0-9._~-]{43,128}$'}
         resource: {type: string, format: uri, pattern: '^https://'}
       additionalProperties: false
     RefreshTokenRequest:
@@ -302,17 +309,19 @@ components:
       type: object
       required: [token]
       properties:
-        token: {type: string, minLength: 1}
-        token_type_hint: {enum: [access_token, refresh_token]}
+        token: {type: string, minLength: 1, description: Candidate RFC 9068 JWT access token.}
+        token_type_hint: {type: string, const: access_token}
       additionalProperties: false
     IntrospectionResponse:
       oneOf:
         - type: object
+          description: Exact response for unknown, inactive, refresh or otherwise non-disclosable tokens.
           required: [active]
           properties:
             active: {const: false}
           additionalProperties: false
         - type: object
+          description: Metadata for an audience-authorised RFC 9068 Bearer access token.
           required: [active, iss, sub, aud, client_id, scope, exp, iat, jti, token_type]
           properties:
             active: {const: true}

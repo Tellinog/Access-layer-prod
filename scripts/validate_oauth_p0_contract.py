@@ -35,6 +35,9 @@ FORBIDDEN_P0_MARKERS = {
 CAPABILITY_PATTERN = re.compile(
     r"^[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}$"
 )
+REQUEST_CONTEXT_IDENTIFIER_PATTERN = r"^[a-z][a-z0-9-]+(?::[a-z][a-z0-9-]+){1,}$"
+PKCE_VERIFIER_PATTERN = r"^[A-Za-z0-9._~-]{43,128}$"
+PKCE_S256_CHALLENGE_PATTERN = r"^[A-Za-z0-9_-]{43}$"
 
 
 def load_json(path: str) -> Any:
@@ -84,6 +87,61 @@ def validate() -> list[str]:
     if set(openapi.get("paths", {})) != EXPECTED_PATHS:
         errors.append("target OpenAPI path set differs from the frozen P0 surface")
 
+    request_context_schema = load_json("schemas/request-context.schema.json")
+    if request_context_schema.get("$id") != "https://platform.unguess-internal.net/schemas/request-context.schema.json":
+        errors.append("shared RequestContext v1 schema identity changed")
+    request_context_properties = request_context_schema.get("properties", {})
+    request_context_patterns = (
+        request_context_properties.get("capability_id", {}).get("pattern"),
+        request_context_properties.get("scopes", {}).get("items", {}).get("pattern"),
+    )
+    if request_context_patterns != (REQUEST_CONTEXT_IDENTIFIER_PATTERN, REQUEST_CONTEXT_IDENTIFIER_PATTERN):
+        errors.append("shared RequestContext v1 capability/scopes grammar drifted from the canonical hierarchy")
+    two_segment_context = {
+        "auth_profile": "unguess-oauth-oidc-v1",
+        "principal_type": "human",
+        "principal_id": "synthetic-subject",
+        "project_slug": "alpha",
+        "resource_id": "https://resource.invalid/api",
+        "capability_id": "alpha:read",
+        "permissions": ["alpha:read"],
+        "scopes": ["alpha:read"],
+        "invocation_channel": "api",
+        "correlation_id": "corr-0001",
+        "environment": "test",
+        "request_started_at": "2026-08-26T00:00:00Z",
+    }
+    if schema_errors(two_segment_context, request_context_schema):
+        errors.append("shared RequestContext v1 rejects a canonical two-segment identifier")
+
+    pkce = spec.get("authorization_code", {}).get("pkce", {})
+    if pkce.get("code_verifier_pattern") != PKCE_VERIFIER_PATTERN:
+        errors.append("machine profile does not freeze the RFC 7636 code_verifier grammar")
+    if pkce.get("s256_code_challenge_pattern") != PKCE_S256_CHALLENGE_PATTERN:
+        errors.append("machine profile does not freeze the exact S256 code_challenge grammar")
+    if pkce.get("supported_methods") != ["S256"] or pkce.get("plain_forbidden") is not True:
+        errors.append("P0 PKCE must advertise only S256 and forbid plain")
+
+    authorize_parameters = {
+        parameter.get("name"): parameter
+        for parameter in openapi.get("paths", {}).get("/oauth/authorize", {}).get("get", {}).get("parameters", [])
+    }
+    if authorize_parameters.get("code_challenge", {}).get("schema", {}).get("pattern") != PKCE_S256_CHALLENGE_PATTERN:
+        errors.append("target OpenAPI does not enforce the exact S256 code_challenge grammar")
+    authorization_request = load_json("examples/oauth/authorization.request.json")
+    expected_authorization_parameters = set(spec.get("authorization_code", {}).get("request_parameters_required", []))
+    if set(authorization_request) != expected_authorization_parameters:
+        errors.append("authorization request fixture differs from the required P0 parameter set")
+    for parameter_name, parameter_value in authorization_request.items():
+        parameter_schema = authorize_parameters.get(parameter_name, {}).get("schema", {})
+        errors.extend(
+            f"authorization request {parameter_name}: {error}"
+            for error in schema_errors(parameter_value, parameter_schema)
+        )
+    openapi_schemas = openapi["components"]["schemas"]
+    if openapi_schemas.get("AuthorizationCodeTokenRequest", {}).get("properties", {}).get("code_verifier", {}).get("pattern") != PKCE_VERIFIER_PATTERN:
+        errors.append("target OpenAPI does not enforce the RFC 7636 code_verifier grammar")
+
     serialized_openapi = json.dumps(openapi, sort_keys=True)
     serialized_metadata = json.dumps(metadata, sort_keys=True)
     for marker in sorted(FORBIDDEN_P0_MARKERS):
@@ -93,11 +151,13 @@ def validate() -> list[str]:
     metadata_schema = load_json("schemas/oauth-authorization-server-metadata.schema.json")
     errors.extend(f"metadata: {error}" for error in schema_errors(metadata, metadata_schema))
 
-    openapi_schemas = openapi["components"]["schemas"]
     openapi_examples = (
+        ("examples/oauth/authorization-code-token.request.json", "AuthorizationCodeTokenRequest"),
         ("examples/oauth/token.response.json", "TokenResponse"),
+        ("examples/oauth/introspection.access-token.request.json", "IntrospectionRequest"),
         ("examples/oauth/introspection.active.json", "IntrospectionResponse"),
         ("examples/oauth/introspection.inactive.json", "IntrospectionResponse"),
+        ("examples/oauth/introspection.nondisclosable-refresh.inactive.json", "IntrospectionResponse"),
         ("examples/oauth/error.response.json", "OAuthError"),
     )
     for example_path, schema_name in openapi_examples:
@@ -143,6 +203,48 @@ def validate() -> list[str]:
     if not schema_errors(invalid_client, client_schema):
         errors.append("client schema accepts a wildcard redirect URI")
 
+    resource_schema = load_json("schemas/oauth-resource-registration.schema.json")
+    resource_without_binding = load_json("examples/oauth/resource-registration.json")
+    resource_without_binding.pop("entitlement_binding")
+    if not schema_errors(resource_without_binding, resource_schema):
+        errors.append("P0 resource schema accepts a resource without its mandatory legacy-tool binding")
+    registration = spec.get("registration", {})
+    if registration.get("p0_resource_entitlement_binding") != "exactly_one_legacy_tool":
+        errors.append("machine profile does not require exactly one P0 legacy-tool entitlement binding")
+    if registration.get("client_and_resource_identity_separate") is not True:
+        errors.append("machine profile conflates OAuth client and resource identity")
+    if registration.get("native_oauth_entitlement_domains") != "deferred_beyond_p0":
+        errors.append("native OAuth entitlement domains are not explicitly deferred beyond P0")
+
+    introspection = spec.get("introspection", {})
+    if introspection.get("token_class_disclosed_active") != "access_token_only":
+        errors.append("P0 introspection active disclosure is not limited to access tokens")
+    if introspection.get("refresh_token_active_disclosure") != "forbidden_return_active_false":
+        errors.append("P0 introspection does not force refresh tokens to active=false")
+    introspection_request = openapi_schemas.get("IntrospectionRequest", {})
+    if not schema_errors({"token": "synthetic", "token_type_hint": "refresh_token"}, introspection_request):
+        errors.append("target OpenAPI accepts a refresh_token introspection hint")
+    introspection_response = openapi_schemas.get("IntrospectionResponse", {})
+    if schema_errors({"active": False}, introspection_response):
+        errors.append("target OpenAPI rejects the exact inactive introspection response")
+    if not schema_errors({"active": False, "reason": "hidden"}, introspection_response):
+        errors.append("target OpenAPI permits inactive introspection reason leakage")
+
+    upstream = spec.get("upstream_identity", {})
+    if upstream.get("callback_path") != "/oauth/upstream/google/callback":
+        errors.append("machine profile does not freeze the separate Google upstream callback")
+    if upstream.get("legacy_callback_reused") is not False or upstream.get("advertised_as_oauth_protocol_endpoint") is not False:
+        errors.append("Google upstream callback must remain separate and non-advertised")
+    if upstream.get("runtime_implemented") is not False:
+        errors.append("Google upstream callback is incorrectly marked implemented")
+    downstream_state = spec.get("authorization_code", {}).get("downstream_client_state", {})
+    if downstream_state.get("response_round_trip") != "exact_original_value":
+        errors.append("machine profile does not preserve exact downstream client state")
+    if downstream_state.get("storage") != "short_lived_reversible_protected":
+        errors.append("downstream client state is not assigned reversible protected storage")
+    if downstream_state.get("logging") != "forbidden":
+        errors.append("machine profile does not forbid downstream client-state logging")
+
     operation_ids: list[str] = []
     for node in iter_nodes(openapi):
         reference = node.get("$ref") if isinstance(node, dict) else None
@@ -175,7 +277,7 @@ def validate() -> list[str]:
         (ROOT / path).read_text(encoding="utf-8")
         for path in ("src/app.ts", "migrations/001_initial.sql", "migrations/002_audit_tool_delete_fk.sql")
     )
-    if re.search(r"/oauth/(?:authorize|token|revoke|introspect)|CREATE TABLE(?: IF NOT EXISTS)? oauth_", runtime_and_migrations, re.I):
+    if re.search(r"/oauth/|CREATE TABLE(?: IF NOT EXISTS)? oauth_", runtime_and_migrations, re.I):
         errors.append("OAuth runtime handler or migration exists during the contract-only step")
 
     return sorted(set(errors))
@@ -186,7 +288,7 @@ def main() -> int:
     parser.add_argument("--json", action="store_true", help="Emit a JSON result.")
     args = parser.parse_args()
     errors = validate()
-    result = {"result": "PASS" if not errors else "FAIL", "errors": errors, "checks": 12}
+    result = {"result": "PASS" if not errors else "FAIL", "errors": errors, "checks": 18}
     if args.json:
         print(json.dumps(result, indent=2))
     elif errors:
@@ -194,7 +296,7 @@ def main() -> int:
         for error in errors:
             print(f"- {error}")
     else:
-        print("OAuth P0 contract validation passed (12 check groups).")
+        print("OAuth P0 contract validation passed (18 check groups).")
     return 0 if not errors else 1
 
 

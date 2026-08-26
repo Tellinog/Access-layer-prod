@@ -18,9 +18,10 @@
 | Introspection | API call by a tool backend to check whether an Access Layer token is still active |
 | Audit event | Structured log entry for access attempts, decisions and admin actions |
 | OAuth client | Software registered to request tokens; distinct from a legacy tool and from the resource |
-| OAuth resource | Canonical HTTPS API/MCP audience receiving a token; may explicitly bind to a legacy tool entitlement domain |
+| OAuth resource | Canonical HTTPS API/MCP audience receiving a token; every P0 resource has exactly one legacy-tool entitlement-only binding and remains distinct from that tool and from the OAuth client |
 | OAuth scope | Canonical `project:domain:action` capability granted by the fail-closed intersection policy |
 | Refresh family | Lineage of rotating OAuth refresh tokens; replay revokes the family and linked OAuth session |
+| OAuth upstream callback | Future internal Google return path `/oauth/upstream/google/callback`, separate from and additive to the frozen legacy callback; not a P0 protocol endpoint |
 
 ## Core entities
 

@@ -90,3 +90,5 @@ Do not expose production until tests in `docs/TESTING.md` pass for:
 # Step 2 deployment block
 
 The source Compose mismatch is resolved from live Coolify evidence: both the PostgreSQL service mount and top-level declaration use `access_layer_postgres_data_v2`, while JWT storage remains `access_layer_jwt_secrets`. Do not add explicit physical volume names or rename either logical/live volume. Deployment is still prohibited until the backup/restore, ownership, registry and remaining continuity gates in `BACKLOG.md` are complete.
+
+The observed non-secret Coolify IDs are server `wx513ojqd80kdicevubog7`, project `xdihnb979tvyh9gdk72zfy7y`, environment `rd3mt4dkpqyghxlx9h96sdlo` and resource `u3cyw3y1obp88to9la0w8c75`; destination remains unresolved. Coolify visibly reported `Changes pending`, which must be reviewed and resolved or explicitly accepted before any future production deploy. This record does not apply those changes or authorise deployment.

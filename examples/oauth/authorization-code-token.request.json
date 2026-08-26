@@ -1,0 +1,8 @@
+{
+  "grant_type": "authorization_code",
+  "code": "example-authorization-code-not-a-real-credential",
+  "redirect_uri": "https://client.invalid/oauth/callback",
+  "client_id": "example-web-bff",
+  "code_verifier": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._~-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+  "resource": "https://example-resource.invalid/api"
+}

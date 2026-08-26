@@ -4,18 +4,28 @@
 
 V1 implementation scaffold complete, with local dependency, typecheck, build and automated test verification complete. Environment-backed integration verification remains pending.
 
+## Step 2 OAuth P0 hardening, 2026-08-26
+
+- The target contract is hardened without runtime implementation: shared RequestContext v1 again accepts canonical hierarchical identifiers with two or more segments, while OAuth P0 alone retains exact `project:domain:action` scope grammar.
+- PKCE now enforces 43–128 RFC 7636 unreserved verifier characters and an exact 43-character unpadded base64url S256 challenge; `plain` remains forbidden.
+- Every P0 resource now requires exactly one legacy-tool entitlement-only binding. OAuth client, resource and legacy tool identities remain separate; native OAuth entitlement domains are deferred beyond P0.
+- P0 introspection discloses only audience-authorised RFC 9068 Bearer access tokens as active to separately authorised resource-server credentials. Refresh, inactive, unknown and otherwise non-disclosable tokens return exactly `{"active":false}`.
+- Future OAuth-to-Google transactions use the separate internal `/oauth/upstream/google/callback`, which is neither advertised nor implemented and never reuses the frozen legacy callback. Future production Google registration adds it without removing the legacy URI.
+- The additive transaction proposal retains exact downstream client state in short-lived reversible protected storage, with an optional hash and no logging; upstream Google state and nonce remain hash-only. No migration exists.
+- Verification passes: lint, build, 113 Vitest tests, 57 Python tests with two expected template-bootstrap skips, 18 OAuth validator groups, schema/OpenAPI/reference checks, legacy baseline tests, resolved Compose continuity and working-tree whitespace checks. Non-strict platform conformance passes 27 checks with seven known warnings; strict release conformance still reports the same five external operational gates.
+
 ## Step 2 production evidence reconciliation, 2026-08-25
 
-- Non-secret Coolify evidence now identifies server `agentic-unguess-prod`, project `agentic-unguess`, production resource `access-layer-prod` (`u3cyw3y1obp88to9la0w8c75`), observed resource type `application`, managed Docker Compose, `main` branch, deploy-on-push, disabled previews and isolated networking.
+- Non-secret Coolify evidence now identifies server `agentic-unguess-prod` (`wx513ojqd80kdicevubog7`), project `agentic-unguess` (`xdihnb979tvyh9gdk72zfy7y`), environment `production` (`rd3mt4dkpqyghxlx9h96sdlo`), production resource `access-layer-prod` (`u3cyw3y1obp88to9la0w8c75`), observed resource type `application`, managed Docker Compose, `main` branch, deploy-on-push, disabled previews and isolated networking. Destination identity remains unresolved.
 - The live origin is `https://access-layer.unguess-internal.net`; app port `8080` has no shown public host-port mapping and PostgreSQL port `5432` remains private.
 - Live resolved Compose proves logical PostgreSQL volume `access_layer_postgres_data_v2` and logical JWT volume `access_layer_jwt_secrets`, backed by the recorded UUID-prefixed named volumes. The source Compose top-level PostgreSQL declaration now matches the unchanged service mount. No explicit physical volume name was added and no live resource was changed.
-- The volume-name mismatch is resolved. Production remains blocked by unverified backup/restore, destination identity, central registry, named ownership, deployed revision/image and continuity-secret/key evidence. No deployment was performed.
+- The volume-name mismatch is resolved. Coolify visibly reported `Changes pending`; that state requires explicit pre-production-deploy diff review and is not a runtime change. Production remains blocked by that review plus unverified backup/restore, destination identity, central registry, named ownership, deployed revision/image and continuity-secret/key evidence. No deployment was performed.
 
 ## Step 2 OAuth vNext P0 contract freeze, 2026-08-25
 
 - The additive P0 OAuth contract is frozen in `specs/oauth-p0.v1.yml`, `docs/OAUTH_P0_CONTRACT.md` and the target-only OAuth OpenAPI/schemas/examples. It is not implemented or enabled.
 - P0 defines RFC 8414 metadata, Authorization Code and Refresh Token, PKCE `S256`, exact redirects, one RFC 8707 resource/audience, RFC 9068 `typ=at+jwt`, RFC 9207 `iss`, revocation, introspection, RFC 9700 controls, RFC 9728 metadata, OAuth errors, controlled registration, refresh-family replay, dedicated key rotation and audit requirements.
-- Human OAuth `sub` remains Google `sub`; access tokens are PII-minimised. OAuth clients/resources are separate, with an explicit optional resource-to-legacy-tool entitlement bridge. Browser applications remain BFF/server-side-token based.
+- Human OAuth `sub` remains Google `sub`; access tokens are PII-minimised. OAuth clients/resources are separate, and every P0 resource has exactly one legacy-tool entitlement-only binding. Browser applications remain BFF/server-side-token based.
 - `client_credentials`, token exchange, `private_key_jwt`, downstream OIDC ID Token/UserInfo/discovery and dynamic registration remain P1/deferred. No OAuth handler, migration, dependency, production registration or deploy was added.
 - Verification passes: lint, build, 113 Vitest tests, 50 Python tests (two template-bootstrap skips), 12 OAuth contract check groups, schema/example/OpenAPI reference validation, legacy baseline checks and resolved Compose inspection. Non-strict platform conformance passes with 27 checks and seven known warnings; strict release conformance remains blocked on five external operational gates.
 

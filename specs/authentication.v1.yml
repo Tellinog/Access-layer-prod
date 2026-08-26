@@ -33,6 +33,9 @@ oauth_profile:
   target_openapi: ../schemas/access-layer-oauth-v1.openapi.yaml
   issuer: https://access-layer.unguess-internal.net
   authorization_endpoint: /oauth/authorize
+  upstream_identity_callback: /oauth/upstream/google/callback
+  upstream_identity_callback_advertised: false
+  legacy_google_callback_reused: false
   token_endpoint: /oauth/token
   revocation_endpoint: /oauth/revoke
   introspection_endpoint: /oauth/introspect
@@ -56,6 +59,8 @@ oauth_profile:
   browser_architecture: bff_server_side_tokens
   oidc_provider_p0_enabled: false
   dedicated_oauth_signing_keys: true
+  introspection_token_class: access_token_only
+  p0_resource_entitlement_binding: exactly_one_legacy_tool
   forbidden:
     - implicit_grant
     - password_grant

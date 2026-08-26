@@ -1,7 +1,7 @@
 # OAuth vNext P0 contract
 
-Status: frozen target contract; not implemented or enabled  
-Machine source: `../specs/oauth-p0.v1.yml`  
+Status: frozen target contract; not implemented or enabled
+Machine source: `../specs/oauth-p0.v1.yml`
 Target OpenAPI: `../schemas/access-layer-oauth-v1.openapi.yaml`
 
 ## Boundary and compatibility
@@ -23,9 +23,11 @@ Stable RFCs are normative: RFC 6749 where applicable, RFC 6750, RFC 7636, RFC 70
 
 ## Authorization request and response
 
-`GET /oauth/authorize` accepts only `response_type=code`. It requires a registered `client_id`, an exact registered `redirect_uri`, client `state`, a space-delimited capability `scope`, one registered HTTPS `resource`, and PKCE `code_challenge` with `code_challenge_method=S256`.
+`GET /oauth/authorize` accepts only `response_type=code`. It requires a registered `client_id`, an exact registered `redirect_uri`, client `state`, a space-delimited capability `scope`, one registered HTTPS `resource`, and PKCE `code_challenge` with `code_challenge_method=S256`. The verifier grammar is exactly 43–128 RFC 7636 unreserved characters (`[A-Za-z0-9._~-]`); the stored S256 challenge is exactly 43 unpadded base64url characters (`[A-Za-z0-9_-]`). `plain`, padding `=`, whitespace and other characters are invalid.
 
-The authorization code is high entropy, hashed at rest, single-use, valid for 60 seconds, and atomically bound to client, redirect URI, resource, granted scopes, human subject and PKCE challenge. The Access Layer-to-Google transaction uses separate server-side state and nonce; downstream client state is never reused as Google state.
+The authorization code is high entropy, hashed at rest, single-use, valid for 60 seconds, and atomically bound to client, redirect URI, resource, granted scopes, human subject and PKCE challenge. The Access Layer-to-Google transaction uses separate server-side state and nonce; downstream client state is never reused as Google state. The exact downstream state is retained only in short-lived reversible protected storage until the authorization response is emitted, with an optional lookup hash; it is never logged. Upstream Google state and nonce remain hash-only.
+
+Google returns OAuth vNext upstream transactions to the separate internal path `/oauth/upstream/google/callback`. This path is not an advertised OAuth protocol endpoint and is not implemented in Step 2. It must not reuse or extend the frozen `/v1/auth/google/callback`. Before a future OAuth rollout, production Google configuration adds the new URI while retaining the existing legacy URI.
 
 A successful redirect contains only `code`, the original `state`, and RFC 9207 `iss=https://access-layer.unguess-internal.net`. A redirectable OAuth error preserves safe `state` and includes `iss`. If the client or redirect URI cannot be trusted, Access Layer returns a local error and does not redirect. Access and refresh tokens never appear in browser URLs.
 
@@ -52,7 +54,7 @@ project:domain:action
 
 A scope is granted only when it is registered for the resource, allowed for the client/resource relationship, present in the human's effective existing grant/permission entitlement, and allowed by central policy. The result is the intersection of those sets. Unknown or unauthorized scope fails closed as `invalid_scope`; aliases require an explicit versioned mapping.
 
-OAuth client identity and resource identity are separate. During migration a resource may explicitly bind to one legacy `tool` as its entitlement domain, allowing existing grants and registered permissions to remain authoritative. That bridge does not make the legacy `tool` both client and resource and does not change any legacy record.
+OAuth client identity and resource identity are separate. Every P0 resource registration requires exactly one `legacy_tool` entitlement binding so existing grants and registered permissions remain authoritative. The bridge is entitlement-only: the legacy `tool` is never implicitly the OAuth client or the OAuth resource, and no legacy record changes. Native OAuth entitlement domains are deferred beyond P0.
 
 P0 is an internal, centrally administered first-party service. Existing admin-managed grants determine entitlement; Step 2 introduces no user-consent product model.
 
@@ -85,11 +87,11 @@ Use of an already-consumed family member is replay: deny the request with `inval
 
 `POST /oauth/revoke` follows RFC 7009. It is authenticated according to the registered client method and is idempotent from the caller's perspective: unknown, expired and already-revoked tokens return the same successful external response. Revoking an access token records its `jti` as inactive for online state. Revoking a refresh token revokes its complete family and linked OAuth session. Offline validation of a self-contained access token can continue only until its original expiry unless resource risk policy requires online introspection.
 
-`POST /oauth/introspect` follows RFC 7662 and requires a separately authorised confidential client or resource-server credential. An unknown or inactive token returns exactly `{"active": false}`; no internal reason, subject, client or resource detail is disclosed. Active responses are audience- and caller-authorized and use `Cache-Control: no-store`.
+`POST /oauth/introspect` follows RFC 7662 and requires separately authorised resource-server credentials. P0 discloses only audience-authorised RFC 9068 Bearer access tokens as active. An OAuth refresh token is never returned as active through this surface; refresh-token lifecycle remains available only through token refresh and RFC 7009 revocation. For an unknown, inactive, refresh or otherwise non-disclosable token, an authenticated caller receives exactly `{"active":false}` with no reason or other fields. Invalid caller credentials use HTTP 401. Active responses use `Cache-Control: no-store`.
 
 ## Metadata and key rotation
 
-RFC 8414 metadata is at `/.well-known/oauth-authorization-server` and advertises only P0 features. RFC 9728 protected-resource metadata identifies the exact resource, Access Layer issuer, registered scopes and header-only bearer method. OIDC discovery and UserInfo are not advertised.
+RFC 8414 metadata is at `/.well-known/oauth-authorization-server` and advertises only P0 protocol endpoints. The internal Google callback is not advertised. RFC 9728 protected-resource metadata identifies the exact resource, Access Layer issuer, registered scopes and header-only bearer method. OIDC discovery and UserInfo are not advertised.
 
 OAuth keys are isolated behind `/oauth/jwks`; legacy `/v1/.well-known/jwks.json` and its key material remain untouched. Rotation rules are:
 
@@ -110,7 +112,7 @@ The legacy `/v1/*` error envelope and status mapping remain unchanged.
 
 Authorization requests/decisions, code issue/exchange/denial, refresh, replay, revocation, introspection, registration changes and signing-key lifecycle changes require structured audit events with correlation ID, outcome, client ID, resource ID, scope identifiers and stable human subject when known.
 
-Never log or persist in audit metadata raw authorization codes, access tokens, refresh tokens, client secrets, cookies, private keys, PKCE verifiers, raw secret-bearing request bodies or reusable secret verifiers. Inactive-token reasons and secret hashes are not audit-facing identifiers.
+Never log or persist in audit metadata raw authorization codes, access tokens, refresh tokens, client secrets, cookies, private keys, PKCE verifiers, downstream client state, raw secret-bearing request bodies or reusable secret verifiers. Inactive-token reasons and secret hashes are not audit-facing identifiers.
 
 ## Future dark rollout and rollback
 

@@ -19,11 +19,13 @@ This is implemented **additively**. The current Access Layer remains available t
 Natural person       resource owner / authenticated subject
 Web BFF or agent      OAuth client
 Project API or MCP    resource server
-Access Layer          authorization server / OpenID Provider
+Access Layer          OAuth authorization server (future P1 OpenID Provider)
 Upstream Google OIDC  external identity provider
 ```
 
 A current Access Layer `tool` must not continue to represent all of these roles in the new model. Client and resource registration are separate.
+
+Every P0 resource has exactly one `legacy_tool` entitlement-only binding so the current grant model remains authoritative. The bound tool is not implicitly the OAuth client or resource. Native OAuth entitlement domains are deferred beyond P0.
 
 ## New project defaults
 
@@ -32,6 +34,7 @@ A current Access Layer `tool` must not continue to represent all of these roles 
 P0 target: OAuth Authorization Code flow through a backend-for-frontend.
 
 - PKCE `S256` required;
+- verifier syntax is 43–128 RFC 7636 unreserved characters and the S256 challenge is exactly 43 unpadded base64url characters;
 - state and nonce required;
 - exact redirect URI matching;
 - tokens remain server-side;
@@ -40,6 +43,7 @@ P0 target: OAuth Authorization Code flow through a backend-for-frontend.
 - CSRF protection is required for mutations.
 - the human OAuth `sub` is the stable Google `sub`;
 - OAuth tokens exclude email/profile claims by default.
+- the exact downstream client state uses short-lived reversible protected storage and is never logged; upstream Google state/nonce remain separately hashed.
 
 During transition, web may continue using the current legacy flow.
 
@@ -91,7 +95,7 @@ The normative P0 contract, token transport, errors, registrations, refresh-famil
 
 ## Introspection policy
 
-Default: local JWT validation plus a bounded introspection cache. Online introspection is mandatory for:
+Default: local JWT validation plus a bounded introspection cache. P0 introspection requires separately authorised resource-server credentials and discloses only RFC 9068 access tokens as active; refresh tokens and other non-disclosable tokens return exactly `{"active":false}`. Online introspection is mandatory for:
 
 - administrative mutations;
 - sensitive data export;

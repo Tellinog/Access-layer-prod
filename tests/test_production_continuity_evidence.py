@@ -154,6 +154,14 @@ class ProductionContinuityEvidenceTests(unittest.TestCase):
         self.assertFalse(report.ready_for_n_to_n_plus_1)
         self.assertIn("jwt_signing_material.source_mode", report.missing_for_isolated_restore)
 
+    def test_committed_bundle_records_proven_coolify_ids_only(self) -> None:
+        coolify = self.template["coolify"]
+        self.assertEqual("wx513ojqd80kdicevubog7", coolify["server_id"])
+        self.assertEqual("xdihnb979tvyh9gdk72zfy7y", coolify["project_id"])
+        self.assertEqual("rd3mt4dkpqyghxlx9h96sdlo", coolify["environment_id"])
+        self.assertEqual("u3cyw3y1obp88to9la0w8c75", coolify["resource_id"])
+        self.assertIsNone(coolify["destination_id"])
+
     def test_file_backed_key_requires_verified_secret_mount(self) -> None:
         evidence = self.restore_ready_evidence("file_path")
         evidence["jwt_signing_material"]["file_persistence"]["mapping_verified"] = False

@@ -91,7 +91,7 @@ A request is allowed only if all checks pass:
 
 ## Additive OAuth vNext target
 
-P0 adds a future authorization-server adapter beside, not inside, the legacy flow. OAuth clients, resources and entitlement domains are separate identities. A resource may explicitly bridge to one existing tool/grant domain for human entitlement reads without reinterpreting the legacy tool as both client and resource. OAuth protocol state uses proposed independent `oauth_*` entities and a dedicated signing key ring/JWKS. See `OAUTH_P0_CONTRACT.md` and `OAUTH_ADDITIVE_DATA_MODEL.md`; neither is runtime-implemented.
+P0 adds a future authorization-server adapter beside, not inside, the legacy flow. OAuth clients and resources are separate identities. Every P0 resource requires exactly one existing legacy tool/grant entitlement-only binding; the bound tool never becomes the OAuth client or resource, and native OAuth entitlement domains are deferred. The future Google return path is the separate internal `/oauth/upstream/google/callback`, never the frozen `/v1/auth/google/callback`, and is not advertised as a protocol endpoint. Exact downstream client state uses short-lived reversible protected storage; upstream Google state/nonce remain separately hashed. OAuth protocol state uses proposed independent `oauth_*` entities and a dedicated signing key ring/JWKS. See `OAUTH_P0_CONTRACT.md` and `OAUTH_ADDITIVE_DATA_MODEL.md`; neither is runtime-implemented.
 
 ## Risks
 

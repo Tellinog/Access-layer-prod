@@ -14,11 +14,11 @@ The first future OAuth migration must be expand-only and readable by the current
 | `oauth_client_credentials` | Client FK, non-reversible secret hash or future key metadata, status, created/activated/expires/retired timestamps and rotation lineage. Never stores plaintext secrets. |
 | `oauth_client_redirect_uris` | Client FK and exact normalized-for-storage-but-exactly-compared redirect URI; unique per client. No wildcard/pattern column. |
 | `oauth_resources` | Canonical HTTPS `resource_id`, display name, status, owner, protected-resource metadata URL and `exact_single_resource` audience policy. It is not an OAuth client. |
-| `oauth_resource_entitlement_bindings` | Resource FK plus explicit legacy `tool_id`/slug bridge. It may read legacy grants/permissions without changing their meaning. One active entitlement domain per P0 resource. |
+| `oauth_resource_entitlement_bindings` | Resource FK plus the mandatory P0 legacy `tool_id`/slug bridge. Exactly one active `legacy_tool` entitlement domain exists per P0 resource. It may read legacy grants/permissions without changing their meaning and never identifies the OAuth client or resource. Native OAuth entitlement domains are deferred beyond P0. |
 | `oauth_scopes` | Canonical `project:domain:action`, description, status and audit metadata. Scope aliases, if ever approved, are separate versioned records. |
 | `oauth_resource_scopes` | Resource/scope registration and status. Only these scopes may appear in that resource's metadata or tokens. |
 | `oauth_client_resource_scopes` | Client/resource/scope allow-list. Prevents a client registration from implying access to every resource or scope. |
-| `oauth_authorization_transactions` | Hashed downstream state, separate upstream Google state/nonce hashes, client, exact redirect, requested resource/scopes, PKCE challenge/method, correlation, expiry and consumed/decision timestamps. |
+| `oauth_authorization_transactions` | Exact downstream client state in short-lived reversible protected storage (for example, an encrypted-at-rest value) until the response is emitted, plus an optional lookup hash; separate upstream Google state/nonce hashes; client, exact redirect, requested resource/scopes, PKCE challenge/method, correlation, expiry and consumed/decision timestamps. Downstream state is never logged. |
 | `oauth_authorizations` | Human `user_id`, client, resource, effective scope set, explicit legacy grant references used for the decision, status and timestamps. P0 has no newly invented consent row. |
 | `oauth_authorization_codes` | Non-reversible code hash; transaction/authorization/client/resource/redirect/subject/PKCE/scope bindings; issued, expires and consumed timestamps. Single-use with atomic consumption. |
 | `oauth_sessions` | Human, client, resource, authorization, status, issued/idle-expiry/revoked timestamps and correlation. Separate from legacy `sessions`. |
@@ -32,9 +32,11 @@ OAuth audit events continue through the append-only legacy `audit_logs` facility
 ## Required constraints
 
 - Client and resource identities are separate foreign-key domains.
+- Every P0 resource has exactly one active `legacy_tool` entitlement binding; the bound tool is entitlement-only and never becomes the OAuth client or resource.
 - Resource IDs and client IDs are immutable after activation.
 - Redirect comparison is exact; wildcard redirect records are impossible.
 - Every authorization transaction contains exactly one resource and `S256` PKCE.
+- Every authorization transaction can return the exact original downstream client state after the Google round trip; only upstream Google state and nonce may be hash-only.
 - Codes and refresh tokens are hashed, unique, single-use and transactionally consumed.
 - Granted scopes are the fail-closed intersection of resource registration, client/resource allowance, legacy human entitlement and central policy.
 - Human OAuth subject is obtained from the linked legacy user's `google_sub`; email and local UUID are not token subjects.

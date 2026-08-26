@@ -137,6 +137,6 @@ Then test:
 - a new tool can be created and its secret copied;
 - a company user without grant creates an access request;
 - an external Google account is denied without creating an approvable access request.
-# Step 1 deployment block
+# Step 2 deployment block
 
-Do not deploy this revision while the PostgreSQL Compose volume reference/declaration mismatch is unresolved. Verify the live Coolify volume mapping and a restorable backup before changing either volume name. See `PLATFORM_ADOPTION_REPORT.md` and `BACKLOG.md`.
+The PostgreSQL source declaration is already reconciled to the proven logical volume `access_layer_postgres_data_v2`; JWT storage remains `access_layer_jwt_secrets`. Do not rename either logical or UUID-prefixed live volume or add an explicit physical name. Coolify visibly reported `Changes pending`, and the destination, restorable backup, registry, ownership and remaining continuity evidence are unresolved. Review those gates before any future production deploy. See `CURRENT_STATE.md` and `BACKLOG.md`.

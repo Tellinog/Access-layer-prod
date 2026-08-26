@@ -8,11 +8,11 @@ repository:
 coolify:
   version: 4.3.9
   server_name: agentic-unguess-prod
-  server_id: null
+  server_id: wx513ojqd80kdicevubog7
   project_name: agentic-unguess
-  project_id: null
+  project_id: xdihnb979tvyh9gdk72zfy7y
   environment_name: production
-  environment_id: null
+  environment_id: rd3mt4dkpqyghxlx9h96sdlo
   resource_name: access-layer-prod
   resource_id: u3cyw3y1obp88to9la0w8c75
   destination_id: null

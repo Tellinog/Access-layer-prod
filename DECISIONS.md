@@ -370,10 +370,26 @@ Decision: `specs/oauth-p0.v1.yml` is the normative Access Layer OAuth vNext P0 p
 
 Human OAuth `sub` remains `users.google_sub` under D-004. OAuth tokens are PII-minimised and exclude email, hosted domain, profile data, legacy role and legacy permissions by default. Business scopes are exact `project:domain:action` capability IDs and are granted only by the intersection of resource registration, client/resource allowance, effective human entitlement and central policy.
 
-OAuth client and resource identities are separate. A resource may explicitly bind to an existing legacy tool/grant entitlement domain without changing the legacy tool model. P0 first-party browser applications remain BFF/server-side-token based and use centrally administered grants without a new end-user consent screen. A public authorization-code client contract exists, but production rollout is disabled until a concrete approved consumer exists.
+OAuth client and resource identities are separate. As hardened by D-037, every P0 resource requires exactly one legacy-tool entitlement-only binding without changing the legacy tool model or making that tool the client or resource. P0 first-party browser applications remain BFF/server-side-token based and use centrally administered grants without a new end-user consent screen. A public authorization-code client contract exists, but production rollout is disabled until a concrete approved consumer exists.
 
 OAuth uses a dedicated signing key ring and `/oauth/jwks`; legacy signing material and `/v1/.well-known/jwks.json` remain untouched. New keys are published 300 seconds before activation, JWKS cache age is 300 seconds, verifier skew is 60 seconds, and old verification keys remain for at least 1,260 seconds after last use. OAuth refresh replay revokes the complete family and linked OAuth session.
 
 `client_credentials`, token exchange, `private_key_jwt`, downstream OIDC discovery/ID Token/UserInfo, dynamic registration, Client ID Metadata Documents, PAR, JAR and DPoP remain P1/deferred. Step 2 adds no handler, dependency, environment variable, table or migration.
 
 Rationale: a complete machine-testable contract is required before implementation, while signing-key isolation, role separation and additive storage preserve rollback and every frozen legacy consumer contract.
+
+## D-037 - Harden the OAuth P0 contract without runtime changes
+
+Status: accepted
+
+Confirmed: 2026-08-26
+
+Decision: the shared RequestContext v1 schema retains its canonical two-or-more-segment hierarchical identifier grammar under the existing schema ID. The stricter exact `project:domain:action` grammar belongs only to OAuth P0 scope, token and resource contracts.
+
+P0 PKCE accepts only verifiers of 43–128 RFC 7636 unreserved characters and S256 challenges of exactly 43 unpadded base64url characters; `plain` remains forbidden. Every P0 resource registration has exactly one `legacy_tool` entitlement-only binding. OAuth clients, OAuth resources and legacy tools remain separate identities, and native OAuth entitlement domains are deferred beyond P0.
+
+P0 introspection requires separately authorised resource-server credentials and discloses only audience-authorised RFC 9068 Bearer access tokens as active. Refresh, inactive, unknown and otherwise non-disclosable tokens return exactly `{"active":false}`; invalid caller credentials return HTTP 401. Refresh-token rotation and RFC 7009 revocation remain unchanged.
+
+Future OAuth vNext Google transactions return to `/oauth/upstream/google/callback`. It is an internal, non-advertised path, is not implemented in Step 2 and never reuses `/v1/auth/google/callback`. A later production Google registration must add the new URI without removing the legacy URI. Exact downstream client state is retained only in short-lived reversible protected storage, optionally indexed by a hash and never logged; upstream Google state and nonce may remain hash-only.
+
+Rationale: these rules remove incompatible shared-schema semantics and underspecified security behavior before implementation while preserving all frozen legacy contracts and keeping Step 2 contract-only.

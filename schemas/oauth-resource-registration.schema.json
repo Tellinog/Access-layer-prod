@@ -12,7 +12,7 @@
     "scopes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}$"}},
     "audience_policy": {"const": "exact_single_resource"},
     "protected_resource_metadata_url": {"type": "string", "format": "uri", "pattern": "^https://"},
-    "entitlement_binding": {"type": "object", "required": ["type", "legacy_tool_slug"], "properties": {"type": {"const": "legacy_tool"}, "legacy_tool_slug": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,62}$"}}, "additionalProperties": false},
+    "entitlement_binding": {"description": "The one mandatory P0 entitlement-only bridge to an existing legacy tool/grant domain; it does not identify the OAuth client or resource.", "type": "object", "required": ["type", "legacy_tool_slug"], "properties": {"type": {"const": "legacy_tool"}, "legacy_tool_slug": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,62}$"}}, "additionalProperties": false},
     "created_at": {"type": "string", "format": "date-time"},
     "updated_at": {"type": "string", "format": "date-time"}
   },

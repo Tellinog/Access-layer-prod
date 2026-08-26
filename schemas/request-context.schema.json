@@ -69,7 +69,7 @@
         "string",
         "null"
       ],
-      "pattern": "^[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}$"
+      "pattern": "^[a-z][a-z0-9-]+(?::[a-z][a-z0-9-]+){1,}$"
     },
     "permissions": {
       "type": "array",
@@ -84,7 +84,7 @@
       "uniqueItems": true,
       "items": {
         "type": "string",
-        "pattern": "^[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}$"
+        "pattern": "^[a-z][a-z0-9-]+(?::[a-z][a-z0-9-]+){1,}$"
       }
     },
     "invocation_channel": {

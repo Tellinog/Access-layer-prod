@@ -1,5 +1,46 @@
 # DEVLOG.md
 
+## 2026-08-26 - Step 2 OAuth P0 contract hardening
+
+Changed by: Codex
+Related task: Resolve independent-audit blockers without starting OAuth runtime implementation.
+
+### Changed
+
+- Restored the shared RequestContext v1 capability/scope grammar to the canonical two-or-more-segment hierarchy while retaining exact three-segment OAuth P0 scope rules.
+- Enforced RFC 7636 verifier syntax and exact unpadded S256 challenge syntax in the machine profile, target OpenAPI, fixtures and regressions.
+- Required exactly one legacy-tool entitlement-only binding per P0 resource, while keeping OAuth client/resource/tool identities separate and deferring native OAuth entitlement domains.
+- Limited P0 active introspection disclosure to RFC 9068 Bearer access tokens for separately authorised resource-server credentials; refresh and other non-disclosable tokens use exact `{"active":false}` responses.
+- Froze the future internal `/oauth/upstream/google/callback` without advertising or implementing it and preserved the legacy callback registration.
+- Replaced the hash-only downstream-state proposal with short-lived reversible protected storage plus optional hash and a no-logging rule.
+- Recorded the proven Coolify server/project/environment IDs, left destination unresolved, and added the visible `Changes pending` pre-deploy review blocker.
+- Removed the Step 2 Markdown trailing whitespace reported by `git diff --check`.
+
+### Behavior
+
+- OAuth runtime endpoints, migrations, dependencies, production environment, SDKs and consumers changed: no.
+- Legacy `/v1/*`, Google callback, JWT/JWKS, sessions, refresh tokens, grants, permissions, tool clients, cookies and Admin UI behavior changed: no.
+- Compose, live volumes, production resource and deployment changed: no; the approved logical-volume correction remains intact.
+
+### Tests/checks
+
+- `npm.cmd run lint` passed.
+- `npm.cmd run build` passed.
+- `npm.cmd test` passed: 12 files, 113 tests.
+- Targeted legacy baseline passed: one file, six tests.
+- Full Python conformance passed: 57 tests, two expected pristine-template bootstrap skips.
+- OAuth P0 validator passed all 18 check groups, including OpenAPI references and schema/example validation.
+- Production-continuity evidence remains `VALID_BUT_NOT_READY` with zero errors: isolated-restore false with 167 missing facts; N→N+1 false with 175 missing facts.
+- Non-strict platform check passed 27 checks with seven known warnings.
+- Strict platform check remains intentionally non-passing only on five external release gates and four legacy-migration warnings.
+- Resolved Compose keeps top-level volumes `access_layer_postgres_data_v2` and `access_layer_jwt_secrets`, the matching service sources, and null published `ports` for app/PostgreSQL.
+- `git diff --check` passed.
+
+### Decisions and follow-up
+
+- Recorded D-037 for the hardening rules above.
+- Do not start Step 3 or deploy. Resolve the `Changes pending` review, destination, backup/restore, registry, ownership, deployed-image and secret/key continuity gates first.
+
 ## 2026-08-25 - Step 2 OAuth vNext P0 contract freeze
 
 Changed by: Codex

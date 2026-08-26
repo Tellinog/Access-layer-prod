@@ -1,0 +1,10 @@
+{
+  "response_type": "code",
+  "client_id": "example-web-bff",
+  "redirect_uri": "https://client.invalid/oauth/callback",
+  "scope": "example-project:records:read",
+  "state": "example-client-state",
+  "code_challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  "code_challenge_method": "S256",
+  "resource": "https://example-resource.invalid/api"
+}

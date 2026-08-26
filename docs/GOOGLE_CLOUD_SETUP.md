@@ -142,3 +142,13 @@ Se l'organizzazione blocca app OAuth non approvate:
 - [ ] `GOOGLE_ALLOWED_HD` configurato.
 - [ ] Test interno/esterno completati.
 - [ ] Nessun token Google salvato o loggato.
+
+## Future OAuth vNext P0 registration (not implemented)
+
+Before OAuth vNext is enabled in a later approved step, add this production authorised redirect URI to the Google web client:
+
+```text
+https://access-layer.unguess-internal.net/oauth/upstream/google/callback
+```
+
+This URI is additive. Do not remove or replace the current production legacy URI `https://access-layer.unguess-internal.net/v1/auth/google/callback`. Step 2 does not change `GOOGLE_REDIRECT_URI`, Google Cloud configuration or runtime routes.

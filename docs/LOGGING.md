@@ -53,7 +53,7 @@ OAuth vNext target events (contract frozen, not emitted yet):
 | `oauth.client.changed` / `resource.changed` / `scope.changed` | Record controlled registration changes |
 | `oauth.signing_key.changed` | Record public `kid` lifecycle action without private key material |
 
-OAuth audit metadata may contain client ID, exact resource ID, canonical scope IDs, stable Google subject when known, correlation ID, outcome and non-sensitive reason code. It must not contain codes, tokens, client secrets, cookies, PKCE verifiers, private keys, secret hashes/verifiers or raw form bodies.
+OAuth audit metadata may contain client ID, exact resource ID, canonical scope IDs, stable Google subject when known, correlation ID, outcome and non-sensitive reason code. It must not contain codes, tokens, client secrets, cookies, PKCE verifiers, downstream client state, private keys, secret hashes/verifiers or raw form bodies.
 
 ## Campi comuni
 

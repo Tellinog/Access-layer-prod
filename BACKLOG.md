@@ -3,6 +3,7 @@
 ## BLOCKER
 
 - Confirm who receives bootstrap platform admin access after first deploy.
+- 2026-08-26 Step 3B: before Step 3D introduces any `protected_private_key_ref` consumer, define and test an allow-list for supported reference schemes and file roots; reject `..` traversal, relative/unsafe paths, encoded traversal and unsupported schemes before any read. Step 3B must not implement a private-key loader.
 - 2026-08-26 Step 3A hardening: before the first non-empty production OAuth registration or pilot, extend and prove backup/export/import/replace-restore coverage for all `oauth_*` state. The current legacy backup surfaces do not preserve these tables, and future `oauth_resource_entitlement_bindings` rows use `ON DELETE RESTRICT`, so a replace restore that runs `DELETE FROM tools` must use dependency-safe ordering. Do not register production OAuth state until this is implemented and restore-tested; no backup code changes are authorised in Step 3A hardening.
 - 2026-08-26 Step 2 hardening: production deployment remains blocked until the exact Coolify destination identity and central registry record are verified. Server `wx513ojqd80kdicevubog7`, project `xdihnb979tvyh9gdk72zfy7y`, environment `rd3mt4dkpqyghxlx9h96sdlo` and resource `u3cyw3y1obp88to9la0w8c75` are proven non-secret facts.
 - 2026-08-26 Step 2 hardening: Coolify visibly reported `Changes pending`. Before any future production deploy, an authorised operator must inspect the pending diff and resolve or explicitly accept it; this task does not apply it.
@@ -74,7 +75,7 @@
 - Full SIEM integration.
 - Dedicated SDK packages per framework.
 - Immutable append-only log storage with WORM retention.
-- OAuth protocol endpoints, discovery/JWKS handlers, upstream Google runtime, authorization/code/session/refresh/revocation transaction tables, token signing/authentication, registration/admin HTTP APIs and pilot records remain outside Step 3A. Production client/resource/scope/mapping/credential registration and any enablement remain deferred until separately approved steps and the release gates pass.
+- OAuth authorization-server discovery routing, authorize/token/revoke/introspect/upstream-Google runtime, authorization/code/session/refresh/revocation transaction tables, token signing/authentication, registration/admin HTTP APIs and pilot records remain outside Step 3B. Step 3B implements only default-off read-only OAuth JWKS and protected-resource metadata. Production client/resource/scope/mapping/credential registration and any enablement remain deferred until separately approved steps and the release gates pass.
 - OAuth P1 features: service principals, `client_credentials`, token exchange, `private_key_jwt`, downstream OIDC ID Token/UserInfo/discovery and dynamic client registration.
 - Native OAuth entitlement domains; every P0 resource instead requires exactly one existing `legacy_tool` entitlement-only binding.
 - UNGUESS Platform SDK dependency adoption and telemetry SDK integration.

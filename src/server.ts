@@ -1,8 +1,9 @@
 import { AuditLogger } from "./audit.js";
-import { buildApp } from "./app.js";
+import { buildApplication } from "./application.js";
 import { loadConfig } from "./config.js";
 import { PostgresDb } from "./db.js";
 import { GoogleAuthLibraryOidcClient } from "./google.js";
+import { OAuthFoundationRepository } from "./oauth/repository.js";
 import { Repositories } from "./repositories.js";
 import { TokenService } from "./token-service.js";
 
@@ -13,9 +14,10 @@ const audit = new AuditLogger(repositories);
 const tokenService = new TokenService(config);
 await tokenService.init();
 
-const app = await buildApp({
+const app = await buildApplication({
   config,
   repositories,
+  oauthRepository: new OAuthFoundationRepository(db),
   audit,
   google: new GoogleAuthLibraryOidcClient(config),
   tokenService

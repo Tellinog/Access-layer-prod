@@ -24,6 +24,17 @@
 | `/v1/admin/*` | Platform admin role, or delegated tool admin where explicitly allowed |
 | `/v1/.well-known/jwks.json` | Public |
 
+## Step 3B default-off read-only OAuth routes
+
+These routes exist only when `OAUTH_P0_ENABLED=true`; absent/false returns 404 and leaves the legacy inventory unchanged.
+
+| Method | Path | Result |
+|---|---|---|
+| GET | `/oauth/jwks` | Dedicated validated OAuth public verification keys; `Cache-Control: public, max-age=300`. Returns sanitized HTTP 503 `{ "error": "temporarily_unavailable" }` when no safe key exists. |
+| GET | `/.well-known/oauth-protected-resource/v1` | Frozen RFC 9728 metadata for `https://access-layer.unguess-internal.net/v1`, header-only Bearer transport and no pilot scopes. |
+
+`/.well-known/oauth-authorization-server` remains unregistered even with the flag true. Its exact frozen payload is built/tested but will not advertise authorize/token/revoke/introspect until those endpoints exist. All other `/oauth/*` protocol routes remain 404. The legacy `/v1/.well-known/jwks.json` endpoint is a separate unchanged key domain.
+
 ## Endpoints
 
 | Method | Path | Purpose | Auth required | Notes |

@@ -1,5 +1,38 @@
 # DEVLOG.md
 
+## 2026-08-26 - Step 3B read-only OAuth metadata/JWKS dark module
+
+Changed by: Codex
+Related task: Add only default-off read-only OAuth metadata/JWKS publication without starting authorization flow.
+
+### Changed
+
+- Added a separate application composer plus isolated OAuth metadata, JWKS-selection and HTTP modules; `src/app.ts` remains byte-identical.
+- Added pure frozen RFC 8414 and RFC 9728 builders. RFC 8414 remains deliberately unmounted while advertised protocol endpoints are absent.
+- Added flag-gated OAuth JWKS and protected-resource metadata GET routes. JWKS validates untrusted public metadata, publishes deterministic safe active/overlap keys and returns sanitized 503 when none are valid.
+- Recorded D-040 sequencing and the pre-Step-3D traversal/scheme-validation blocker for any future private-key reference loader.
+
+### Behavior
+
+- With `OAUTH_P0_ENABLED` absent/false, the application route inventory remains exactly legacy and every Step 3B path returns 404.
+- With the flag true, only `GET /oauth/jwks` and `GET /.well-known/oauth-protected-resource/v1` are newly reachable. Legacy JWKS and every other legacy behavior remain unchanged.
+- No authorization/token/refresh/revoke/introspect/upstream-Google runtime, private-key loading/signing, migration/table, pilot/seed, registration/admin API, dependency, consumer/SDK or production/Coolify action was added.
+
+### Tests/checks
+
+- `npm.cmd run lint` and `npm.cmd run build` passed.
+- Full Vitest passed: 14 files and 191 tests.
+- Python conformance reported 60 passed, 2 skipped (62 collected).
+- Frozen OAuth P0 validator passed all 24 check groups.
+- Production continuity remained `VALID_BUT_NOT_READY` with both readiness gates false.
+- Non-strict platform checker passed 27 checks with the seven known warnings.
+- Frozen source/spec/schema/migration/dependency audit and `git diff --check` passed.
+- Docker daemon/API, a local PostgreSQL listener and `psql` remain unavailable; no live migration/database test or production connection occurred. Step 3B adds no migration.
+
+### Decisions
+
+- D-040 records truthful metadata route sequencing and separate default-off composition; frozen protocol semantics are unchanged.
+
 ## 2026-08-26 - Step 3A OAuth Dark Foundation hardening
 
 Changed by: Codex

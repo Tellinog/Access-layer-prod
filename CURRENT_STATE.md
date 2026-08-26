@@ -2,7 +2,17 @@
 
 ## Phase
 
-V1 legacy implementation complete. Step 3A OAuth Dark Foundation is implemented locally as an additive, disabled persistence/domain layer. OAuth protocol runtime and environment-backed integration verification remain pending.
+V1 legacy implementation complete. Step 3B adds a local, default-off read-only OAuth metadata/JWKS module over the Step 3A foundation. Authorization, token and upstream Google runtime remain unimplemented.
+
+## Step 3B read-only OAuth metadata/JWKS dark module, 2026-08-26
+
+- Added a separate application composer and `src/oauth/` metadata, JWKS-selection and HTTP modules. The frozen `src/app.ts` legacy builder remains byte-identical; when `OAUTH_P0_ENABLED` is absent/false, the composer registers nothing and the legacy route inventory is exact.
+- With `OAUTH_P0_ENABLED=true`, only `GET /oauth/jwks` and `GET /.well-known/oauth-protected-resource/v1` are added. Authorization-server metadata, authorize, token, revoke, introspect and upstream Google callback routes remain 404.
+- Pure RFC 8414 and RFC 9728 builders reproduce the frozen examples. RFC 8414 is deliberately not routed until its advertised protocol endpoints exist; RFC 9728 remains the frozen header-only Bearer, empty-scope, no-pilot target metadata.
+- OAuth JWKS reads only public signing metadata through `OAuthFoundationRepository`, validates lifecycle and public-JWK shape, exposes valid `published` pre-activation overlap plus `active` verification keys, sorts by `kid`, and excludes staged/disabled/retired/invalid records. A successful response uses `Cache-Control: public, max-age=300`; no valid key or repository failure returns sanitized HTTP 503 `temporarily_unavailable` rather than an empty 200.
+- The legacy `/v1/.well-known/jwks.json` route, key material and response are unchanged. No private-key reference is selected, no key loader/signing path exists, and no migration, dependency, pilot/seed, registration/admin API, consumer/SDK or production/Coolify action was added.
+- Before Step 3D signing, any future file/reference loader must reject path traversal, unsafe paths and unsupported schemes. This is recorded as a blocker; Step 3B implements no loader.
+- Verification passes: lint/build; 191 Vitest tests across 14 files; Python reports 60 passed and 2 skipped from 62 collected; all 24 OAuth validator groups; continuity as `VALID_BUT_NOT_READY` with both gates false; non-strict platform validation with 27 passes/seven known warnings; and frozen-file/diff checks. Live PostgreSQL remains unavailable because Docker has no reachable daemon, no local PostgreSQL listener exists, and `psql` is absent.
 
 ## Step 3A OAuth Dark Foundation, 2026-08-26
 

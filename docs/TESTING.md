@@ -1,18 +1,26 @@
 # TESTING.md
 
+## Step 3B read-only OAuth metadata/JWKS conformance
+
+`tests/oauth-darkness.test.ts` compares the default-off composed route inventory to the unchanged legacy `buildApp`, proves the two new paths remain 404 when disabled, and proves only `/oauth/jwks` plus RFC 9728 protected-resource metadata become reachable when enabled. Authorization-server metadata, authorize, token, revoke, introspect and upstream Google remain 404. The legacy JWKS response is identical for both flag states.
+
+Pure tests deep-equal both frozen metadata examples. JWKS tests include valid active and published pre-activation overlap keys in deterministic `kid` order; exclude staged, disabled, retired, malformed, incoherent and not-yet-published rows; enforce the exact 300-second public cache header; prove serialization is restricted to six public RSA members even for an injected extra reference-like field; and require sanitized 503 `temporarily_unavailable` for empty/invalid/repository-failure states.
+
+Final Step 3B result: lint/build passed; Vitest passed 191 tests across 14 files; Python reported 60 passed, 2 skipped (62 collected); the OAuth validator passed 24 check groups; continuity remained `VALID_BUT_NOT_READY` with both gates false; non-strict platform validation passed 27 checks with seven known warnings; and the frozen-file audit plus `git diff --check` passed. Live PostgreSQL application remains unavailable for the previously recorded environmental reasons; Step 3B adds no migration.
+
 ## Step 3A OAuth dark-foundation conformance
 
 `tests/oauth-foundation.test.ts` deterministically verifies that `migrations/003_oauth_dark_foundation.sql` creates exactly the ten approved tables, contains no destructive/legacy DDL or data write, omits all protocol transaction tables and includes the required identity, redirect, mapping, allow-list, hash-only credential and signing-key constraints. Signing coverage includes the exact 300-second publication lead, 1,260-second post-signature retention, retirement ordering, status/timestamp coherence and NULL-safe required-string public JWK checks.
 
 The same suite exercises synthetic fail-closed registration helpers for exact three-segment OAuth scopes, exact legacy tool-slug and permission grammars, schema-parity redirect/resource URI syntax, confidential/public credential-presence lifecycle metadata, complete one-to-one entitlement mapping coverage, registered permissions and explicit client/resource/scope allow-list rows. URI cases cover raw whitespace/control, backslash, malformed percent escapes, userinfo, fragments and wildcards while proving valid strings are not rewritten. Signing tests reject insufficient lead/retention, incoherent active/retired timestamps, missing/null/wrong-type/empty required public JWK members and every forbidden private member. Repository tests prove absence denies, legacy access is read-only and limited to entitlement lookup, resource credential queries do not select hashes, and signing-key queries expose neither private material nor the protected private-key reference.
 
-`tests/oauth-darkness.test.ts` builds the actual Fastify app with `OAUTH_P0_ENABLED=false` and `true`, proves identical route inventories, and receives HTTP 404 for metadata, protected-resource metadata, authorize, token, revoke, introspect, OAuth JWKS and upstream Google callback paths. `tests/config.test.ts` proves an old environment with the variable absent defaults to false and that the optional flag creates no new OAuth secret/key/credential requirement.
+Step 3B supersedes the Step 3A all-dark HTTP assertion while preserving the default-off result. `tests/config.test.ts` proves an old environment with the variable absent defaults to false and that the optional flag creates no new OAuth secret/key/credential requirement.
 
 The frozen legacy source/route/error/payload checks remain active. The legacy config hash witness removes only the exact additive default-false assignment before comparing to the Step 1 hash; any other change still fails. `specs/oauth-p0.v1.yml`, target OAuth OpenAPI/schemas/examples and the historical legacy OpenAPI remain unchanged.
 
 Live migration application was unavailable in this workspace: the Docker client cannot reach `npipe:////./pipe/docker_engine`, no PostgreSQL tools are installed, and `127.0.0.1:5432` refuses connections. No production database was contacted. A disposable PostgreSQL 16 apply plus old-binary smoke test remains recorded in `../BACKLOG.md`; until then, the deterministic migration test is the Step 3A evidence for expand-only shape and required constraints.
 
-Final Step 3A hardening result: lint/build passed; Vitest passed 190 tests across 14 files; the Python suite passed 62 tests with two expected skips; the OAuth validator passed 24 check groups; continuity remained schema-valid `VALID_BUT_NOT_READY`; non-strict platform validation passed 27 checks with seven known warnings; the frozen-file diff audit and `git diff --check` passed. Migration `003` contains exactly ten tables and has hardening SHA-256 `96B3993FCFDB930597CBDECA37E86D51DF486FD9E951970D156A21C454F18EFE`.
+Final Step 3A hardening result: lint/build passed; Vitest passed 190 tests across 14 files; the Python suite reported 60 passed, 2 skipped (62 collected); the OAuth validator passed 24 check groups; continuity remained schema-valid `VALID_BUT_NOT_READY`; non-strict platform validation passed 27 checks with seven known warnings; the frozen-file diff audit and `git diff --check` passed. Migration `003` contains exactly ten tables and has hardening SHA-256 `96B3993FCFDB930597CBDECA37E86D51DF486FD9E951970D156A21C454F18EFE`.
 
 ## Step 2 OAuth P0 contract conformance
 

@@ -46,6 +46,12 @@ The separately approved Step 3A scope implements one expand-only ten-table regis
 
 Still out of scope are every OAuth protocol or metadata route, upstream Google callback runtime, authorization transaction/code/session/refresh/revocation tables, token signing/verification, credential authentication, registration/admin HTTP API, pilot/seed data, production enablement/deploy and consumer or Platform SDK changes.
 
+## Step 3B read-only metadata/JWKS boundary
+
+Step 3B implements pure frozen RFC 8414/RFC 9728 builders, deterministic public OAuth JWKS selection and only two default-off HTTP routes: `/oauth/jwks` and `/.well-known/oauth-protected-resource/v1`. RFC 8414 authorization-server metadata is not routed until its advertised endpoints exist.
+
+Authorize, token, refresh, revoke, introspect, upstream Google, private-key loading/signing, protocol transaction tables, registration/admin APIs, pilots/seeds, production actions, consumers and SDKs remain out of scope.
+
 ## Personas
 
 | Persona | Goal | Main needs | Notes |

@@ -421,3 +421,15 @@ Decision: implement Step 3A through one expand-only `003_oauth_dark_foundation.s
 Rationale: a separate schema/module boundary makes the additive storage reviewable and old-binary compatible, prevents accidental coupling to the frozen legacy path, and leaves all protocol behavior for a later separately approved step. This decision records implementation structure only; D-036, D-037, D-038 and `specs/oauth-p0.v1.yml` remain the protocol semantics.
 
 Hardening note, 2026-08-26: the same boundary owns schema-parity URI and client-credential-lifecycle validation plus a pure signing-key lifecycle/public-JWK validator. Because migration `003` is unreleased, its signing constraints are hardened in place to encode the already-frozen 300/1,260-second rules and NULL-safe public-JWK shape. This refines D-039's implementation structure and introduces no protocol decision.
+
+## D-040 - Sequence read-only OAuth metadata before authorization-server discovery
+
+Status: accepted
+
+Confirmed: 2026-08-26
+
+Decision: compose Step 3B outside the frozen legacy `buildApp` boundary. `OAUTH_P0_ENABLED=true` registers only the dedicated read-only `/oauth/jwks` and RFC 9728 protected-resource metadata routes. The exact frozen RFC 8414 payload is built and tested now but its well-known route remains unregistered while authorize, token, revoke and introspect are absent, so the service does not advertise endpoints that return 404.
+
+OAuth JWKS publication uses only repository-returned public metadata, validates lifecycle and public-JWK shape, publishes valid pre-activation `published` and `active` records in deterministic `kid` order, and returns sanitized `temporarily_unavailable` when no safe key exists. It never falls back to or changes the legacy key ring.
+
+Rationale: a separate default-off composer preserves the frozen legacy source and route inventory while allowing truthful incremental publication. This decision records implementation sequencing only and does not revise D-036 through D-039 or the frozen target contract.

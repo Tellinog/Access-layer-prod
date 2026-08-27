@@ -151,10 +151,14 @@ class OAuthP0ContractTests(unittest.TestCase):
 
     def test_introspection_discloses_only_access_tokens_as_active(self) -> None:
         openapi = validator.load_yaml("schemas/access-layer-oauth-v1.openapi.yaml")
+        revocation_schema = openapi["components"]["schemas"]["RevocationRequest"]
         request_schema = openapi["components"]["schemas"]["IntrospectionRequest"]
         response_schema = openapi["components"]["schemas"]["IntrospectionResponse"]
         self.assertEqual([], validator.schema_errors({"token": "synthetic", "token_type_hint": "access_token"}, request_schema))
-        self.assertTrue(validator.schema_errors({"token": "synthetic", "token_type_hint": "refresh_token"}, request_schema))
+        self.assertEqual([], validator.schema_errors({"token": "synthetic", "token_type_hint": "refresh_token"}, request_schema))
+        self.assertEqual([], validator.schema_errors({"token": "synthetic", "token_type_hint": "unknown_type"}, request_schema))
+        for hint in ["access_token", "refresh_token", "unknown_type"]:
+            self.assertEqual([], validator.schema_errors({"token": "synthetic", "token_type_hint": hint}, revocation_schema))
         self.assertEqual([], validator.schema_errors({"active": False}, response_schema))
         self.assertTrue(validator.schema_errors({"active": False, "reason": "revoked"}, response_schema))
         self.assertEqual(
@@ -169,6 +173,10 @@ class OAuthP0ContractTests(unittest.TestCase):
             contract["active_disclosure_audience_rule"],
         )
         self.assertEqual("active_false_only", contract["audience_mismatch_response"])
+        self.assertEqual("advisory_ignored_for_active_disclosure", contract["token_type_hint_semantics"])
+        revocation = validator.load_yaml("specs/oauth-p0.v1.yml")["revocation"]
+        self.assertEqual("advisory_lookup_order_only", revocation["token_type_hint_semantics"])
+        self.assertEqual("jwt_exp_plus_verifier_clock_skew", revocation["access_token_jti_retention_deadline"])
         auth = contract["authentication"]
         self.assertEqual("client_secret_basic", auth["method"])
         self.assertEqual("oauth_resource", auth["credential_owner"])

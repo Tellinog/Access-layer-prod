@@ -5,6 +5,7 @@ import type { Config } from "../types.js";
 import { isCanonicalOAuthScope, isExactOAuthHttpsUri, isExactOAuthRedirectUri } from "./validation.js";
 import {
   OAUTH_ACCESS_TOKEN_TTL_SECONDS,
+  OAUTH_VERIFIER_CLOCK_SKEW_SECONDS,
   OAuthAccessTokenSigner,
   OAuthSigningUnavailableError,
   selectOAuthSigningKey,
@@ -274,7 +275,7 @@ export class OAuthTokenLifecycleService {
 
   async revoke(input: {
     token: string;
-    tokenTypeHint?: "access_token" | "refresh_token";
+    tokenTypeHint?: string;
     clientId: string;
     clientSecret?: string | null;
   }): Promise<void> {
@@ -282,36 +283,48 @@ export class OAuthTokenLifecycleService {
     const now = (this.input.now ?? (() => new Date()))();
     await this.input.repository.transaction(async (repository) => {
       const client = await this.authenticateClient(repository, input.clientId, input.clientSecret, null, now);
-      let handled = false;
-      if (input.tokenTypeHint !== "refresh_token") {
+      const revokeAccessToken = async (): Promise<boolean> => {
+        let claims: OAuthAccessTokenClaims;
         try {
           const unverified = decodeJwt(input.token);
-          if (typeof unverified.aud === "string") {
-            const claims = await verifyOAuthAccessToken({
-              token: input.token, issuer: this.input.config.authIssuer,
-              audience: unverified.aud, keys: await repository.listVerificationKeys(), now
-            });
-            if (claims.client_id === client.clientId) {
-              const oauthResourceId = await repository.resolveOAuthResourceInternalId(claims.aud);
-              if (oauthResourceId) {
-                await repository.recordAccessTokenRevocation({
-                  jti: claims.jti, expiresAt: new Date(claims.exp * 1000), oauthClientId: client.id,
-                  oauthResourceId, clientId: client.clientId, resourceId: claims.aud,
-                  correlationId: randomUUID(), now
-                });
-                handled = true;
-              }
-            }
-          }
+          if (typeof unverified.aud !== "string") return false;
+          claims = await verifyOAuthAccessToken({
+            token: input.token, issuer: this.input.config.authIssuer,
+            audience: unverified.aud, keys: await repository.listVerificationKeys(), now
+          });
         } catch {
           // Unknown, malformed and non-OAuth candidates are deliberately non-disclosable.
+          return false;
         }
-      }
-      if (!handled && input.tokenTypeHint !== "access_token") {
+        if (claims.client_id !== client.clientId) return false;
+        const oauthResourceId = await repository.resolveOAuthResourceInternalId(claims.aud);
+        if (!oauthResourceId) return false;
+        const retentionExpiresAt = new Date(
+          (claims.exp + OAUTH_VERIFIER_CLOCK_SKEW_SECONDS) * 1000
+        );
+        await repository.recordAccessTokenRevocation({
+          jti: claims.jti, retentionExpiresAt, oauthClientId: client.id,
+          oauthResourceId, clientId: client.clientId, resourceId: claims.aud,
+          correlationId: randomUUID(), now
+        });
+        return true;
+      };
+      const revokeRefreshToken = async (): Promise<boolean> => {
         const context = await repository.lockRefreshByHash(refreshHash);
         if (context && context.oauthClientId === client.id) {
           await repository.revokeRefreshFamily(context, now, "client_revocation");
+          return true;
+        }
+        return false;
+      };
+      const lookups = input.tokenTypeHint === "refresh_token"
+        ? [revokeRefreshToken, revokeAccessToken]
+        : [revokeAccessToken, revokeRefreshToken];
+      let handled = false;
+      for (const lookup of lookups) {
+        if (await lookup()) {
           handled = true;
+          break;
         }
       }
       if (!handled) {
@@ -324,6 +337,7 @@ export class OAuthTokenLifecycleService {
 
   async introspect(input: {
     token: string;
+    tokenTypeHint?: string;
     credentialId: string;
     credentialSecret: string;
     correlationId?: string;

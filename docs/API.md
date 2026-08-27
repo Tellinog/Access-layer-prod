@@ -50,7 +50,7 @@ Untrusted client or redirect input receives a local OAuth JSON error and is neve
 
 ## Step 3D unmounted token-lifecycle core
 
-Step 3D implements the internal repository/service behavior for code exchange, OAuth client/resource credential verification, dedicated-key access-token signing, refresh rotation/replay, revocation and introspection. It adds no Fastify registration: `/oauth/token`, `/oauth/revoke`, `/oauth/introspect` and `/.well-known/oauth-authorization-server` still return 404 in both flag states. The target-only request/response shapes in `../schemas/access-layer-oauth-v1.openapi.yaml` remain frozen inputs for a later Step 3E mount.
+Step 3D implements the internal repository/service behavior for code exchange, OAuth client/resource credential verification, dedicated-key access-token signing, refresh rotation/replay, revocation and introspection. Revocation and introspection `token_type_hint` values are advisory: a wrong or unknown revocation hint cannot prevent lookup of the other supported token class, and introspection ignores the hint without widening its access-token-only active disclosure. Access-token jti revocation is retained through `exp` plus the frozen 60-second verifier clock-skew window. It adds no Fastify registration: `/oauth/token`, `/oauth/revoke`, `/oauth/introspect` and `/.well-known/oauth-authorization-server` still return 404 in both flag states. The target-only request/response shapes in `../schemas/access-layer-oauth-v1.openapi.yaml` remain frozen inputs for a later Step 3E mount.
 
 ## Endpoints
 

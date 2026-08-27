@@ -1,5 +1,30 @@
 # DEVLOG.md
 
+## 2026-08-27 - Step 3D final OAuth lifecycle semantics hardening
+
+Changed by: Codex
+Related task: Finalize advisory RFC token hints, skew-safe access-jti revocation and monotonic signing timestamps without mounting Step 3D routes.
+
+### Changed
+
+- RFC 7009 `token_type_hint` now selects lookup order only. Client authentication still happens first; a miss falls through to the other supported type, unknown hints use default order, exact OAuth client ownership remains required and every outcome stays externally non-disclosing.
+- RFC 7662 hints are accepted as advisory and ignored by the unmounted introspection core. Target OpenAPI and the machine contract now accept wrong/unknown strings while retaining access-token-only, exact-audience `active:true` disclosure and `active:false` for refresh tokens.
+- Access-token jti revocation retention is now JWT `exp + 60 seconds`; revocation inside the accepted skew window still persists, repeated writes can only extend retention, and the online query cannot resurrect a revoked token before verifier acceptance ends.
+- OAuth signing-key `last_signed_at` now uses a guarded SQL maximum so backwards wall-clock observations cannot reduce the retirement-grace basis.
+- Added final-hardening regressions for wrong/unknown hints, skew-window revocation/boundaries and monotonic signing time while preserving all earlier Step 3D race, replay, persisted-state and key-isolation coverage.
+
+### Boundary
+
+- Migration 005 is unchanged and remains the only Step 3D migration, with exactly four approved OAuth lifecycle tables. No migration 006 exists.
+- Token, revoke, introspect and RFC 8414 routes remain unmounted. Legacy `/v1/*`, Steps 1–3C, dependencies, pilots, registration/admin APIs, deployment and production configuration remain unchanged.
+
+### Tests/checks
+
+- TypeScript lint and build passed. Full Vitest passed 283 tests across 16 files, including all 28 token-lifecycle tests.
+- Python unittest discovery passed 60 tests with two expected skips (62 collected). The OAuth validator passed all 24 check groups. Continuity returned the expected schema-valid `VALID_BUT_NOT_READY` status with both readiness gates false, and non-strict platform validation passed 27 checks with seven known warnings.
+- Migration 005 shape/hash and the frozen legacy/Steps 1–3C/dependency boundary passed, as did `git diff --check`. Migration 005 remains byte-unchanged at SHA-256 `aaffcb469000f62e680b5d391360fdacc4414e4280ba230e90e7fd4eee4dafbe` and no migration 006 exists.
+- The Docker CLI is installed but cannot reach `npipe:////./pipe/docker_engine`; `psql` is absent and `127.0.0.1:5432` is closed. No disposable-PostgreSQL apply or real same-refresh concurrency run is claimed, the existing release assumption remains open, and production was not contacted.
+
 ## 2026-08-27 - Step 3D dark OAuth token-lifecycle core
 
 Changed by: Codex

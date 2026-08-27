@@ -142,6 +142,8 @@ The migration performs no `ALTER`, seed or data write and does not change migrat
 
 Code exchange first authenticates with SHARE locks, then UPDATE-locks only the matching authorization-code row and SHARE-locks authorization/client/resource/user/grant rows. Refresh UPDATE-locks only the refresh-token/family/session rows and SHARE-locks the related authorization/client/resource/user/grant rows. Entitlement rows remain SHARE-locked in canonical scope order. This avoids SHARE-to-UPDATE upgrades on read-only rows and preserves the required loser path where same-token concurrency observes `consumed`, commits family/session replay revocation and returns `invalid_grant`.
 
+For `oauth_revocations.target_type = 'access_token_jti'`, `expires_at` is the online revocation-retention deadline (`JWT exp + 60-second verifier skew`), not a rewrite of the JWT expiry. Repeated inserts retain the greatest deadline. `oauth_signing_keys.last_signed_at` updates also use a guarded SQL maximum, preventing clock rollback from shortening the signing-key retirement grace.
+
 Live application of 001→005 remains required on disposable PostgreSQL 16 when available. Deterministic shape and repository/service race tests are not a claim that PostgreSQL accepted the migration.
 # Step 2 continuity note
 

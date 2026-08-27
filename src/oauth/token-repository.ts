@@ -579,7 +579,7 @@ export class OAuthTokenRepository {
 
   async recordAccessTokenRevocation(input: {
     jti: string;
-    expiresAt: Date;
+    retentionExpiresAt: Date;
     oauthClientId: string;
     oauthResourceId: string;
     clientId: string;
@@ -587,13 +587,14 @@ export class OAuthTokenRepository {
     correlationId: string;
     now: Date;
   }): Promise<void> {
-    if (input.expiresAt.getTime() <= input.now.getTime()) return;
+    if (input.retentionExpiresAt.getTime() <= input.now.getTime()) return;
     await this.db.query(
       `INSERT INTO oauth_revocations (
          target_type, target_id, oauth_client_id, oauth_resource_id, reason_code, revoked_at, expires_at
        ) VALUES ('access_token_jti',$1,$2,$3,'client_revocation',$4,$5)
-       ON CONFLICT (target_type, target_id) DO NOTHING`,
-      [input.jti, input.oauthClientId, input.oauthResourceId, input.now, input.expiresAt]
+       ON CONFLICT (target_type, target_id) DO UPDATE
+       SET expires_at = GREATEST(oauth_revocations.expires_at, EXCLUDED.expires_at)`,
+      [input.jti, input.oauthClientId, input.oauthResourceId, input.now, input.retentionExpiresAt]
     );
     await this.writeOAuthAudit({
       eventType: "oauth.token.revoked", outcome: "success", correlationId: input.correlationId,
@@ -696,7 +697,8 @@ export class OAuthTokenRepository {
 
   private async markSigningKeyUsed(signingKeyId: string, now: Date): Promise<void> {
     const key = await this.db.query(
-      `UPDATE oauth_signing_keys SET last_signed_at = $2
+      `UPDATE oauth_signing_keys
+       SET last_signed_at = GREATEST(COALESCE(last_signed_at, $2), $2)
        WHERE id = $1 AND key_namespace = 'oauth_p0' AND status = 'active'
          AND activates_at <= $2 AND retire_after IS NULL`,
       [signingKeyId, now]

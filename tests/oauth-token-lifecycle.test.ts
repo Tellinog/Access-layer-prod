@@ -9,6 +9,7 @@ import { hashOAuthCredentialSecret, sha256 } from "../src/security.js";
 import {
   OAUTH_ACCESS_TOKEN_TTL_SECONDS,
   OAUTH_SIGNING_KEY_MAX_BYTES,
+  OAUTH_VERIFIER_CLOCK_SKEW_SECONDS,
   OAuthAccessTokenSigner,
   OAuthSigningUnavailableError,
   loadOAuthPrivateSigningKey,
@@ -298,6 +299,7 @@ class MemoryOAuthTokenRepository extends OAuthTokenRepository {
   replayRevoked = false;
   familyRevoked = false;
   accessRevoked = false;
+  accessRevocationExpiresAt: Date | null = null;
   onlineActive = true;
   introspections: boolean[] = [];
   codeDenials: Array<Record<string, unknown>> = [];
@@ -384,9 +386,23 @@ class MemoryOAuthTokenRepository extends OAuthTokenRepository {
     this.familyRevoked = true; context.familyStatus = "revoked"; context.sessionStatus = "revoked";
   }
   override async resolveOAuthResourceInternalId(): Promise<string | null> { return oauthResourceId; }
-  override async recordAccessTokenRevocation(): Promise<void> { this.accessRevoked = true; }
+  override async recordAccessTokenRevocation(
+    input: Parameters<OAuthTokenRepository["recordAccessTokenRevocation"]>[0]
+  ): Promise<void> {
+    if (input.retentionExpiresAt.getTime() <= input.now.getTime()) return;
+    this.accessRevoked = true;
+    if (!this.accessRevocationExpiresAt || input.retentionExpiresAt > this.accessRevocationExpiresAt) {
+      this.accessRevocationExpiresAt = input.retentionExpiresAt;
+    }
+  }
   override async writeRevocationAudit(): Promise<void> { return undefined; }
-  override async isAccessTokenActiveOnline(): Promise<boolean> { return this.onlineActive && !this.accessRevoked; }
+  override async isAccessTokenActiveOnline(
+    input: Parameters<OAuthTokenRepository["isAccessTokenActiveOnline"]>[0]
+  ): Promise<boolean> {
+    const revoked = this.accessRevoked && this.accessRevocationExpiresAt !== null &&
+      this.accessRevocationExpiresAt.getTime() > input.now.getTime();
+    return this.onlineActive && !revoked;
+  }
   override async writeIntrospectionAudit(input: { active: boolean }): Promise<void> { this.introspections.push(input.active); }
   override async recordCodeExchangeDeniedAudit(input: Record<string, unknown>): Promise<void> {
     if (this.failCodeDenialAudit) throw new Error("audit unavailable");
@@ -394,7 +410,7 @@ class MemoryOAuthTokenRepository extends OAuthTokenRepository {
   }
 }
 
-async function serviceFixture() {
+async function serviceFixture(now: () => Date = () => fixedNow) {
   const repository = new MemoryOAuthTokenRepository();
   repository.clientCredentialHash = await hashOAuthCredentialSecret(clientSecret, pepper);
   repository.resourceCredentialHash = await hashOAuthCredentialSecret(resourceSecret, pepper);
@@ -407,7 +423,7 @@ async function serviceFixture() {
         oauthSigningKeyRoot: tempRoot,
         toolClientSecretPepper: "legacy-tool-only-pepper"
       },
-      repository, now: () => fixedNow
+      repository, now
     })
   };
 }
@@ -640,6 +656,40 @@ describe("OAuth token-lifecycle service", () => {
     expect(repository.familyRevoked).toBe(true);
   });
 
+  it("treats wrong and unknown RFC 7009 hints only as lookup-order advice", async () => {
+    const refreshWithAccessHint = await serviceFixture();
+    const first = await refreshWithAccessHint.service.exchangeAuthorizationCode({
+      code: "raw-code", clientId, clientSecret,
+      redirectUri: refreshWithAccessHint.repository.code.redirectUri,
+      resource: resourceId, codeVerifier: verifier
+    });
+    await expect(refreshWithAccessHint.service.revoke({
+      token: first.refreshToken, tokenTypeHint: "access_token", clientId, clientSecret
+    })).resolves.toBeUndefined();
+    expect(refreshWithAccessHint.repository.familyRevoked).toBe(true);
+
+    const accessWithRefreshHint = await serviceFixture();
+    const second = await accessWithRefreshHint.service.exchangeAuthorizationCode({
+      code: "raw-code", clientId, clientSecret,
+      redirectUri: accessWithRefreshHint.repository.code.redirectUri,
+      resource: resourceId, codeVerifier: verifier
+    });
+    await expect(accessWithRefreshHint.service.revoke({
+      token: second.accessToken, tokenTypeHint: "refresh_token", clientId, clientSecret
+    })).resolves.toBeUndefined();
+    expect(accessWithRefreshHint.repository.accessRevoked).toBe(true);
+
+    const unknownHint = await serviceFixture();
+    const third = await unknownHint.service.exchangeAuthorizationCode({
+      code: "raw-code", clientId, clientSecret, redirectUri: unknownHint.repository.code.redirectUri,
+      resource: resourceId, codeVerifier: verifier
+    });
+    await expect(unknownHint.service.revoke({
+      token: third.refreshToken, tokenTypeHint: "urn:example:unknown-token", clientId, clientSecret
+    })).resolves.toBeUndefined();
+    expect(unknownHint.repository.familyRevoked).toBe(true);
+  });
+
   it("keeps access-token revocation durable across resource disable and re-enable", async () => {
     const { repository, service } = await serviceFixture();
     const issued = await service.exchangeAuthorizationCode({
@@ -652,6 +702,59 @@ describe("OAuth token-lifecycle service", () => {
     repository.onlineActive = true;
     await expect(service.introspect({
       token: issued.accessToken, credentialId: "resource-credential", credentialSecret: resourceSecret
+    })).resolves.toEqual({ active: false });
+  });
+
+  it("retains jti revocation through the complete verifier clock-skew window", async () => {
+    let currentNow = fixedNow;
+    const { repository, service } = await serviceFixture(() => currentNow);
+    const issued = await service.exchangeAuthorizationCode({
+      code: "raw-code", clientId, clientSecret, redirectUri: repository.code.redirectUri,
+      resource: resourceId, codeVerifier: verifier
+    });
+    const exp = decodeJwt(issued.accessToken).exp!;
+    await service.revoke({ token: issued.accessToken, tokenTypeHint: "access_token", clientId, clientSecret });
+    expect(repository.accessRevocationExpiresAt).toEqual(
+      new Date((exp + OAUTH_VERIFIER_CLOCK_SKEW_SECONDS) * 1000)
+    );
+
+    currentNow = new Date((exp + 30) * 1000);
+    await expect(service.introspect({
+      token: issued.accessToken, credentialId: "resource-credential", credentialSecret: resourceSecret
+    })).resolves.toEqual({ active: false });
+    currentNow = new Date((exp + OAUTH_VERIFIER_CLOCK_SKEW_SECONDS - 1) * 1000);
+    await expect(service.introspect({
+      token: issued.accessToken, credentialId: "resource-credential", credentialSecret: resourceSecret
+    })).resolves.toEqual({ active: false });
+    currentNow = new Date((exp + OAUTH_VERIFIER_CLOCK_SKEW_SECONDS) * 1000);
+    await expect(service.introspect({
+      token: issued.accessToken, credentialId: "resource-credential", credentialSecret: resourceSecret
+    })).resolves.toEqual({ active: false });
+    currentNow = new Date((exp + OAUTH_VERIFIER_CLOCK_SKEW_SECONDS + 1) * 1000);
+    await expect(service.introspect({
+      token: issued.accessToken, credentialId: "resource-credential", credentialSecret: resourceSecret
+    })).resolves.toEqual({ active: false });
+  });
+
+  it("persists revocation initiated inside the accepted skew window until acceptance ends", async () => {
+    let currentNow = fixedNow;
+    const { repository, service } = await serviceFixture(() => currentNow);
+    const issued = await service.exchangeAuthorizationCode({
+      code: "raw-code", clientId, clientSecret, redirectUri: repository.code.redirectUri,
+      resource: resourceId, codeVerifier: verifier
+    });
+    const exp = decodeJwt(issued.accessToken).exp!;
+    currentNow = new Date((exp + 30) * 1000);
+    await expect(service.revoke({
+      token: issued.accessToken, tokenTypeHint: "refresh_token", clientId, clientSecret
+    })).resolves.toBeUndefined();
+    expect(repository.accessRevocationExpiresAt).toEqual(
+      new Date((exp + OAUTH_VERIFIER_CLOCK_SKEW_SECONDS) * 1000)
+    );
+    currentNow = new Date((exp + OAUTH_VERIFIER_CLOCK_SKEW_SECONDS - 1) * 1000);
+    await expect(service.introspect({
+      token: issued.accessToken, tokenTypeHint: "unknown_type",
+      credentialId: "resource-credential", credentialSecret: resourceSecret
     })).resolves.toEqual({ active: false });
   });
 
@@ -676,6 +779,24 @@ describe("OAuth token-lifecycle service", () => {
     })).resolves.toEqual({ active: false });
     expect(repository.introspections).toEqual([true, false, false]);
   });
+
+  it("ignores wrong or unknown RFC 7662 hints without widening active disclosure", async () => {
+    const { repository, service } = await serviceFixture();
+    const issued = await service.exchangeAuthorizationCode({
+      code: "raw-code", clientId, clientSecret, redirectUri: repository.code.redirectUri,
+      resource: resourceId, codeVerifier: verifier
+    });
+    for (const tokenTypeHint of ["refresh_token", "unknown_type"]) {
+      await expect(service.introspect({
+        token: issued.accessToken, tokenTypeHint,
+        credentialId: "resource-credential", credentialSecret: resourceSecret
+      })).resolves.toMatchObject({ active: true, aud: resourceId });
+      await expect(service.introspect({
+        token: issued.refreshToken, tokenTypeHint,
+        credentialId: "resource-credential", credentialSecret: resourceSecret
+      })).resolves.toEqual({ active: false });
+    }
+  });
 });
 
 describe("repository race and secrecy SQL", () => {
@@ -689,7 +810,8 @@ describe("repository race and secrecy SQL", () => {
     expect(source).toContain("status = 'consumed', consumed_at = $2");
     expect(source).toContain("status = 'revoked'");
     expect(source).toContain("oauth.refresh.replay_detected");
-    expect(source).toContain("last_signed_at = $2");
+    expect(source).toContain("last_signed_at = GREATEST(COALESCE(last_signed_at, $2), $2)");
+    expect(source).toContain("GREATEST(oauth_revocations.expires_at, EXCLUDED.expires_at)");
     expect(source).toContain("authorization.granted_scopes AS authorization_granted_scopes");
     expect(source).toContain("oauth.code.exchange_denied");
     expect(source).toContain("WHERE resource_id = $1 AND audience_policy = 'exact_single_resource'");
@@ -697,5 +819,27 @@ describe("repository race and secrecy SQL", () => {
     expect(source).not.toMatch(/INSERT INTO (sessions|refresh_tokens|one_time_codes|authorization_grants)/);
     expect(source).not.toMatch(/UPDATE (sessions|refresh_tokens|one_time_codes|authorization_grants)/);
     expect(source).not.toContain("TOOL_CLIENT_SECRET_PEPPER");
+  });
+
+  it("keeps last_signed_at monotonic when an observed signing clock moves backwards", async () => {
+    let persisted = new Date("2026-08-27T10:05:00.000Z");
+    const db: Db = {
+      query: async <T>(sql: string, params: unknown[] = []) => {
+        expect(sql).toContain("GREATEST(COALESCE(last_signed_at, $2), $2)");
+        const observed = params[1] as Date;
+        persisted = new Date(Math.max(persisted.getTime(), observed.getTime()));
+        return { rows: [] as T[], rowCount: 1, command: "UPDATE", oid: 0, fields: [] };
+      },
+      transaction: async (fn) => fn(db),
+      close: async () => undefined
+    };
+    const repository = new OAuthTokenRepository(db);
+    const markSigningKeyUsed = repository as unknown as {
+      markSigningKeyUsed(signingKeyId: string, now: Date): Promise<void>;
+    };
+    await markSigningKeyUsed.markSigningKeyUsed(signingKey.id, new Date("2026-08-27T10:04:00.000Z"));
+    expect(persisted).toEqual(new Date("2026-08-27T10:05:00.000Z"));
+    await markSigningKeyUsed.markSigningKeyUsed(signingKey.id, new Date("2026-08-27T10:06:00.000Z"));
+    expect(persisted).toEqual(new Date("2026-08-27T10:06:00.000Z"));
   });
 });

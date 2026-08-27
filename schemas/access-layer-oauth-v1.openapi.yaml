@@ -129,6 +129,8 @@ paths:
       summary: Revoke an OAuth token per RFC 7009
       description: >-
         Unknown and already-revoked tokens receive the same idempotent response.
+        token_type_hint is advisory and only selects lookup order; an unknown or
+        incorrect hint is ignored and cannot prevent lookup of another supported type.
         Access-token revocation records the jti for online state; refresh-token
         revocation revokes the complete family and linked OAuth session.
       security:
@@ -152,6 +154,7 @@ paths:
         Restricted to separately authorised credentials owned by one OAuth
         resource. Only an RFC 9068 Bearer access token whose exact aud equals
         the authenticated credential's resource may be disclosed as active.
+        token_type_hint is advisory and ignored for active-disclosure decisions.
         Refresh tokens, audience mismatches and every unknown, inactive or
         non-disclosable token receive exactly active=false. Invalid caller
         credentials use 401.
@@ -313,7 +316,7 @@ components:
       required: [token]
       properties:
         token: {type: string, minLength: 1}
-        token_type_hint: {enum: [access_token, refresh_token]}
+        token_type_hint: {type: string, description: Advisory RFC 7009 lookup hint; unknown values are ignored.}
         client_id: {type: string, description: Required only for a registered public client using auth method none.}
       additionalProperties: false
     IntrospectionRequest:
@@ -321,7 +324,7 @@ components:
       required: [token]
       properties:
         token: {type: string, minLength: 1, description: Candidate RFC 9068 JWT access token.}
-        token_type_hint: {type: string, const: access_token}
+        token_type_hint: {type: string, description: Advisory RFC 7662 hint; it does not change P0 access-token-only disclosure.}
       additionalProperties: false
     IntrospectionResponse:
       oneOf:

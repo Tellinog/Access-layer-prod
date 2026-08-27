@@ -361,9 +361,23 @@ def validate() -> list[str]:
         errors.append("P0 introspection active disclosure is not limited to access tokens")
     if introspection.get("refresh_token_active_disclosure") != "forbidden_return_active_false":
         errors.append("P0 introspection does not force refresh tokens to active=false")
+    if introspection.get("token_type_hint_semantics") != "advisory_ignored_for_active_disclosure":
+        errors.append("P0 introspection token_type_hint is not advisory")
     introspection_request = openapi_schemas.get("IntrospectionRequest", {})
-    if not schema_errors({"token": "synthetic", "token_type_hint": "refresh_token"}, introspection_request):
-        errors.append("target OpenAPI accepts a refresh_token introspection hint")
+    for hint in ["access_token", "refresh_token", "unknown_token_type"]:
+        if schema_errors({"token": "synthetic", "token_type_hint": hint}, introspection_request):
+            errors.append("target OpenAPI rejects an advisory introspection token_type_hint")
+            break
+    revocation = spec.get("revocation", {})
+    if revocation.get("token_type_hint_semantics") != "advisory_lookup_order_only":
+        errors.append("P0 revocation token_type_hint is not advisory")
+    if revocation.get("access_token_jti_retention_deadline") != "jwt_exp_plus_verifier_clock_skew":
+        errors.append("P0 access-token revocation does not retain jti state through verifier skew")
+    revocation_request = openapi_schemas.get("RevocationRequest", {})
+    for hint in ["access_token", "refresh_token", "unknown_token_type"]:
+        if schema_errors({"token": "synthetic", "token_type_hint": hint}, revocation_request):
+            errors.append("target OpenAPI rejects an advisory revocation token_type_hint")
+            break
     introspection_response = openapi_schemas.get("IntrospectionResponse", {})
     if schema_errors({"active": False}, introspection_response):
         errors.append("target OpenAPI rejects the exact inactive introspection response")

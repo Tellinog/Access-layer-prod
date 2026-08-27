@@ -174,7 +174,10 @@ revocation:
   client_authentication: client_secret_basic_or_none_as_registered
   unknown_token_response_status: 200
   access_token_action: revoke_jti_for_online_state
+  access_token_jti_retention_deadline: jwt_exp_plus_verifier_clock_skew
   refresh_token_action: revoke_complete_family_and_linked_oauth_session
+  token_type_hint_semantics: advisory_lookup_order_only
+  wrong_or_unknown_token_type_hint: search_all_supported_types_without_disclosure
   self_contained_access_token_offline_window: until_expiry_unless_online_policy_required
 introspection:
   standard: rfc7662
@@ -202,7 +205,8 @@ introspection:
   active_token_profile: rfc9068_bearer_access_token
   active_disclosure_audience_rule: exact_token_aud_equals_authenticated_credential_resource
   audience_mismatch_response: active_false_only
-  token_type_hint_values: [access_token]
+  token_type_hint_semantics: advisory_ignored_for_active_disclosure
+  wrong_or_unknown_token_type_hint: accepted_without_changing_disclosure_rules
   refresh_token_active_disclosure: forbidden_return_active_false
   non_disclosable_token_response_fields: [active]
   caller_authentication_failure_status: 401

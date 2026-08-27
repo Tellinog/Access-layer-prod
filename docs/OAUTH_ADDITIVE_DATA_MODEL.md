@@ -10,6 +10,8 @@ Step 3C implements the three authorization transaction/authorization/code rows s
 
 Step 3D joined reads use mixed row-lock strength without upgrades: only code or refresh token/family/session rows receive UPDATE locks; authorization/client/resource/user/grant rows and entitlement mappings receive SHARE locks. The service additionally cross-checks authorization `granted_scopes` against code scopes and every refresh token/family generation, current-scope and ceiling field before mutating state.
 
+For `oauth_revocations` rows whose target is `access_token_jti`, `expires_at` is the revocation-retention deadline: JWT `exp` plus the frozen 60-second verifier skew. It is not the token's nominal expiry. Conflict handling may only extend that deadline. OAuth signing metadata similarly treats `last_signed_at` as a monotonic maximum so retirement decisions use the latest recorded signing instant.
+
 ## Proposed entities
 
 | Proposed table | Purpose and minimum contract |

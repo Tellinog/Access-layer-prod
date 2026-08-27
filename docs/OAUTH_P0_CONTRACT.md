@@ -87,11 +87,11 @@ Use of an already-consumed family member is replay: deny the request with `inval
 
 ## Revocation and introspection
 
-`POST /oauth/revoke` follows RFC 7009. It is authenticated according to the registered client method and is idempotent from the caller's perspective: unknown, expired and already-revoked tokens return the same successful external response. Revoking an access token records its `jti` as inactive for online state. Revoking a refresh token revokes its complete family and linked OAuth session. Offline validation of a self-contained access token can continue only until its original expiry unless resource risk policy requires online introspection.
+`POST /oauth/revoke` follows RFC 7009. It is authenticated according to the registered client method and is idempotent from the caller's perspective: unknown, expired and already-revoked tokens return the same successful external response. Optional `token_type_hint` is advisory: a recognised value chooses only lookup order, a miss searches the other supported type, and an unknown value is ignored. It never changes client ownership checks or discloses the matched class. Revoking an access token records its `jti` as inactive for online state through `exp + 60 seconds`, the end of the frozen verifier-skew acceptance window. Revoking a refresh token revokes its complete family and linked OAuth session. Offline validation of a self-contained access token can continue only until its original expiry unless resource risk policy requires online introspection.
 
 Recording an access-token jti revocation resolves the exact existing OAuth resource/audience even while that resource is disabled. It does not use a legacy fallback, so disable/re-enable cannot make a previously revoked token active again.
 
-`POST /oauth/introspect` follows RFC 7662 and uses `client_secret_basic` with separately authorised credentials owned by one OAuth resource. The target-only `oauth_resource_credentials` model contains the resource FK, stable credential ID used as the Basic username, a non-reversible secret hash, status and lifecycle/rotation metadata. It is separate from `oauth_client_credentials` and legacy `tool_clients`.
+`POST /oauth/introspect` follows RFC 7662 and uses `client_secret_basic` with separately authorised credentials owned by one OAuth resource. Its optional `token_type_hint` is advisory and ignored for active disclosure; wrong or unknown values do not invalidate an otherwise valid request. The target-only `oauth_resource_credentials` model contains the resource FK, stable credential ID used as the Basic username, a non-reversible secret hash, status and lifecycle/rotation metadata. It is separate from `oauth_client_credentials` and legacy `tool_clients`.
 
 P0 discloses an RFC 9068 Bearer access token as active only when its exact `aud` equals the authenticated credential's associated resource. An audience mismatch returns exactly `{"active":false}`. An OAuth refresh token is never returned as active through this surface; refresh-token lifecycle remains available only through token refresh and RFC 7009 revocation. For an unknown, inactive, refresh or otherwise non-disclosable token, an authenticated caller receives exactly `{"active":false}` with no reason or other fields. Invalid caller credentials use HTTP 401. Active responses use `Cache-Control: no-store`.
 
@@ -109,6 +109,8 @@ OAuth keys are isolated behind `/oauth/jwks`; legacy `/v1/.well-known/jwks.json`
 6. keep all private key material out of Git, logs and evidence.
 
 The private signing loader additionally rejects equality between the candidate OAuth key's derived RSA public `n`/`e` and the actual configured legacy key, regardless of copied filename or inline/file legacy configuration. Verification accepts an active overlap key only while `retire_after > now`, requires finite integer `iat`/`exp`, rejects `iat` beyond the 60-second verifier skew and keeps the exact 900-second lifetime.
+
+Successful issuance records `last_signed_at` monotonically as the maximum of the already persisted value and the observed signing instant. A backwards wall-clock observation cannot reduce the retirement-grace basis.
 
 Published RS256 verification keys additionally require RFC 7518 minimum-octet Base64urlUInt encoding. The RSA modulus is positive and at least 2048 bits; the public exponent is at least 3, odd and less than the modulus. Persisted rows are untrusted and fail closed before JWKS publication.
 

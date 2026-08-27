@@ -24,6 +24,8 @@
 | OAuth resource credential | Separately authorised `client_secret_basic` credential owned by one OAuth resource for introspection; distinct from OAuth client credentials and legacy tool clients |
 | Refresh family | Lineage of rotating OAuth refresh tokens; replay revokes the family and linked OAuth session |
 | OAuth upstream callback | Future internal Google return path `/oauth/upstream/google/callback`, separate from and additive to the frozen legacy callback; not a P0 protocol endpoint |
+| OAuth authorization transaction | Ten-minute, single-claim record binding one validated request to protected downstream state and independent hash-only Google state/nonce |
+| OAuth authorization code | 60-second opaque 32-byte credential returned once to the exact client redirect and persisted only by SHA-256 hash with client/resource/user/redirect/scope/PKCE bindings |
 
 ## Core entities
 

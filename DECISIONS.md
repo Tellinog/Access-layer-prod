@@ -435,3 +435,15 @@ OAuth JWKS publication uses only repository-returned public metadata, validates 
 Rationale: a separate default-off composer preserves the frozen legacy source and route inventory while allowing truthful incremental publication. This decision records implementation sequencing only and does not revise D-036 through D-039 or the frozen target contract.
 
 Hardening note, 2026-08-26: the unreleased no-pilot RFC 9728 example incorrectly emitted `scopes_supported: []`. It now omits that zero-valued multi-value parameter, while a present member requires at least one canonical scope. This is a conformance correction because stable published RFCs remain normative over repository examples; it does not create a new protocol choice. The same implementation boundary now preserves issuer identity exactly, disables automatic `HEAD` siblings for the two GET routes, and requires RSA `n`/`e` to be valid unpadded Base64urlUInt before publication. These are fail-closed implementation hardenings within D-040, not Step 3C semantics.
+
+## D-041 - Isolate dark authorization issuance and transaction protection
+
+Status: accepted
+
+Confirmed: 2026-08-26
+
+Decision: implement Step 3C outside the frozen legacy `buildApp` boundary through one OAuth flow repository, one authorization service, one separate upstream-Google adapter and one dedicated state-protection primitive. Migration 004 owns only authorization transactions, authorizations and authorization codes. The service may call the frozen legacy user upsert and pending-grant-link methods, read the active grant, and append sanitized audit rows; every other OAuth write remains confined to `oauth_*` tables.
+
+The dedicated `OAUTH_TRANSACTION_PROTECTION_KEY` is decoded only when configured, is mandatory only under the existing true OAuth flag and is never derived from a legacy secret. Transaction creation/audit, denial/audit and authorization/code/completion/audit execute atomically in short database transactions. The Google network exchange occurs only after the upstream-state claim transaction has completed.
+
+Rationale: this structure makes the narrow legacy mutation exception auditable, keeps external I/O outside database transactions, and prevents partial code issuance or missing decision audits. The 600-second transaction TTL, 60-second code TTL, exact redirect/error behavior, AES-256-GCM parameters and entropy/hash rules are authorised frozen Step 3C inputs, not new protocol semantics.

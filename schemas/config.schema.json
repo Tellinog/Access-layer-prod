@@ -98,7 +98,14 @@
     "OAUTH_P0_ENABLED": {
       "type": "boolean",
       "default": false,
-      "description": "Optional default-false OAuth P0 flag. Step 3B registers only the read-only OAuth JWKS and RFC 9728 GET routes when true."
+      "description": "Optional default-false OAuth P0 flag. Step 3C additionally registers the dark authorization-code issuance routes when true."
+    },
+    "OAUTH_TRANSACTION_PROTECTION_KEY": {
+      "type": "string",
+      "minLength": 43,
+      "maxLength": 43,
+      "pattern": "^[A-Za-z0-9_-]{43}$",
+      "description": "Dedicated canonical unpadded base64url encoding of exactly 32 random bytes. Required only when OAUTH_P0_ENABLED is true; never commit a value."
     },
     "SESSION_COOKIE_NAME": {
       "type": "string"
@@ -161,5 +168,11 @@
       "minLength": 32,
       "description": "Optional Bearer token for machine-to-machine backup export."
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"OAUTH_P0_ENABLED": {"const": true}}, "required": ["OAUTH_P0_ENABLED"]},
+      "then": {"required": ["OAUTH_TRANSACTION_PROTECTION_KEY"]}
+    }
+  ]
 }

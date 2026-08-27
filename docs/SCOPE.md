@@ -52,6 +52,12 @@ Step 3B implements pure frozen RFC 8414/RFC 9728 builders, deterministic public 
 
 Authorize, token, refresh, revoke, introspect, upstream Google, private-key loading/signing, protocol transaction tables, registration/admin APIs, pilots/seeds, production actions, consumers and SDKs remain out of scope.
 
+## Step 3C dark authorization-issuance boundary
+
+Step 3C adds only three OAuth authorization-flow tables, GET `/oauth/authorize`, the separate GET `/oauth/upstream/google/callback`, protected downstream-state persistence, current-entitlement evaluation and opaque authorization-code issuance. These paths remain behind the optional default-false flag and have no automatic HEAD siblings.
+
+Token exchange/client authentication, OAuth access/refresh tokens and sessions, signing/private-key loading, RFC 8414 routing, revoke, introspect, registration/admin APIs, pilot/seed data, production/Google Console actions, consumers and SDKs remain out of scope.
+
 ## Personas
 
 | Persona | Goal | Main needs | Notes |

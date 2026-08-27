@@ -110,6 +110,20 @@ Exact mapping coverage, proof that every mapped permission is registered for the
 `OAUTH_ADDITIVE_DATA_MODEL.md` continues to define the later transaction entities as a frozen proposal. Step 3A implements only the ten foundation tables above and does not rename, reuse or reinterpret any legacy table.
 
 Before any non-empty production OAuth registration or pilot, backup/export/import/replace-restore must preserve all `oauth_*` state and prove dependency-safe ordering around `oauth_resource_entitlement_bindings` and legacy `tools`. Current legacy backup surfaces do not meet that requirement. Step 3A hardening records this as a blocker and does not modify backup behavior.
+
+## Step 3C OAuth authorization issuance
+
+`migrations/004_oauth_authorization_code_flow.sql` is expand-only and creates exactly:
+
+| Table | Step 3C purpose |
+|---|---|
+| `oauth_authorization_transactions` | One validated client/resource/redirect/scope/PKCE request, AEAD-protected downstream state, independent Google state/nonce hashes, correlation, 600-second expiry and pending/claimed/completed/denied lifecycle |
+| `oauth_authorizations` | The exact user, client, resource, granted scopes and legacy authorization grant used by a successful current entitlement decision |
+| `oauth_authorization_codes` | Unique SHA-256 code hash plus transaction/authorization/client/resource/user/redirect/scope/PKCE bindings, fixed 60-second expiry and future single-use consumption timestamp |
+
+The migration contains no legacy DDL or data write and adds no OAuth session, refresh or revocation entity. References to `users` and `authorization_grants` use `ON DELETE RESTRICT` to preserve authorization history. Runtime writes to legacy domain data are limited to the existing user upsert and pending-grant linking methods; entitlement lookups remain read-only and OAuth audits continue through `audit_logs`.
+
+The reviewed migration SHA-256 is `96c37fe2a043a1aae6f813ca36db36cb1aa7ce67f2abfbff42c4883e35f72772`. Live PostgreSQL 16 application and previous-binary smoke evidence must not be claimed unless actually run against a disposable database. Docker/API, `psql` and a local port-5432 server were unavailable for this run, so deterministic migration-shape tests remain the local evidence.
 # Step 2 continuity note
 
 Live Coolify evidence proves that logical volume `access_layer_postgres_data_v2` backs `/var/lib/postgresql/data` and resolves to the recorded UUID-prefixed physical volume. The source top-level declaration now matches the unchanged service mount. Do not add an explicit physical name, rename the logical/live volume, migrate data or deploy. Backup/restore evidence and the other release gates remain open. The machine database baseline is `../specs/legacy-contract-baseline.v1.json`.

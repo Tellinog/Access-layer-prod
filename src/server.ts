@@ -4,6 +4,8 @@ import { loadConfig } from "./config.js";
 import { PostgresDb } from "./db.js";
 import { GoogleAuthLibraryOidcClient } from "./google.js";
 import { OAuthFoundationRepository } from "./oauth/repository.js";
+import { OAuthAuthorizationFlowRepository } from "./oauth/flow-repository.js";
+import { OAuthGoogleAuthLibraryOidcClient } from "./oauth/google.js";
 import { Repositories } from "./repositories.js";
 import { TokenService } from "./token-service.js";
 
@@ -18,6 +20,8 @@ const app = await buildApplication({
   config,
   repositories,
   oauthRepository: new OAuthFoundationRepository(db),
+  oauthFlowRepository: new OAuthAuthorizationFlowRepository(db),
+  oauthGoogle: new OAuthGoogleAuthLibraryOidcClient(config),
   audit,
   google: new GoogleAuthLibraryOidcClient(config),
   tokenService

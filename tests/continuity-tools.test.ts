@@ -131,11 +131,11 @@ describe("production continuity helper safety", () => {
     const { report } = collect();
     const inventory = report.source_inventory as { variables: string[] };
     expect([...inventory.variables].sort()).toEqual(sourceEnvironmentNames());
-    expect(inventory.variables).toHaveLength(42);
+    expect(inventory.variables).toHaveLength(43);
   });
 
   it("keeps runtime and entrypoint invariant and pins the approved Compose continuity correction", () => {
-    expect(sha256Lf("src/config.ts")).toBe("ba6ed50feacb8af5f85bfa04f08d3d1df014b33fa0f1c293927e709225f67ff7");
+    expect(sha256Lf("src/config.ts")).toBe("91692c970af969a310175a5e2c7b49dbe020598fd597ddc1773de5de11c037ce");
     expect(sha256Lf("docker-compose.yaml")).toBe("3c91dbaccd3dadae1ef8587fba307721e72fe281aed26b969b961cc9a84630aa");
     expect(sha256Lf("docker/entrypoint.sh")).toBe("07d57fbdbb6bc09268b154c7d97afbfc5f8d5699b0378c747057393769ec6d76");
   });

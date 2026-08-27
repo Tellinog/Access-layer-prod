@@ -3,6 +3,7 @@
 ## BLOCKER
 
 - Confirm who receives bootstrap platform admin access after first deploy.
+- 2026-08-26 Step 3C: before any OAuth enablement, provision `OAUTH_TRANSACTION_PROTECTION_KEY` as a dedicated canonical base64url 32-byte secret through the approved secret manager and add the separate OAuth callback URI in Google Cloud without removing the legacy callback. Neither action is authorised or performed by Step 3C.
 - 2026-08-26 Step 3B: before Step 3D introduces any `protected_private_key_ref` consumer, define and test an allow-list for supported reference schemes and file roots; reject `..` traversal, relative/unsafe paths, encoded traversal and unsupported schemes before any read. Step 3B must not implement a private-key loader.
 - 2026-08-26 Step 3A hardening: before the first non-empty production OAuth registration or pilot, extend and prove backup/export/import/replace-restore coverage for all `oauth_*` state. The current legacy backup surfaces do not preserve these tables, and future `oauth_resource_entitlement_bindings` rows use `ON DELETE RESTRICT`, so a replace restore that runs `DELETE FROM tools` must use dependency-safe ordering. Do not register production OAuth state until this is implemented and restore-tested; no backup code changes are authorised in Step 3A hardening.
 - 2026-08-26 Step 2 hardening: production deployment remains blocked until the exact Coolify destination identity and central registry record are verified. Server `wx513ojqd80kdicevubog7`, project `xdihnb979tvyh9gdk72zfy7y`, environment `rd3mt4dkpqyghxlx9h96sdlo` and resource `u3cyw3y1obp88to9la0w8c75` are proven non-secret facts.
@@ -14,8 +15,9 @@
 
 ## RESOLVED
 
+- 2026-08-26 Step 3C: the default-off dark Authorization Code issuance path is implemented with migration 004, separate Google callback, protected downstream state, atomic state claim, exact entitlement revalidation and SHA-256-only 60-second codes. Token exchange and every later lifecycle remain unimplemented.
 - 2026-08-26 Step 3A: the generic OAuth dark foundation is implemented locally through one expand-only migration, a default-false optional flag, an isolated `src/oauth/` module and deterministic darkness/migration/validation tests. No protocol route, pilot, seed, transaction table, production action or legacy behavior change was introduced.
-- 2026-08-26 Step 3A: `.env.example` and `.env.production.example` expose the same 42 variable names, with optional `OAUTH_P0_ENABLED=false`; absence remains valid and requires no additional OAuth key or credential configuration.
+- 2026-08-26 Step 3A historical result: `.env.example` and `.env.production.example` exposed the same 42 variable names, with optional `OAUTH_P0_ENABLED=false`; Step 3C later adds the state-only conditional protection-key input as variable 43.
 - 2026-08-25 Step 2: Coolify evidence proves PostgreSQL logical volume `access_layer_postgres_data_v2` resolves to `u3cyw3y1obp88to9la0w8c75_access-layer-postgres-data-v2`; the source top-level declaration now matches the unchanged service mount. JWT logical volume `access_layer_jwt_secrets` is also proven as the named volume `u3cyw3y1obp88to9la0w8c75_access-layer-jwt-secrets`. No explicit physical name was added and no live volume was renamed.
 - 2026-08-25 Step 2: confirmed Coolify server `agentic-unguess-prod`, project `agentic-unguess`, environment `production`, resource `access-layer-prod` (`u3cyw3y1obp88to9la0w8c75`), resource type `application`, managed Docker Compose, `main` branch, deploy-on-push, disabled previews, isolated predefined-network setting, public app port 8080 without a shown host mapping, and private PostgreSQL port 5432.
 - 2026-08-24: restored root `.env.example` as a compatibility copy with the same 41 variable names as `.env.production.example`; production values and secret handling remain unchanged.
@@ -47,6 +49,7 @@
 
 ## ASSUMPTION_TO_VALIDATE
 
+- 2026-08-26 Step 3C: apply `001`→`004` to a disposable PostgreSQL 16 database and run the legacy binary/schema-consumer smoke test on a host with an available daemon. Deterministic migration-shape tests cover migration 004 locally; no production database may be used.
 - 2026-08-26 Step 3A: apply `001`→`003` to a disposable PostgreSQL 16 database and run the legacy binary/schema-consumer smoke test on a host with an available daemon. This workspace has the Docker CLI but no reachable Docker API and no PostgreSQL listener on `127.0.0.1:5432`; deterministic migration-shape/constraint tests are green, but live SQL application is not claimed.
 - 2026-08-05: the relationship tables reuse the current v1 Admin list endpoints, which return at most 200 users/grants per request. Confirm and design server-side pagination before the registered-user directory or a tool's grant set can exceed that operational limit.
 - The current SVG favicon is a project-created interim mark based on the documented UI palette. Replace it if an approved company logo/favicons system becomes available.
@@ -64,7 +67,7 @@
 - 2026-08-24: Nancy, Test Generator and Goodman in-memory refresh locks are sufficient only for their observed single-replica assumptions; multi-replica safety is not proven.
 - 2026-08-24: Petyr's supplied registration and code are deployed as inspected. Evidence contains a superseded Access Layer origin and a permission used in code but absent from the supplied tool registration.
 - 2026-08-24 Step 1.5: repository expectations (app `8080`, PostgreSQL `5432` private, no shown public host-port mapping, target domain) are now verified by the 2026-08-25 Step 2 evidence.
-- 2026-08-25 Step 1.5B / 2026-08-26 Step 3A: current live safe effective configuration is still unproven. All 42 source-derived variables, including optional `OAUTH_P0_ENABLED`, remain `UNOBSERVED` in the committed evidence template until an operator supplies state/effective-value proof.
+- 2026-08-25 Step 1.5B / 2026-08-26 Step 3C: current live safe effective configuration is still unproven. All 43 source-derived variables, including optional `OAUTH_P0_ENABLED` and state-only `OAUTH_TRANSACTION_PROTECTION_KEY`, remain `UNOBSERVED` in the committed evidence template until an operator supplies state/effective-value proof.
 
 ## DEFERRED_SCOPE
 
@@ -75,7 +78,7 @@
 - Full SIEM integration.
 - Dedicated SDK packages per framework.
 - Immutable append-only log storage with WORM retention.
-- OAuth authorization-server discovery routing, authorize/token/revoke/introspect/upstream-Google runtime, authorization/code/session/refresh/revocation transaction tables, token signing/authentication, registration/admin HTTP APIs and pilot records remain outside Step 3B. Step 3B implements only default-off read-only OAuth JWKS and protected-resource metadata. Production client/resource/scope/mapping/credential registration and any enablement remain deferred until separately approved steps and the release gates pass.
+- OAuth authorization-server discovery routing, token exchange/authentication, signing/private-key loading, refresh, revoke, introspect, OAuth session/refresh/revocation tables, registration/admin HTTP APIs and pilot records remain outside Step 3C. Production client/resource/scope/mapping/credential registration and any enablement remain deferred until separately approved steps and the release gates pass.
 - OAuth P1 features: service principals, `client_credentials`, token exchange, `private_key_jwt`, downstream OIDC ID Token/UserInfo/discovery and dynamic client registration.
 - Native OAuth entitlement domains; every P0 resource instead requires exactly one existing `legacy_tool` entitlement-only binding.
 - UNGUESS Platform SDK dependency adoption and telemetry SDK integration.

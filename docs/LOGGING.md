@@ -41,7 +41,7 @@ Access Layer deve sapere da chi arriva ogni richiesta di accesso, per quale tool
 | `admin.grant.revoked` | admin revoca grant | `success` |
 | `admin.user.status_changed` | admin cambia stato utente | `success` |
 
-OAuth vNext target events (contract frozen, not emitted yet):
+OAuth vNext target events:
 
 | Event type | Purpose |
 |---|---|
@@ -53,7 +53,9 @@ OAuth vNext target events (contract frozen, not emitted yet):
 | `oauth.client.changed` / `resource.changed` / `scope.changed` | Record controlled registration changes |
 | `oauth.signing_key.changed` | Record public `kid` lifecycle action without private key material |
 
-OAuth audit metadata may contain client ID, exact resource ID, canonical scope IDs, stable Google subject when known, correlation ID, outcome and non-sensitive reason code. It must not contain codes, tokens, client secrets, cookies, PKCE verifiers, downstream client state, private keys, secret hashes/verifiers or raw form bodies.
+Step 3C emits only `oauth.authorization.requested`, `oauth.authorization.allowed`, `oauth.authorization.denied` and `oauth.code.issued`. Later code exchange/token/refresh/revoke/introspection and registration/key events remain unimplemented. Automatic Fastify request logs are silent on `/oauth/authorize` and `/oauth/upstream/google/callback` because their query strings contain state, Google code and PKCE material.
+
+OAuth audit metadata may contain client ID, exact resource ID, canonical scope IDs, stable Google subject/user ID when known, correlation ID, outcome and non-sensitive reason code. It must not contain authorization or Google codes, tokens, client secrets, cookies, PKCE verifiers/challenges, downstream/upstream state, nonce, private keys, secret hashes/verifiers, raw query strings or raw form bodies.
 
 ## Campi comuni
 

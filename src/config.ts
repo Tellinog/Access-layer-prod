@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { config as loadDotenv } from "dotenv";
 import type { Config } from "./types.js";
+import { parseOAuthTransactionProtectionKey } from "./oauth/state-protection.js";
 import { normalizeEmail } from "./validation.js";
 
 loadDotenv();
@@ -98,6 +99,15 @@ export function loadConfig(): Config {
     throw new Error("JWT_PRIVATE_KEY_PEM_PATH or JWT_PRIVATE_KEY_PEM is required");
   }
 
+  const oauthP0Enabled = readBoolean("OAUTH_P0_ENABLED", false);
+  const oauthTransactionProtectionKeyValue = readOptional("OAUTH_TRANSACTION_PROTECTION_KEY");
+  if (oauthP0Enabled && oauthTransactionProtectionKeyValue === undefined) {
+    throw new Error("Missing required environment variable OAUTH_TRANSACTION_PROTECTION_KEY when OAUTH_P0_ENABLED=true");
+  }
+  const oauthTransactionProtectionKey = oauthTransactionProtectionKeyValue === undefined
+    ? undefined
+    : parseOAuthTransactionProtectionKey(oauthTransactionProtectionKeyValue);
+
   const config: Config = {
     appEnv,
     appBaseUrl: readRequired("APP_BASE_URL"),
@@ -117,7 +127,8 @@ export function loadConfig(): Config {
     accessTokenTtlSeconds: readInt("ACCESS_TOKEN_TTL_SECONDS", 900, 60, 3600),
     refreshTokenTtlSeconds: readInt("REFRESH_TOKEN_TTL_SECONDS", 28800, 300, 86400),
     oneTimeCodeTtlSeconds: readInt("ONE_TIME_CODE_TTL_SECONDS", 60, 15, 300),
-    oauthP0Enabled: readBoolean("OAUTH_P0_ENABLED", false),
+    oauthP0Enabled,
+    oauthTransactionProtectionKey,
     sessionCookieName: readOptional("SESSION_COOKIE_NAME", "access_layer_admin_session") ?? "access_layer_admin_session",
     sessionSecret: readRequired("SESSION_SECRET"),
     toolClientSecretPepper: readRequired("TOOL_CLIENT_SECRET_PEPPER"),

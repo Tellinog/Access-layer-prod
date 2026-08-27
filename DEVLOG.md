@@ -1,5 +1,31 @@
 # DEVLOG.md
 
+## 2026-08-26 - Step 3C dark OAuth Authorization Code issuance
+
+Changed by: Codex
+Related task: Implement only the default-off OAuth authorization request, separate Google round-trip, entitlement decision and code issuance path.
+
+### Changed
+
+- Added expand-only migration 004 with exactly the OAuth authorization transaction, authorization and authorization-code tables.
+- Added isolated OAuth AEAD state protection, separate Google adapter, flow repository, authorization service and two GET-only HTTP routes behind `OAUTH_P0_ENABLED`.
+- Added the optional state-only `OAUTH_TRANSACTION_PROTECTION_KEY` configuration/evidence input, required only when OAuth is enabled, plus schema and synthetic coverage.
+- Added deterministic migration, route, redirect-trust, AEAD, replay/expiry, nonce, entitlement, pending-link, hash/TTL, audit-secrecy and legacy-boundary tests.
+
+### Behavior
+
+- Default/false remains exact legacy. True adds only Step 3B plus `/oauth/authorize` and `/oauth/upstream/google/callback`; token, revoke, introspect and RFC 8414 discovery remain 404 and all four new GET routes have no HEAD sibling.
+- Authorization requests fail closed against exact registration and PKCE. Google state/nonce are independent and hash-only; exact downstream state is AES-256-GCM protected with transaction-bound AAD for 600 seconds.
+- Verified users are upserted and existing pending grants linked using frozen methods. No new legacy grant, access request, session or code is created. Successful OAuth codes are 32-byte opaque credentials, SHA-256-only at rest and valid for exactly 60 seconds.
+- Legacy runtime, consumers, deploy behavior, migrations 001–003 and frozen protocol contracts are unchanged. No token endpoint/signing/private-key loader/refresh/revoke/introspection/pilot/seed/registration API/production action was added.
+
+### Tests/checks
+
+- TypeScript lint and build passed; Vitest passed 249 tests across 15 files; the repository Python suite passed 60 tests with 2 expected skips; and the OAuth validator passed all 24 check groups.
+- Continuity remained intentionally `VALID_BUT_NOT_READY` with both release gates false. Non-strict platform validation passed 27 checks with seven known warnings. Frozen legacy/dependency/migration checks and `git diff --check` passed.
+- Migration 004 contains exactly three `CREATE TABLE` statements and zero destructive statements; SHA-256 is `96c37fe2a043a1aae6f813ca36db36cb1aa7ce67f2abfbff42c4883e35f72772`.
+- Docker has no reachable daemon, `psql` is absent and port 5432 is closed. No live PostgreSQL migration/previous-binary smoke test is claimed, and no production database was contacted.
+
 ## 2026-08-26 - Step 3B final RSA/JWK hardening
 
 Changed by: Codex

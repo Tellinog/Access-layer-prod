@@ -33,7 +33,20 @@ These routes exist only when `OAUTH_P0_ENABLED=true`; absent/false returns 404 a
 | GET | `/oauth/jwks` | Dedicated validated OAuth public verification keys; `Cache-Control: public, max-age=300`. Returns sanitized HTTP 503 `{ "error": "temporarily_unavailable" }` when no safe key exists. |
 | GET | `/.well-known/oauth-protected-resource/v1` | RFC 9728 metadata for `https://access-layer.unguess-internal.net/v1` and header-only Bearer transport; with no pilot scopes, `scopes_supported` is omitted. |
 
-Both Step 3B paths are GET-only; Fastify's automatic `HEAD` siblings are disabled and return 404. `/.well-known/oauth-authorization-server` remains unregistered even with the flag true. Its exact target payload is built/tested but will not advertise authorize/token/revoke/introspect until those endpoints exist. All other `/oauth/*` protocol routes remain 404. The legacy `/v1/.well-known/jwks.json` endpoint is a separate unchanged key domain.
+Both Step 3B paths are GET-only; Fastify's automatic `HEAD` siblings are disabled and return 404. `/.well-known/oauth-authorization-server` remains unregistered even with the flag true. Its exact target payload is built/tested but will not advertise authorize/token/revoke/introspect until those endpoints exist. The legacy `/v1/.well-known/jwks.json` endpoint is a separate unchanged key domain.
+
+## Step 3C default-off authorization issuance routes
+
+These additional routes exist only when `OAUTH_P0_ENABLED=true` and are also GET-only with explicit HEAD 404:
+
+| Method | Path | Result |
+|---|---|---|
+| GET | `/oauth/authorize` | Validates the frozen code/PKCE/resource/scope request, persists a protected 600-second transaction and redirects to the separate Google flow. |
+| GET | `/oauth/upstream/google/callback` | Atomically claims Google state, validates identity/nonce and current exact entitlement, then redirects an opaque 60-second code, exact state and `iss` to the stored redirect. |
+
+Untrusted client or redirect input receives a local OAuth JSON error and is never redirected. After exact redirect trust, protocol errors use only `error`, exact safely retained `state` and exact `iss`; no verbose description is added. Success adds only `code`, exact state and issuer to any safe pre-registered query parameters. Automatic request logging is disabled for both paths.
+
+`/oauth/token`, `/oauth/revoke`, `/oauth/introspect` and `/.well-known/oauth-authorization-server` remain 404. There is no access/refresh token response, client authentication, signing or private-key loading in Step 3C.
 
 ## Endpoints
 
@@ -101,7 +114,7 @@ See:
 
 ## Additive OAuth P0 target
 
-The complete target-only OAuth surface is documented separately in `../schemas/access-layer-oauth-v1.openapi.yaml` and `OAUTH_P0_CONTRACT.md`. The current runtime registers only the two GET-only Step 3B read surfaces above when the optional flag is true; absent/false remains fully dark. RFC 8414 metadata, `/oauth/authorize`, `/oauth/token`, `/oauth/revoke`, access-token-only `/oauth/introspect` and the internal `/oauth/upstream/google/callback` remain unregistered. Step 3A's zero-route statement is historical and applies to that completed foundation step, not the current Step 3B composer. The historical `../schemas/openapi.yaml` and frozen `/v1/auth/google/callback` remain unchanged.
+The complete target-only OAuth surface is documented separately in `../schemas/access-layer-oauth-v1.openapi.yaml` and `OAUTH_P0_CONTRACT.md`. With the optional flag true, the current runtime registers the two GET-only Step 3B reads and the two GET-only Step 3C issuance paths above; absent/false remains fully dark. RFC 8414 metadata, `/oauth/token`, `/oauth/revoke` and access-token-only `/oauth/introspect` remain unregistered. Step 3A's zero-route and Step 3B's read-only statements are historical phase boundaries. The historical `../schemas/openapi.yaml` and frozen `/v1/auth/google/callback` remain unchanged.
 # Step 1 machine baseline
 
 The exhaustive repository-observed route and wire-contract freeze is `../specs/legacy-contract-baseline.v1.json`. It records one known documentation drift: runtime registers `GET /v1/admin/backup/secret-material`, while the historical `../schemas/openapi.yaml` omits it. Step 1 changes neither side.

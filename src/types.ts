@@ -26,6 +26,7 @@ export interface Config {
   refreshTokenTtlSeconds: number;
   oneTimeCodeTtlSeconds: number;
   oauthP0Enabled: boolean;
+  oauthTransactionProtectionKey?: Buffer;
   sessionCookieName: string;
   sessionSecret: string;
   toolClientSecretPepper: string;

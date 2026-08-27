@@ -44,7 +44,7 @@ TRUST_PROXY_HOPS=1
 
 The dashboard is at `/admin`; admin and tool-management APIs are under `/v1/admin/*`.
 
-`OAUTH_P0_ENABLED` is optional and defaults to `false`; absent/false preserves the exact legacy route inventory. Step 3B registers only `GET /oauth/jwks` and `GET /.well-known/oauth-protected-resource/v1` when true, with no automatic `HEAD` siblings. The authorization-server metadata, authorize, token, revoke, introspect and upstream-Google paths remain unregistered. No OAuth secret, private-key loader or client/resource credential configuration is accepted or required by this read-only step. Do not enable the flag in production: no pilot/key provisioning or production action is authorised.
+`OAUTH_P0_ENABLED` is optional and defaults to `false`; absent/false preserves the exact legacy route inventory and requires no OAuth protection key. Step 3C true additionally registers GET-only `/oauth/authorize` and `/oauth/upstream/google/callback` beside the two Step 3B reads, all without automatic HEAD siblings. `OAUTH_TRANSACTION_PROTECTION_KEY` must then be a dedicated canonical unpadded base64url encoding of exactly 32 random bytes. RFC 8414, token, revoke and introspect remain unregistered. Do not set either OAuth value in production: no callback registration, pilot/key provisioning or production action is authorised.
 
 ## Local Docker Compose
 

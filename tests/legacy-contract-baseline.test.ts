@@ -13,7 +13,10 @@ function text(path: string): string {
 
 function sha256Lf(path: string): string {
   const source = path === "src/config.ts"
-    ? text(path).replace('    oauthP0Enabled: readBoolean("OAUTH_P0_ENABLED", false),\n', "")
+    ? text(path)
+      .replace('import { parseOAuthTransactionProtectionKey } from "./oauth/state-protection.js";\n', "")
+      .replace(/  const oauthP0Enabled = readBoolean\("OAUTH_P0_ENABLED", false\);[\s\S]*?  const config: Config = \{\n/, "  const config: Config = {\n")
+      .replace("    oauthP0Enabled,\n    oauthTransactionProtectionKey,\n", "")
     : text(path);
   return createHash("sha256").update(source, "utf8").digest("hex");
 }
@@ -28,10 +31,10 @@ describe("legacy compatibility baseline", () => {
     }
   });
 
-  it("allows only the additive default-false OAuth flag outside the frozen legacy config witness", () => {
+  it("allows only the additive default-false OAuth configuration outside the frozen legacy config witness", () => {
     const config = text("src/config.ts");
-    expect(config.match(/OAUTH_P0_ENABLED/g)).toHaveLength(1);
-    expect(config).toContain('oauthP0Enabled: readBoolean("OAUTH_P0_ENABLED", false)');
+    expect(config).toContain('const oauthP0Enabled = readBoolean("OAUTH_P0_ENABLED", false)');
+    expect(config).toContain('readOptional("OAUTH_TRANSACTION_PROTECTION_KEY")');
   });
 
   it("freezes every registered v1 method and path", () => {

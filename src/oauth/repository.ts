@@ -44,6 +44,35 @@ export class OAuthFoundationRepository {
     };
   }
 
+  async resolveClientById(id: string): Promise<OAuthClientRecord | null> {
+    const result = await this.db.query<{
+      id: string;
+      client_id: string;
+      client_name: string;
+      client_type: OAuthClientRecord["clientType"];
+      token_endpoint_auth_method: OAuthClientRecord["tokenEndpointAuthMethod"];
+      grant_types: OAuthClientRecord["grantTypes"];
+      status: OAuthClientRecord["status"];
+      owner_team: string;
+      owner_contact: string | null;
+    }>(`SELECT id, client_id, client_name, client_type, token_endpoint_auth_method,
+               grant_types, status, owner_team, owner_contact
+        FROM oauth_clients
+        WHERE id = $1`, [id]);
+    const row = firstOrNull(result.rows);
+    return row && {
+      id: row.id,
+      clientId: row.client_id,
+      clientName: row.client_name,
+      clientType: row.client_type,
+      tokenEndpointAuthMethod: row.token_endpoint_auth_method,
+      grantTypes: row.grant_types,
+      status: row.status,
+      ownerTeam: row.owner_team,
+      ownerContact: row.owner_contact
+    };
+  }
+
   async resolveExactRedirectUris(oauthClientId: string): Promise<string[]> {
     const result = await this.db.query<{ redirect_uri: string }>(
       `SELECT redirect_uri
@@ -69,6 +98,33 @@ export class OAuthFoundationRepository {
                audience_policy, protected_resource_metadata_url
         FROM oauth_resources
         WHERE resource_id = $1`, [resourceId]);
+    const row = firstOrNull(result.rows);
+    return row && {
+      id: row.id,
+      resourceId: row.resource_id,
+      displayName: row.display_name,
+      status: row.status,
+      ownerTeam: row.owner_team,
+      ownerContact: row.owner_contact,
+      audiencePolicy: row.audience_policy,
+      protectedResourceMetadataUrl: row.protected_resource_metadata_url
+    };
+  }
+
+  async resolveResourceById(id: string): Promise<OAuthResourceRecord | null> {
+    const result = await this.db.query<{
+      id: string;
+      resource_id: string;
+      display_name: string;
+      status: OAuthResourceRecord["status"];
+      owner_team: string;
+      owner_contact: string | null;
+      audience_policy: OAuthResourceRecord["audiencePolicy"];
+      protected_resource_metadata_url: string;
+    }>(`SELECT id, resource_id, display_name, status, owner_team, owner_contact,
+               audience_policy, protected_resource_metadata_url
+        FROM oauth_resources
+        WHERE id = $1`, [id]);
     const row = firstOrNull(result.rows);
     return row && {
       id: row.id,

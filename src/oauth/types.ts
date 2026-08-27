@@ -121,3 +121,39 @@ export interface OAuthSigningKeyPublicMetadata {
   retireAfter: Date | null;
   retiredAt: Date | null;
 }
+
+export type OAuthAuthorizationTransactionStatus = "pending" | "claimed" | "completed" | "denied" | "expired";
+
+export interface OAuthAuthorizationTransactionRecord {
+  id: string;
+  oauthClientId: string;
+  oauthResourceId: string;
+  redirectUri: string;
+  requestedScopes: string[];
+  codeChallenge: string;
+  codeChallengeMethod: "S256";
+  protectedDownstreamState: Record<string, unknown>;
+  upstreamStateHash: string;
+  upstreamNonceHash: string;
+  correlationId: string;
+  status: OAuthAuthorizationTransactionStatus;
+  expiresAt: Date;
+  claimedAt: Date | null;
+  completedAt: Date | null;
+  createdAt: Date;
+}
+
+export interface OAuthAuthorizationCodeIssuance {
+  transactionId: string;
+  userId: string;
+  oauthClientId: string;
+  oauthResourceId: string;
+  legacyAuthorizationGrantId: string;
+  grantedScopes: string[];
+  redirectUri: string;
+  codeChallenge: string;
+  codeHash: string;
+  correlationId: string;
+  issuedAt: Date;
+  expiresAt: Date;
+}

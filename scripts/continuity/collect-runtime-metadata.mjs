@@ -11,7 +11,7 @@ export const CONFIG_ENVIRONMENT_NAMES = Object.freeze([
   "BACKUP_API_TOKEN", "BACKUP_ENCRYPTION_KEY", "CORS_ALLOWED_ORIGINS", "DATABASE_URL",
   "ENABLE_REFRESH_TOKENS", "GOOGLE_ALLOWED_HD", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET",
   "GOOGLE_OIDC_SCOPE", "GOOGLE_REDIRECT_URI", "JWT_PRIVATE_KEY_PEM", "JWT_PRIVATE_KEY_PEM_PATH",
-  "JWT_PUBLIC_KEY_ID", "LOG_IP_SALT", "LOG_LEVEL", "OAUTH_P0_ENABLED", "ONE_TIME_CODE_TTL_SECONDS", "PORT",
+  "JWT_PUBLIC_KEY_ID", "LOG_IP_SALT", "LOG_LEVEL", "OAUTH_P0_ENABLED", "OAUTH_TRANSACTION_PROTECTION_KEY", "ONE_TIME_CODE_TTL_SECONDS", "PORT",
   "POSTGRES_DB", "POSTGRES_PASSWORD", "POSTGRES_USER", "PUBLIC_BASE_PATH",
   "REFRESH_TOKEN_TTL_SECONDS", "RETURN_URL_ALLOWED_SCHEMES", "RUN_MIGRATIONS_ON_START",
   "RUN_SEED_ON_START", "SEED_EXAMPLE_TOOLS", "SESSION_COOKIE_NAME", "SESSION_SECRET",
@@ -156,6 +156,11 @@ export function collectRuntimeMetadata(environment = process.env) {
     missing.push("environment_state.BACKUP_API_TOKEN=VALID_NON_EMPTY");
   }
 
+  const oauthP0Enabled = boolean(environment, "OAUTH_P0_ENABLED", false, missing);
+  if (oauthP0Enabled === true && states.OAUTH_TRANSACTION_PROTECTION_KEY !== "PRESENT_NON_EMPTY") {
+    missing.push("environment_state.OAUTH_TRANSACTION_PROTECTION_KEY=PRESENT_NON_EMPTY");
+  }
+
   const effectiveConfig = {
     app_env: appEnv,
     public_base_path: publicBasePath(environment, missing),
@@ -174,7 +179,7 @@ export function collectRuntimeMetadata(environment = process.env) {
     refresh_token_ttl_seconds: integer(environment, "REFRESH_TOKEN_TTL_SECONDS", 28800, 300, 86400, missing),
     one_time_code_ttl_seconds: integer(environment, "ONE_TIME_CODE_TTL_SECONDS", 60, 15, 300, missing),
     enable_refresh_tokens: boolean(environment, "ENABLE_REFRESH_TOKENS", true, missing),
-    oauth_p0_enabled: boolean(environment, "OAUTH_P0_ENABLED", false, missing),
+    oauth_p0_enabled: oauthP0Enabled,
     session_cookie_name: optional(environment, "SESSION_COOKIE_NAME", "access_layer_admin_session"),
     cors_allowed_origins: safeOrigins(environment, "CORS_ALLOWED_ORIGINS", missing),
     return_url_allowed_schemes: csv(environment, "RETURN_URL_ALLOWED_SCHEMES", "https,http"),

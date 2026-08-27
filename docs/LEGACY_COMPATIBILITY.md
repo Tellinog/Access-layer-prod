@@ -1,6 +1,6 @@
 # Legacy Compatibility
 
-> Step 3A status: the current legacy-only runtime surface remains frozen in `../specs/legacy-contract-baseline.v1.json`. The additive OAuth P0 contract remains frozen and runtime-disabled in `../specs/oauth-p0.v1.yml`. Step 3A adds only one expand-only foundation migration, a default-false flag and isolated non-HTTP primitives; no OAuth endpoint, protocol transaction, token, seed, pilot or adapter is registered. Dual-run protocol material below remains a future constraint, not current behavior or a passed N→N+1 result.
+> Current status: the legacy runtime surface remains frozen in `../specs/legacy-contract-baseline.v1.json`. Step 3C adds only a default-off OAuth authorization-code issuance adapter outside `src/app.ts`; absent/false retains exact legacy routes. Token exchange/signing/session/refresh/revoke/introspection and every production/pilot action remain absent. Dual-run material below remains a future constraint, not a passed N→N+1 result.
 
 ## Objective
 

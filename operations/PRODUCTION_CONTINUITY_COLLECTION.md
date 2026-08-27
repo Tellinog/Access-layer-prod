@@ -93,7 +93,7 @@ Record safe effective values for behavior-sensitive configuration, including:
 - SIEM enablement and endpoint only when safely observable;
 - PostgreSQL user/database names and only the non-identifying count/state of bootstrap emails.
 
-Secret-bearing variables—including database credentials/URL, session secret, pepper, private key/paths except the allowlisted `/run/secrets` path, Google client secret, backup secrets, salt, and tokens—remain state-only. `ADMIN_BOOTSTRAP_EMAILS` is state/count-only because addresses are personal data; it is not a session-continuity prerequisite after bootstrap.
+Secret-bearing variables—including database credentials/URL, session secret, pepper, private key/paths except the allowlisted `/run/secrets` path, Google client secret, OAuth transaction protection key, backup secrets, salt, and tokens—remain state-only. `OAUTH_TRANSACTION_PROTECTION_KEY` is required only when the separately controlled OAuth flag is true; its value or a reusable verifier is never evidence. `ADMIN_BOOTSTRAP_EMAILS` is state/count-only because addresses are personal data; it is not a session-continuity prerequisite after bootstrap.
 
 Container-local observation may not expose Compose interpolation inputs such as PostgreSQL variables. Leave them unobserved in helper output and supplement them from an authorised Coolify configuration view without copying values. Never weaken the gate to convert an unobservable fact into an inferred fact.
 

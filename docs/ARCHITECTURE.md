@@ -113,7 +113,21 @@ server -> buildApplication -> buildApp (unchanged legacy routes)
                                                   `-> public metadata repository -> JWKS selector
 ```
 
-`OAUTH_P0_ENABLED` still defaults to `false`. When false/absent, `buildApplication` returns the exact legacy route inventory. When true, only the dedicated OAuth JWKS and protected-resource metadata GET routes are registered; their automatic Fastify `HEAD` siblings are explicitly disabled. The RFC 8414 builder exists but is intentionally not mounted until its advertised protocol routes exist. Metadata preserves the configured issuer identifier exactly while using a separately trailing-slash-normalized base only for endpoint construction. No OAuth Google callback, token, credential-authentication, private-key loading/signing or authorization-decision code is present. The repository query exposes public/lifecycle metadata but never the protected private-key reference.
+At the Step 3B boundary, `OAUTH_P0_ENABLED=true` registered only the dedicated OAuth JWKS and protected-resource metadata GET routes. The RFC 8414 builder remains intentionally unmounted until its advertised protocol routes exist. Metadata preserves the configured issuer identifier exactly while using a separately trailing-slash-normalized base only for endpoint construction. The repository query exposes public/lifecycle metadata but never the protected private-key reference.
+
+Step 3C extends only the true-flag branch with a separate authorization-issuance boundary:
+
+```text
+/oauth/authorize -> exact registration + PKCE -> protected 600s transaction -> OAuth Google adapter
+                                                                              |
+/oauth/upstream/google/callback <- atomic state claim <- Google identity ------+
+            -> legacy user upsert + pending-grant link only
+            -> current exact entitlement mapping/grant decision
+            -> atomic OAuth authorization + SHA-256 code + completion/audits
+            -> exact client redirect (code, state, iss)
+```
+
+The external Google exchange occurs after the state-claim query completes and outside a database transaction. Token exchange/signing and every OAuth session/refresh/revocation component remain absent. `src/app.ts` and the legacy Google adapter remain unchanged.
 
 ## Risks
 

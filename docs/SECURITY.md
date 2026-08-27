@@ -25,6 +25,12 @@ The additive OAuth protocol target is frozen but not implemented. `OAUTH_P0_CONT
 
 Step 3B implements only a read-only, default-off metadata/JWKS surface over the Step 3A foundation; the authorization protocol remains unimplemented. `OAUTH_P0_ENABLED` defaults to `false`, requires no additional OAuth secret/key input, and leaves every new route at 404 when false/absent. When true, only GET OAuth JWKS and GET RFC 9728 protected-resource metadata are registered outside the unchanged legacy builder; automatic `HEAD` siblings are disabled.
 
+That paragraph records the completed Step 3B boundary. Step 3C now adds only dark Authorization Code issuance when the same flag is true. The authorize and separate upstream-Google callback routes disable automatic request logging and HEAD exposure. They validate singleton requests, exact registered redirect trust, active client/resource state, canonical scopes, explicit allowances and PKCE S256 before creating a transaction. Untrusted client/redirect failures are local; only a previously trusted exact redirect receives OAuth response parameters and exact RFC 9207 issuer identity.
+
+`OAUTH_TRANSACTION_PROTECTION_KEY` is a dedicated canonical unpadded base64url encoding of exactly 32 random bytes. It is absent/optional when OAuth is false and mandatory when true; it is never derived from or replaced by a legacy secret. Exact downstream state is encrypted with AES-256-GCM using a fresh 96-bit IV, versioned envelope and AAD bound to version plus transaction UUID. Upstream Google state and nonce are independently random and stored only as SHA-256 hashes. The 600-second transaction is claimed atomically once before any Google network exchange.
+
+After verified Google identity, Step 3C may upsert the legacy user and link existing pending-email grants through the frozen methods. It creates no legacy grant, access request, session or one-time code. Client/resource/allowances/mappings and the active grant are re-read; each exact mapped permission must still be registered and present case-sensitively in that grant. Authorization, a SHA-256-only code row, transaction completion and sanitized success audits are committed atomically. Raw 32-byte authorization codes exist only for the response, expire after 60 seconds and never enter persistence or logs.
+
 Foundation credential tables contain only `secret_hash` plus lifecycle metadata. Repository metadata queries deliberately do not select credential hashes. Controlled client-registration validation carries only non-secret `secretPresent`, rotation and expiry metadata: confidential `client_secret_basic` requires presence, while public `none` forbids it. Plaintext credentials and credential hashes are not members of that validation model.
 
 Redirect, resource and protected-resource metadata URI helpers reject raw whitespace/control characters, raw backslashes, malformed percent escapes, userinfo, fragments and wildcards before exact scheme/localhost checks. They validate the original string and do not normalize the value used for registration or comparison.
@@ -37,7 +43,7 @@ Every P0 resource requires exactly one legacy-tool entitlement-only binding and 
 
 P0 introspection uses `client_secret_basic` credentials owned by one OAuth resource and stored only as non-reversible hashes with lifecycle/rotation metadata. These credentials are neither OAuth client credentials nor legacy tool clients. It discloses only RFC 9068 access tokens whose exact `aud` equals the credential's resource as active. Audience mismatches, refresh, inactive, unknown and otherwise non-disclosable tokens receive exactly `{"active":false}`; invalid caller credentials fail authentication.
 
-OAuth vNext uses the future internal Google callback `/oauth/upstream/google/callback`; it never extends the frozen legacy callback and remains unimplemented and unregistered after Step 3B. Exact downstream client state is kept only in future short-lived reversible protected storage until returned and is never logged. Upstream Google state and nonce may remain hash-only.
+OAuth vNext uses the internal Google callback `/oauth/upstream/google/callback`; it never extends the frozen legacy callback. Step 3C registers it only under the default-false flag. Exact downstream client state is kept only in short-lived authenticated-encrypted storage until returned and is never logged. Upstream Google state and nonce are hash-only.
 
 First-party browser clients remain BFF/server-side-token applications. Public-client rollout, SPA bearer-token storage, downstream OIDC, service principals, `client_credentials`, token exchange, `private_key_jwt` and dynamic registration are disabled/deferred.
 
@@ -123,6 +129,7 @@ Secrets:
 - `TOOL_CLIENT_SECRET_PEPPER`
 - `BACKUP_ENCRYPTION_KEY`
 - `LOG_IP_SALT`
+- `OAUTH_TRANSACTION_PROTECTION_KEY` when dark OAuth is enabled
 - per-tool client secrets
 
 `JWT_PRIVATE_KEY_PEM_PATH` and `JWT_PRIVATE_KEY_PEM` are alternatives. Do not set both unless the deployment platform intentionally overrides file-based keys with injected PEM content.

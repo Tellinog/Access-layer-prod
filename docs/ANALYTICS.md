@@ -18,7 +18,7 @@ This project does not track product analytics for user behavior. It tracks secur
 | Refresh failures | `token.refresh.denied` | Expiry, replay, integration and authorization monitoring |
 | Admin grant changes | `admin.grant.*` | Change tracking |
 
-Future OAuth P0 operational metrics derive from `oauth.authorization.*`, `oauth.code.*`, `oauth.token.refreshed`, `oauth.refresh.replay_detected`, `oauth.token.revoked`, `oauth.token.introspected` and registration/key lifecycle events. They remain disabled until OAuth runtime exists and must use aggregate client/resource/scope dimensions without tokens, email or subject in metric labels.
+Step 3C can derive dark/local issuance metrics from `oauth.authorization.*` and `oauth.code.issued` only when OAuth is explicitly enabled in an isolated environment. Later exchange/refresh/replay/revoke/introspection and registration/key metrics remain disabled. Metric labels may use aggregate client/resource/scope dimensions but never tokens, codes, state, nonce, PKCE, email or subject.
 
 ## Dashboards
 

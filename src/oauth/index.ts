@@ -1,5 +1,13 @@
 export { OAuthFoundationRepository } from "./repository.js";
-export { registerOAuthReadOnlyHttp } from "./http.js";
+export { registerOAuthAuthorizationHttp, registerOAuthReadOnlyHttp } from "./http.js";
+export { OAuthAuthorizationFlowRepository } from "./flow-repository.js";
+export { OAuthAuthorizationService } from "./authorization.js";
+export { OAuthGoogleAuthLibraryOidcClient, oauthUpstreamGoogleRedirectUri } from "./google.js";
+export {
+  parseOAuthTransactionProtectionKey,
+  protectOAuthDownstreamState,
+  unprotectOAuthDownstreamState
+} from "./state-protection.js";
 export { selectOAuthJwks } from "./jwks.js";
 export {
   buildOAuthAuthorizationServerMetadata,

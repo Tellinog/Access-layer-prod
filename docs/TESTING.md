@@ -1,5 +1,17 @@
 # TESTING.md
 
+## Step 3C dark authorization-code issuance conformance
+
+`tests/oauth-authorization.test.ts` verifies migration 004 creates exactly the three approved tables with no destructive SQL or legacy data writes; fixes transaction/code TTLs at 600/60 seconds; and keeps downstream state protected, Google state/nonce hash-only and code material SHA-256-only at rest. AEAD tests cover exact round trip, unique 96-bit IVs, malformed envelopes, tag tamper and transaction/AAD swaps with a synthetic non-secret key.
+
+Authorization tests cover singleton parameters, client-before-redirect trust, no redirect to untrusted URIs, active client/resource checks, canonical non-duplicate scopes, exact allowances, PKCE S256, exact state/issuer error responses, atomic callback claim, replay/expiry, nonce mismatch, disabled users, pending-grant linking, current grant/permission checks, registration revalidation, 32-byte code entropy, exact 60-second code TTL and audit/persistence secrecy. The Google test adapter asserts exchange occurs with no database transaction open. Static boundaries reject any flow-repository legacy write and any legacy grant/access-request/session/code creation.
+
+`tests/oauth-darkness.test.ts` continues to deep-compare false/omitted composition with the frozen legacy builder. Under true, only the two Step 3B GETs and two Step 3C GETs are reachable; all four HEAD forms plus RFC 8414, token, revoke and introspect remain 404, and legacy JWKS stays unchanged. Route-level automatic logging for authorize/callback is configured silent.
+
+Final Step 3C result: TypeScript lint/build passed; Vitest passed 249 tests across 15 files; the repository Python suite reported 60 passed, 2 skipped (62 collected); the OAuth validator passed 24 check groups; continuity remained `VALID_BUT_NOT_READY` with both gates false; the non-strict platform checker passed 27 checks with seven known warnings; and the frozen legacy/dependency/migration audit plus `git diff --check` passed. Migration 004 SHA-256 is `96c37fe2a043a1aae6f813ca36db36cb1aa7ce67f2abfbff42c4883e35f72772`.
+
+Live PostgreSQL application was unavailable: Docker could not reach its API, `psql` was absent and `127.0.0.1:5432` was closed. The deterministic migration tests are the local evidence; no live application/previous-binary smoke result is claimed and no production database was contacted.
+
 ## Step 3B read-only OAuth metadata/JWKS conformance
 
 `tests/oauth-darkness.test.ts` compares the default-off composed route inventory to the unchanged legacy `buildApp`, proves the two new paths remain 404 when disabled, and proves only GET `/oauth/jwks` plus GET RFC 9728 protected-resource metadata become reachable when enabled. Their automatic `HEAD` siblings, authorization-server metadata, authorize, token, revoke, introspect and upstream Google remain 404. The legacy JWKS response is identical for both flag states.

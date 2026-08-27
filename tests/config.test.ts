@@ -36,10 +36,25 @@ describe("loadConfig", () => {
     expect(loadConfig().oauthP0Enabled).toBe(false);
   });
 
-  it("parses the optional OAuth P0 foundation flag without requiring any OAuth key or credential input", () => {
+  it("parses the OAuth P0 flag with the dedicated transaction protection key", () => {
     vi.stubEnv("OAUTH_P0_ENABLED", "true");
+    vi.stubEnv("OAUTH_TRANSACTION_PROTECTION_KEY", Buffer.alloc(32, 7).toString("base64url"));
 
     expect(loadConfig().oauthP0Enabled).toBe(true);
+    expect(loadConfig().oauthTransactionProtectionKey).toEqual(Buffer.alloc(32, 7));
+  });
+
+  it("requires a dedicated canonical 32-byte transaction protection key only when OAuth is enabled", () => {
+    vi.stubEnv("OAUTH_P0_ENABLED", "true");
+    vi.stubEnv("OAUTH_TRANSACTION_PROTECTION_KEY", undefined);
+    expect(() => loadConfig()).toThrow("OAUTH_TRANSACTION_PROTECTION_KEY");
+
+    vi.stubEnv("OAUTH_TRANSACTION_PROTECTION_KEY", `${Buffer.alloc(32, 7).toString("base64url")}=`);
+    expect(() => loadConfig()).toThrow("canonical unpadded base64url");
+
+    vi.stubEnv("OAUTH_P0_ENABLED", "false");
+    vi.stubEnv("OAUTH_TRANSACTION_PROTECTION_KEY", undefined);
+    expect(loadConfig().oauthTransactionProtectionKey).toBeUndefined();
   });
 
   it("loads comma-separated Workspace hosted domains in normalized form", () => {

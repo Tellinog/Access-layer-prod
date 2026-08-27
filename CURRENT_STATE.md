@@ -2,7 +2,20 @@
 
 ## Phase
 
-V1 legacy implementation complete. Step 3B adds a local, default-off read-only OAuth metadata/JWKS module over the Step 3A foundation. Authorization, token and upstream Google runtime remain unimplemented.
+V1 legacy implementation complete. Step 3C adds a local, default-off dark OAuth Authorization Code issuance path over the frozen Step 3A/3B foundation. Token exchange, signing, refresh, revoke, introspect and RFC 8414 discovery remain unimplemented.
+
+## Step 3C dark OAuth Authorization Code issuance, 2026-08-26
+
+- Added expand-only `migrations/004_oauth_authorization_code_flow.sql`, creating exactly `oauth_authorization_transactions`, `oauth_authorizations` and `oauth_authorization_codes`. It does not alter or write legacy tables and adds no OAuth session, refresh or revocation table.
+- When `OAUTH_P0_ENABLED` is absent/false, route inventory remains exactly legacy. When true, Step 3B GET routes plus GET-only `/oauth/authorize` and `/oauth/upstream/google/callback` are mounted; their `HEAD` siblings, RFC 8414 discovery, token, revoke and introspect remain 404.
+- The authorize path validates one active client, exact registered redirect, one active HTTPS resource, canonical non-duplicate scopes, explicit client/resource/scope rows, `response_type=code`, singleton parameters and PKCE `S256`. It never redirects to an untrusted URI; trusted redirects carry exact state and issuer identity on errors.
+- A separate OAuth Google adapter computes `${APP_BASE_URL without trailing slash}/oauth/upstream/google/callback` while reusing only existing Google credentials and claim validation. The legacy Google adapter and callback are unchanged.
+- `OAUTH_TRANSACTION_PROTECTION_KEY` is a dedicated canonical unpadded base64url 32-byte key required only when OAuth is true. AES-256-GCM uses a fresh 96-bit IV, versioned envelope and transaction-bound AAD. Exact downstream state is stored only in the protected envelope; independent upstream state and nonce persist only as SHA-256 hashes. Transaction TTL is 600 seconds and callback state is atomically claimed once before the Google network exchange.
+- After verified identity, OAuth reuses only legacy user upsert and pending-email grant linking, then re-resolves client/resource/mapping/allowance and the active grant. It creates no legacy grant, access request, session or one-time code. Every requested scope must map exactly to a registered legacy permission present in that grant.
+- Successful issuance atomically creates one OAuth authorization and a SHA-256-only authorization-code row, completes the transaction and writes sanitized allowed/code-issued audits. The opaque code contains 32 random bytes, expires in exactly 60 seconds and appears only once in the browser redirect with exact state and `iss`.
+- Automatic request logging is silent for authorize/callback. OAuth audits contain only safe identifiers and never raw state, nonce, Google/code credentials, PKCE values, tokens, cookies or secrets.
+- `src/app.ts`, migrations 001–003, the frozen legacy spec/OpenAPI, legacy Google/JWT/JWKS/session/refresh/grant/permission behavior, dependencies, seeds, consumers, SDKs and deployment configuration remain unchanged. No production, Coolify or Google Console action occurred.
+- Final verification passes: TypeScript lint/build; 249 Vitest tests across 15 files; Python 60 passed and 2 expected skips; all 24 OAuth validator groups; continuity as `VALID_BUT_NOT_READY` with both gates false; non-strict platform validation with 27 passes/seven known warnings; frozen legacy/dependency/migration audit; and `git diff --check`. Migration 004 SHA-256 is `96c37fe2a043a1aae6f813ca36db36cb1aa7ce67f2abfbff42c4883e35f72772`. Docker has no reachable daemon, `psql` is absent and no server listens on `127.0.0.1:5432`, so live disposable PostgreSQL application and the previous-binary smoke test remain unverified; no production database was contacted.
 
 ## Step 3B read-only OAuth metadata/JWKS dark module, 2026-08-26
 
@@ -63,7 +76,7 @@ V1 legacy implementation complete. Step 3B adds a local, default-off read-only O
 
 ## Step 1.5B continuity evidence hardening, 2026-08-25
 
-- Production-continuity evidence is schema v2 and remains deliberately redacted and `NOT_READY`. It distinguishes absent, empty, and non-empty environment states, preserves an empty production `PUBLIC_BASE_PATH` as valid, and now inventories all 42 configuration inputs derived from `src/config.ts`, `docker-compose.yaml`, and `docker/entrypoint.sh`, including Step 3A's optional default-false flag.
+- At the Step 1.5B boundary, production-continuity evidence schema v2 inventoried 42 configuration inputs. Step 3C extends that source-derived inventory to 43 with the state-only conditional OAuth transaction protection key; the bundle remains redacted and `NOT_READY`.
 - File-backed and inline JWT signing modes are explicit. File-backed readiness requires proof of the actual persistent `/run/secrets` storage/mount as well as public `kid`/public-key fingerprint evidence; private key material and private verifiers remain forbidden.
 - `SESSION_SECRET`, `TOOL_CLIENT_SECRET_PEPPER`, `BACKUP_ENCRYPTION_KEY`, `GOOGLE_CLIENT_SECRET`, and `LOG_IP_SALT` require external, secret-safe sameness proof. Presence alone is insufficient, and no secret value or reusable verifier may be committed.
 - Validation exposes separate `ready_for_isolated_restore` and `ready_for_n_to_n_plus_1` gates. The final gate still requires a `PASSED` isolated restore. The committed template has both gates false; no restore, live collection, or upgrade exercise was performed.

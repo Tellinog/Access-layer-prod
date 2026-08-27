@@ -1,5 +1,35 @@
 # DEVLOG.md
 
+## 2026-08-27 - Step 3D dark OAuth token-lifecycle core
+
+Changed by: Codex
+Related task: Implement the OAuth P0 exchange/signing/refresh/revocation/introspection core without mounting Step 3D protocol routes.
+
+### Changed
+
+- Added expand-only migration 005 with exactly four OAuth-only lifecycle tables and no legacy DDL/data write.
+- Added OAuth-only credential verification, transactional token repository/service, dedicated signing-key loader/signer/verifier, refresh-family replay handling, access/refresh revocation and resource-owned introspection core.
+- Added `OAUTH_CREDENTIAL_SECRET_PEPPER` and `OAUTH_SIGNING_KEY_ROOT` as optional unprovisioned configuration/evidence inputs; the core fails closed if required material is absent.
+- Added migration, binding/PKCE/race/current-entitlement, JWT/PII, key-boundary, refresh/lineage/replay/scope/idle, revocation/introspection and frozen-boundary tests.
+- Hardened mixed PostgreSQL row-lock clauses to avoid read-row SHARE-to-UPDATE upgrades while preserving same-token replay semantics and deterministic ordering.
+- Added material-based legacy/OAuth RSA identity separation, OAuth/tool pepper inequality, persisted scope/generation corruption checks, overlap-key retirement/future-`iat` verification, disabled-resource jti revocation durability and separate sanitized code-denial audit persistence.
+
+### Behavior
+
+- Authorization codes and refresh credentials are hashed before lookup and never persisted raw. Code consumption, OAuth lifecycle persistence, sanitized audit and signing-key usage timestamp are one transaction.
+- OAuth access tokens are dedicated-key RFC 9068 RS256 JWTs with exact 900-second lifetime and PII-minimised claims. Valid refresh rotates once, narrows only, and slides idle expiry by exactly 28,800 seconds; consumed reuse commits family/session revocation and returns `invalid_grant`.
+- Revocation/introspection exist only as core service methods. Token/revoke/introspect/RFC 8414 HTTP routes remain unmounted, default-off and 404; all legacy and Step 3B/3C route behavior remains unchanged.
+- No registration API, pilot/seed, production secret/key, consumer/SDK, Coolify or deployment change occurred.
+- A failed code exchange rolls back its main transaction, then writes `oauth.code.exchange_denied` in one separate bounded transaction. Failure of that mandatory denial audit is returned only as `temporarily_unavailable`.
+
+### Tests/checks
+
+- TypeScript lint and build passed. Full Vitest passed 278 tests across 16 files; the focused lifecycle/config suite passed 37 tests, including 23 Step 3D lifecycle tests.
+- Python unittest discovery passed 60 tests with two expected skips (62 collected). The OAuth validator passed 24 check groups. Continuity validated as `VALID_BUT_NOT_READY` with both gates false (expected exit 2), and non-strict platform validation passed 27 checks with seven known warnings.
+- Migration-shape, mixed-lock SQL, frozen legacy/dependency/migrations 001–004 checks and `git diff --check` passed. Migration 005 SHA-256 is `aaffcb469000f62e680b5d391360fdacc4414e4280ba230e90e7fd4eee4dafbe` and its table list is exactly the four approved OAuth lifecycle tables.
+- Docker CLI was present but its daemon/API was unavailable; `psql` was absent and `127.0.0.1:5432` was closed. Therefore disposable PostgreSQL 16 migration application and real same-refresh concurrency were not run and remain an explicit external release assumption. No production database was contacted.
+- No production connection or deployment occurred.
+
 ## 2026-08-27 - Step 3C protected-state lifecycle hardening
 
 Changed by: Codex

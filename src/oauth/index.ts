@@ -2,6 +2,21 @@ export { OAuthFoundationRepository } from "./repository.js";
 export { registerOAuthAuthorizationHttp, registerOAuthReadOnlyHttp } from "./http.js";
 export { OAuthAuthorizationFlowRepository } from "./flow-repository.js";
 export { OAuthAuthorizationService } from "./authorization.js";
+export { OAuthTokenRepository } from "./token-repository.js";
+export {
+  OAUTH_REFRESH_IDLE_SECONDS,
+  OAuthCoreError,
+  OAuthTokenLifecycleService
+} from "./token-service.js";
+export {
+  OAUTH_ACCESS_TOKEN_TTL_SECONDS,
+  OAUTH_SIGNING_KEY_MAX_BYTES,
+  OAuthAccessTokenSigner,
+  OAuthSigningUnavailableError,
+  loadOAuthPrivateSigningKey,
+  selectOAuthSigningKey,
+  verifyOAuthAccessToken
+} from "./signing.js";
 export { OAuthGoogleAuthLibraryOidcClient, oauthUpstreamGoogleRedirectUri } from "./google.js";
 export {
   parseOAuthTransactionProtectionKey,

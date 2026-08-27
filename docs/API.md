@@ -48,6 +48,10 @@ Untrusted client or redirect input receives a local OAuth JSON error and is neve
 
 `/oauth/token`, `/oauth/revoke`, `/oauth/introspect` and `/.well-known/oauth-authorization-server` remain 404. There is no access/refresh token response, client authentication, signing or private-key loading in Step 3C.
 
+## Step 3D unmounted token-lifecycle core
+
+Step 3D implements the internal repository/service behavior for code exchange, OAuth client/resource credential verification, dedicated-key access-token signing, refresh rotation/replay, revocation and introspection. It adds no Fastify registration: `/oauth/token`, `/oauth/revoke`, `/oauth/introspect` and `/.well-known/oauth-authorization-server` still return 404 in both flag states. The target-only request/response shapes in `../schemas/access-layer-oauth-v1.openapi.yaml` remain frozen inputs for a later Step 3E mount.
+
 ## Endpoints
 
 | Method | Path | Purpose | Auth required | Notes |

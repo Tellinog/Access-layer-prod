@@ -1,5 +1,19 @@
 # TESTING.md
 
+## Step 3D dark token-lifecycle-core conformance
+
+`tests/oauth-token-lifecycle.test.ts` verifies migration 005 creates exactly the four approved OAuth tables, contains no destructive/legacy data SQL and retains the frozen hashes for migrations 001–004. It checks the exact 28,800-second idle constraints, SHA-256 hash form, generation/same-family parent lineage, one-current-member partial index, replay state and access-jti expiry.
+
+Service tests use synthetic local RSA and OAuth registration/state only. Coverage includes salted OAuth-only credential verification, OAuth/tool pepper inequality, confidential and public-`none` clients without legacy fallback, immediate code hashing, exact client/resource/redirect/PKCE, code/authorization scope equality, current user/authorization/grant/mapping/permission re-check, single/concurrent code consumption, sanitized separately committed denial audits and fail-closed audit-write failure, exact RFC 9068 header/claims/900-second TTL/unique jti/sid/PII exclusion, hash-only refresh issuance, rotation lineage, persisted generation/current/ceiling/authorization corruption denial, monotonic scope narrowing, exact idle slide, expired/revoked/current-entitlement denial, concurrent replay family/session revocation, disabled-resource revocation durability, access/refresh/unknown revocation behavior and exact-audience/inactive introspection normalization.
+
+Key-boundary tests cover zero/ambiguous/non-active signing selection, relative and unsupported references, encoded traversal, outside-root paths, symlink realpath escape where supported by the host, non-regular/empty/oversized files, copied/renamed and inline legacy-key public-identity rejection, public/private mismatch and fingerprint mismatch. Verification tests cover overlap-key acceptance before and rejection at/after `retire_after`, finite integer times, future-`iat` denial and exact TTL. Errors expose no key material or path.
+
+Static repository tests require mixed lock clauses that UPDATE-lock only code or token/family/session and SHARE-lock related read-only rows, plus compare-and-set consumption and OAuth-only writes. A real disposable PostgreSQL 16 same-refresh race remains an explicit release assumption whenever Docker/PostgreSQL is unavailable; the serialized in-memory race is not presented as PostgreSQL evidence.
+
+`tests/oauth-darkness.test.ts` remains the HTTP source of truth: token/revoke/introspect/RFC 8414 stay 404 under both relevant composition states, while the exact Step 3B/3C routes and frozen legacy inventory remain green. Final command results, counts and live PostgreSQL limitations are recorded in `../DEVLOG.md`.
+
+Final Step 3D hardening result: TypeScript lint/build passed; Vitest passed 278 tests across 16 files; Python passed 60 with two expected skips (62 collected); the OAuth validator passed 24 check groups; continuity was `VALID_BUT_NOT_READY` with both gates false; non-strict platform validation passed 27 checks with seven known warnings; migration/frozen-legacy/dependency checks and `git diff --check` passed. Migration 005 SHA-256 is `aaffcb469000f62e680b5d391360fdacc4414e4280ba230e90e7fd4eee4dafbe`. Docker API, `psql` and a local PostgreSQL listener were unavailable, so no disposable-PG apply or real same-refresh race is claimed and no production system was contacted.
+
 ## Step 3C dark authorization-code issuance conformance
 
 `tests/oauth-authorization.test.ts` verifies migration 004 creates exactly the three approved tables with no destructive SQL or legacy data writes; fixes transaction/code TTLs at 600/60 seconds; and keeps downstream state protected, Google state/nonce hash-only and code material SHA-256-only at rest. AEAD tests cover exact round trip, unique 96-bit IVs, malformed envelopes, tag tamper and transaction/AAD swaps with a synthetic non-secret key.

@@ -57,6 +57,35 @@ describe("loadConfig", () => {
     expect(loadConfig().oauthTransactionProtectionKey).toBeUndefined();
   });
 
+  it("keeps Step 3D core secrets optional at route-composition time and parses them separately", () => {
+    vi.stubEnv("OAUTH_CREDENTIAL_SECRET_PEPPER", undefined);
+    vi.stubEnv("OAUTH_SIGNING_KEY_ROOT", undefined);
+    expect(loadConfig()).toMatchObject({
+      oauthCredentialSecretPepper: undefined,
+      oauthSigningKeyRoot: undefined
+    });
+
+    vi.stubEnv("OAUTH_CREDENTIAL_SECRET_PEPPER", "oauth-only-secret-pepper");
+    vi.stubEnv("OAUTH_SIGNING_KEY_ROOT", "C:\\oauth-keys");
+    expect(loadConfig()).toMatchObject({
+      oauthCredentialSecretPepper: "oauth-only-secret-pepper",
+      oauthSigningKeyRoot: "C:\\oauth-keys"
+    });
+
+    vi.stubEnv("OAUTH_CREDENTIAL_SECRET_PEPPER", "too-short");
+    expect(() => loadConfig()).toThrow("OAUTH_CREDENTIAL_SECRET_PEPPER");
+  });
+
+  it("rejects reuse of the legacy tool-client pepper without disclosing either value", () => {
+    vi.stubEnv("OAUTH_CREDENTIAL_SECRET_PEPPER", baseEnv.TOOL_CLIENT_SECRET_PEPPER);
+    expect(() => loadConfig()).toThrow("OAuth credential secret isolation is invalid");
+    try {
+      loadConfig();
+    } catch (error) {
+      expect(String(error)).not.toContain(baseEnv.TOOL_CLIENT_SECRET_PEPPER);
+    }
+  });
+
   it("loads comma-separated Workspace hosted domains in normalized form", () => {
     vi.stubEnv("GOOGLE_ALLOWED_HD", "UNGUESS.IO,nuotounostiledivita.it");
 

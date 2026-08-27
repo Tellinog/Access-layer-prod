@@ -66,7 +66,7 @@ docker inspect --format '{{json .Mounts}}' <exact-app-container-id>
 
 ## Secret continuity without secret disclosure
 
-Presence is necessary but does not prove continuity. Before an isolated restore, an authorised operator must prove that the source and isolated target bind the same `SESSION_SECRET`, `TOOL_CLIENT_SECRET_PEPPER`, `BACKUP_ENCRYPTION_KEY`, `GOOGLE_CLIENT_SECRET`, and `LOG_IP_SALT` where applicable.
+Presence is necessary but does not prove continuity. Before an isolated restore, an authorised operator must prove that the source and isolated target bind the same `SESSION_SECRET`, `TOOL_CLIENT_SECRET_PEPPER`, `OAUTH_CREDENTIAL_SECRET_PEPPER`, `BACKUP_ENCRYPTION_KEY`, `GOOGLE_CLIENT_SECRET`, and `LOG_IP_SALT` where applicable. OAuth signing-key continuity is a separate public-key/external-evidence requirement; do not record its private key or filesystem path.
 
 Use one approved method recorded in the evidence model:
 
@@ -93,7 +93,7 @@ Record safe effective values for behavior-sensitive configuration, including:
 - SIEM enablement and endpoint only when safely observable;
 - PostgreSQL user/database names and only the non-identifying count/state of bootstrap emails.
 
-Secret-bearing variables—including database credentials/URL, session secret, pepper, private key/paths except the allowlisted `/run/secrets` path, Google client secret, OAuth transaction protection key, backup secrets, salt, and tokens—remain state-only. `OAUTH_TRANSACTION_PROTECTION_KEY` is required only when the separately controlled OAuth flag is true; its value or a reusable verifier is never evidence. `ADMIN_BOOTSTRAP_EMAILS` is state/count-only because addresses are personal data; it is not a session-continuity prerequisite after bootstrap.
+Secret-bearing variables—including database credentials/URL, session secrets, both credential peppers, private keys/paths, Google client secret, OAuth transaction protection key, backup secrets, salt, and tokens—remain state-only. `OAUTH_TRANSACTION_PROTECTION_KEY` is required only when the separately controlled OAuth flag is true; its value or a reusable verifier is never evidence. `OAUTH_SIGNING_KEY_ROOT` is state-only because Step 3D forbids exposing key paths. `ADMIN_BOOTSTRAP_EMAILS` is state/count-only because addresses are personal data; it is not a session-continuity prerequisite after bootstrap.
 
 Container-local observation may not expose Compose interpolation inputs such as PostgreSQL variables. Leave them unobserved in helper output and supplement them from an authorised Coolify configuration view without copying values. Never weaken the gate to convert an unobservable fact into an inferred fact.
 

@@ -44,6 +44,8 @@ Minimum production variables:
 - `ACCESS_REQUEST_REOPEN_AFTER_DAYS` defaults to `30`
 - `OAUTH_P0_ENABLED` is optional and defaults to `false`; absent/false preserves the exact legacy route inventory.
 - `OAUTH_TRANSACTION_PROTECTION_KEY` remains optional/absent while OAuth is false and is required only when true. It must be a dedicated canonical unpadded base64url encoding of exactly 32 random bytes. Never store a real value in Git or derive it from legacy secrets.
+- `OAUTH_CREDENTIAL_SECRET_PEPPER` is an optional Step 3D core input. The core fails closed for confidential client/resource credential verification when absent; it must never equal or derive from `TOOL_CLIENT_SECRET_PEPPER`.
+- `OAUTH_SIGNING_KEY_ROOT` is an optional Step 3D core input naming an absolute dedicated local filesystem root. Token signing fails closed when absent; key references, including paths, must not be logged. Neither input is provisioned or used by the unmounted HTTP surface in Step 3D.
 
 ## Infrastructure
 
@@ -95,7 +97,7 @@ When `RUN_SEED_ON_START=true`, the seed reconciles the reserved `access-admin` r
 9. Register pilot tool.
 10. Run end-to-end tests.
 
-The historical Step 3A foundation and Step 3B read surface did not authorise production OAuth changes. Step 3C adds only local default-off issuance; it likewise authorises no production flag/key, Google callback, pilot, key provisioning or registration change. Production remains blocked by the continuity/release gates below.
+The historical Step 3A foundation and Step 3B read surface did not authorise production OAuth changes. Step 3C adds only local default-off issuance, and Step 3D adds only an unmounted local core; neither authorises a production flag/key/pepper/root, Google callback, pilot, key provisioning or registration change. Production remains blocked by the continuity/release gates below.
 
 ## Rollback
 

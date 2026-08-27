@@ -107,6 +107,16 @@
       "pattern": "^[A-Za-z0-9_-]{43}$",
       "description": "Dedicated canonical unpadded base64url encoding of exactly 32 random bytes. Required only when OAUTH_P0_ENABLED is true; never commit a value."
     },
+    "OAUTH_CREDENTIAL_SECRET_PEPPER": {
+      "type": "string",
+      "minLength": 16,
+      "description": "Dedicated OAuth client/resource credential pepper. It is not the legacy tool-client pepper and is required before invoking the Step 3D core."
+    },
+    "OAUTH_SIGNING_KEY_ROOT": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Dedicated absolute local filesystem root for OAuth private signing-key references. It is required before invoking OAuth token issuance."
+    },
     "SESSION_COOKIE_NAME": {
       "type": "string"
     },

@@ -58,6 +58,12 @@ Step 3C adds only three OAuth authorization-flow tables, GET `/oauth/authorize`,
 
 Token exchange/client authentication, OAuth access/refresh tokens and sessions, signing/private-key loading, RFC 8414 routing, revoke, introspect, registration/admin APIs, pilot/seed data, production/Google Console actions, consumers and SDKs remain out of scope.
 
+## Step 3D dark token-lifecycle-core boundary
+
+Step 3D adds only the OAuth session/refresh-family/refresh-token/revocation tables plus unmounted services for code exchange, dedicated-key RFC 9068 signing, refresh rotation/replay, revocation and resource-owned introspection. OAuth credential hashes use a dedicated pepper, key references are confined to a dedicated local root, and every successful issue/rotate transition is transactional with audit and `last_signed_at`.
+
+Still out of scope are mounting `/oauth/token`, `/oauth/revoke`, `/oauth/introspect` or RFC 8414; registration/admin APIs, pilots/seeds, production secret/key provisioning or enablement, consumers/SDKs, backup implementation changes, deployment and Step 3E.
+
 ## Personas
 
 | Persona | Goal | Main needs | Notes |

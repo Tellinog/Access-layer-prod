@@ -447,3 +447,19 @@ Decision: implement Step 3C outside the frozen legacy `buildApp` boundary throug
 The dedicated `OAUTH_TRANSACTION_PROTECTION_KEY` is decoded only when configured, is mandatory only under the existing true OAuth flag and is never derived from a legacy secret. Transaction creation/audit, denial/audit and authorization/code/completion/audit execute atomically in short database transactions. The Google network exchange occurs only after the upstream-state claim transaction has completed.
 
 Rationale: this structure makes the narrow legacy mutation exception auditable, keeps external I/O outside database transactions, and prevents partial code issuance or missing decision audits. The 600-second transaction TTL, 60-second code TTL, exact redirect/error behavior, AES-256-GCM parameters and entropy/hash rules are authorised frozen Step 3C inputs, not new protocol semantics.
+
+## D-042 - Keep the Step 3D OAuth token lifecycle atomic, key-isolated and unmounted
+
+Status: accepted
+
+Confirmed: 2026-08-27
+
+Decision: implement Step 3D through one expand-only four-table migration plus a separate OAuth token repository, lifecycle service and signing boundary. Authorization-code consumption, OAuth session/refresh-family/root-token persistence, sanitized audit and signing-key `last_signed_at` update commit as one transaction. Refresh rotation applies the same rule; a consumed-token replay commits whole-family and linked-session revocation before the service returns `invalid_grant`.
+
+OAuth client/resource credentials use only the dedicated `OAUTH_CREDENTIAL_SECRET_PEPPER`, which must not equal `TOOL_CLIENT_SECRET_PEPPER`; public clients use registered method `none`, and no credential lookup falls back to legacy `tool_clients`. OAuth signing uses only one active, non-retiring OAuth key whose local file reference resolves inside `OAUTH_SIGNING_KEY_ROOT`, has a different derived RSA public identity from the actual configured legacy key, and matches the persisted public JWK and canonical public fingerprint. Old active overlap keys remain verification-only strictly before `retire_after`. Zero or multiple signable keys fail closed.
+
+Read-only client/authorization/resource/user/grant rows use SHARE locks only; code exchange UPDATE-locks only the code row, while refresh UPDATE-locks only token/family/session rows. Stored authorization/code/family/token scope and generation state is cross-checked before signing. A failed code transaction is followed by a separate bounded sanitized `oauth.code.exchange_denied` audit transaction; if that write fails, the caller receives `temporarily_unavailable`. Access-token revocation resolves an exact OAuth resource independent of active status so jti revocation remains durable across resource disable/re-enable.
+
+Step 3D exposes no HTTP route. `/oauth/token`, `/oauth/revoke`, `/oauth/introspect` and RFC 8414 remain unregistered until a separately approved Step 3E. The new credential pepper and signing root are optional at route-composition/config-load time so the existing Step 3B/3C dark surface remains usable for isolated tests; invoking a Step 3D operation that needs either input fails closed when it is absent.
+
+Rationale: transactional shared state closes code/refresh races and preserves audit completeness, while strict OAuth-only credentials and realpath-bound key loading prevent legacy fallback or cross-key-domain signing. Keeping the core unmounted permits review and deterministic testing without advertising or enabling the protocol surface.

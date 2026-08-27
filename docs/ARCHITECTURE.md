@@ -129,6 +129,26 @@ Step 3C extends only the true-flag branch with a separate authorization-issuance
 
 The external Google exchange occurs after the state-claim query completes and outside a database transaction. Token exchange/signing and every OAuth session/refresh/revocation component remain absent. `src/app.ts` and the legacy Google adapter remain unchanged.
 
+Step 3D adds an internal core without extending the HTTP composer:
+
+```text
+raw code -> SHA-256 -> OAuthTokenLifecycleService -> transaction/row locks
+                                                    |-> UPDATE code; SHARE registration/entitlement reads
+                                                    |-> authorization/code scope-set consistency
+                                                    |-> code CAS + OAuth session/family/refresh hash
+                                                    |-> dedicated OAuth signing + last_signed_at
+                                                    `-> sanitized audit
+
+raw refresh -> SHA-256 -> UPDATE token/family/session + SHARE current entitlement
+                         generation/scope/ceiling/authorization consistency
+                         current rotate + exact 28,800s slide
+                         consumed replay -> family + OAuth session revoke
+
+resource credential -> OAuth JWT local verify -> jti/session/authorization/entitlement online state
+```
+
+The signer reads only a single active, non-retiring OAuth key under the dedicated realpath-confined root and rejects derived RSA public identity equality with the configured legacy key. Denied code exchange auditing uses a separate bounded transaction because the main exchange transaction rolls back. Exact OAuth resource lookup keeps jti revocation durable while a resource is disabled. The legacy signer/JWKS and all legacy persistence remain separate. Step 3D routes are deliberately absent; the earlier sentence describing token/session components as absent records the Step 3C boundary.
+
 ## Risks
 
 | Risk | Mitigation |

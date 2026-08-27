@@ -1,12 +1,12 @@
 # OAuth vNext P0 contract
 
-Status: frozen target contract; Step 3C default-off authorization-code issuance subset; token and later protocol runtime not implemented or enabled
+Status: frozen target contract; Step 3D default-off token-lifecycle core implemented but token/revoke/introspect/discovery HTTP remains unmounted and disabled
 Machine source: `../specs/oauth-p0.v1.yml`
 Target OpenAPI: `../schemas/access-layer-oauth-v1.openapi.yaml`
 
 ## Boundary and compatibility
 
-P0 is an additive OAuth authorization-server contract. Step 2 created no runtime endpoint, table, migration, dependency, client registration or production configuration. Step 3A added only the disabled foundation and Step 3B added flag-gated read-only `/oauth/jwks` plus RFC 9728 metadata. Step 3C adds only flag-gated authorization request, separate upstream-Google callback and code issuance backed by three transaction tables. RFC 8414 remains unmounted and token authentication/exchange, signing, OAuth sessions/refresh/revoke/introspection, registration APIs, seeds and production configuration remain absent. The frozen `access-layer-legacy-v1` contract remains authoritative for `/v1/*`, Google callback, JWT/JWKS, sessions, refresh tokens, grants, permissions, cookies, tool clients, Admin UI and current consumers. OAuth failure must never silently fall back to legacy credentials, and no consumer is forced to migrate.
+P0 is an additive OAuth authorization-server contract. Step 2 created no runtime endpoint, table, migration, dependency, client registration or production configuration. Step 3A added only the disabled foundation, Step 3B added flag-gated read-only `/oauth/jwks` plus RFC 9728 metadata, and Step 3C added flag-gated authorization/code issuance. Step 3D adds four lifecycle tables and unmounted service/repository core for client authentication, exchange, signing, refresh/replay, revocation and introspection. RFC 8414 and token/revoke/introspect HTTP remain unmounted; registration APIs, seeds, pilots and production configuration remain absent. The frozen `access-layer-legacy-v1` contract remains authoritative for `/v1/*`, Google callback, JWT/JWKS, sessions, refresh tokens, grants, permissions, cookies, tool clients, Admin UI and current consumers. OAuth failure never falls back to legacy credentials, and no consumer is forced to migrate.
 
 Stable RFCs are normative: RFC 6749 where applicable, RFC 6750, RFC 7636, RFC 7009, RFC 7662, RFC 8414, RFC 8707, RFC 9068, RFC 9207, RFC 9700, RFC 9728 and RFC 10017. OAuth 2.1 is an aligned work-in-progress draft profile, not a published RFC.
 
@@ -81,11 +81,15 @@ OAuth refresh tokens are opaque and stored only as non-reversible hashes. Every 
 
 Refresh occurs only while processing authenticated user activity. Timers, cron jobs, hidden heartbeats and inactive pages may not keep a session alive. The idle timeout is 28,800 seconds, matching D-029. Refresh cannot change subject, client or resource and cannot expand scope.
 
+The Step 3D core treats stored lifecycle rows as untrusted: current token generation/scopes must match family generation/current scopes, current scopes must remain inside the family ceiling, and ceiling/current/requested scopes must remain inside the active authorization grant. Inconsistent stored state returns `invalid_grant`; an otherwise valid request that attempts widening remains `invalid_scope`.
+
 Use of an already-consumed family member is replay: deny the request with `invalid_grant`, revoke the complete family and linked OAuth session, and emit the replay audit event. Online introspection becomes inactive immediately; already-issued self-contained access tokens remain cryptographically valid until expiry unless the resource's risk policy requires online state.
 
 ## Revocation and introspection
 
 `POST /oauth/revoke` follows RFC 7009. It is authenticated according to the registered client method and is idempotent from the caller's perspective: unknown, expired and already-revoked tokens return the same successful external response. Revoking an access token records its `jti` as inactive for online state. Revoking a refresh token revokes its complete family and linked OAuth session. Offline validation of a self-contained access token can continue only until its original expiry unless resource risk policy requires online introspection.
+
+Recording an access-token jti revocation resolves the exact existing OAuth resource/audience even while that resource is disabled. It does not use a legacy fallback, so disable/re-enable cannot make a previously revoked token active again.
 
 `POST /oauth/introspect` follows RFC 7662 and uses `client_secret_basic` with separately authorised credentials owned by one OAuth resource. The target-only `oauth_resource_credentials` model contains the resource FK, stable credential ID used as the Basic username, a non-reversible secret hash, status and lifecycle/rotation metadata. It is separate from `oauth_client_credentials` and legacy `tool_clients`.
 
@@ -103,6 +107,8 @@ OAuth keys are isolated behind `/oauth/jwks`; legacy `/v1/.well-known/jwks.json`
 4. allow at most 60 seconds verifier clock skew;
 5. keep an old verification key for at least 1,260 seconds after its last signature (900-second token lifetime + 300-second JWKS cache + 60-second skew);
 6. keep all private key material out of Git, logs and evidence.
+
+The private signing loader additionally rejects equality between the candidate OAuth key's derived RSA public `n`/`e` and the actual configured legacy key, regardless of copied filename or inline/file legacy configuration. Verification accepts an active overlap key only while `retire_after > now`, requires finite integer `iat`/`exp`, rejects `iat` beyond the 60-second verifier skew and keeps the exact 900-second lifetime.
 
 Published RS256 verification keys additionally require RFC 7518 minimum-octet Base64urlUInt encoding. The RSA modulus is positive and at least 2048 bits; the public exponent is at least 3, odd and less than the modulus. Persisted rows are untrusted and fail closed before JWKS publication.
 

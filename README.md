@@ -2,7 +2,7 @@
 
 > Platform status (2026-08-25): Template v2.1 is adopted in `legacy-migration` mode. Live evidence resolved the source Compose PostgreSQL logical-volume mismatch without renaming the live volume. Deployment remains blocked by the backup/restore, ownership, registry and remaining continuity gates in `BACKLOG.md`.
 
-> OAuth vNext status: Step 3C adds a default-off dark authorization request, separate upstream-Google callback and code-issuance path beside the frozen Step 3B read surfaces. With `OAUTH_P0_ENABLED` absent/false every new route remains 404. RFC 8414, token, revoke and introspect remain unregistered; no pilot, signing loader or production enablement exists, and `specs/oauth-p0.v1.yml` remains frozen.
+> OAuth vNext status: Step 3D adds a default-off, unmounted token-lifecycle core beside the frozen Step 3B/3C surfaces. With `OAUTH_P0_ENABLED` absent/false every new route remains 404; even when true, RFC 8414, token, revoke and introspect remain unregistered. No pilot, production key/secret or enablement exists, and `specs/oauth-p0.v1.yml` remains frozen.
 
 Layer di accesso condiviso per tool web interni aziendali.
 

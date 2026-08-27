@@ -16,7 +16,8 @@ function sha256Lf(path: string): string {
     ? text(path)
       .replace('import { parseOAuthTransactionProtectionKey } from "./oauth/state-protection.js";\n', "")
       .replace(/  const oauthP0Enabled = readBoolean\("OAUTH_P0_ENABLED", false\);[\s\S]*?  const config: Config = \{\n/, "  const config: Config = {\n")
-      .replace("    oauthP0Enabled,\n    oauthTransactionProtectionKey,\n", "")
+      .replace("    oauthP0Enabled,\n    oauthTransactionProtectionKey,\n    oauthCredentialSecretPepper,\n    oauthSigningKeyRoot,\n", "")
+      .replace(/\n  if \(config\.oauthCredentialSecretPepper !== undefined &&[\s\S]*?OAuth credential secret isolation is invalid"\);\n  \}\n/, "")
     : text(path);
   return createHash("sha256").update(source, "utf8").digest("hex");
 }
@@ -35,6 +36,9 @@ describe("legacy compatibility baseline", () => {
     const config = text("src/config.ts");
     expect(config).toContain('const oauthP0Enabled = readBoolean("OAUTH_P0_ENABLED", false)');
     expect(config).toContain('readOptional("OAUTH_TRANSACTION_PROTECTION_KEY")');
+    expect(config).toContain('readOptional("OAUTH_CREDENTIAL_SECRET_PEPPER")');
+    expect(config).toContain('readOptional("OAUTH_SIGNING_KEY_ROOT")');
+    expect(config).toContain("OAuth credential secret isolation is invalid");
   });
 
   it("freezes every registered v1 method and path", () => {

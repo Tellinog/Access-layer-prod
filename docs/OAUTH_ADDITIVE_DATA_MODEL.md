@@ -1,12 +1,14 @@
 # Proposed additive OAuth data model
 
-Status: Step 3A foundation and Step 3C authorization-issuance subset implemented; later token/session/refresh/revocation model remains a proposal.
+Status: Step 3A foundation, Step 3C authorization issuance and Step 3D unmounted token/session/refresh/revocation core implemented; HTTP protocol mounting remains deferred.
 
 ## Migration boundary
 
 Step 3A implements the first OAuth migration as `../migrations/003_oauth_dark_foundation.sql`. It is expand-only and readable by the currently deployed legacy binary. It adds only the ten foundation `oauth_*` tables and the read-only entitlement bridge; it does not rename, drop, reinterpret or reuse legacy `users`, `tools`, `tool_clients`, `tool_permissions`, `authorization_grants`, `auth_requests`, `one_time_codes`, `sessions` or `refresh_tokens`. Legacy rows remain authoritative for legacy traffic.
 
-Step 3C implements the three authorization transaction/authorization/code rows shown below through additive migration 004. OAuth session, refresh and revocation entities remain unimplemented and must not be inferred from their absence.
+Step 3C implements the three authorization transaction/authorization/code rows shown below through additive migration 004. Step 3D implements the four token-lifecycle rows through additive migration 005 without mounting protocol routes.
+
+Step 3D joined reads use mixed row-lock strength without upgrades: only code or refresh token/family/session rows receive UPDATE locks; authorization/client/resource/user/grant rows and entitlement mappings receive SHARE locks. The service additionally cross-checks authorization `granted_scopes` against code scopes and every refresh token/family generation, current-scope and ceiling field before mutating state.
 
 ## Proposed entities
 
@@ -24,11 +26,11 @@ Step 3C implements the three authorization transaction/authorization/code rows s
 | `oauth_authorization_transactions` | Exact downstream client state in a versioned AES-256-GCM envelope with transaction-bound AAD; separate SHA-256 Google state/nonce hashes; client, exact redirect, resource/scopes, PKCE, correlation, fixed 600-second expiry and claim/completion timestamps. |
 | `oauth_authorizations` | Human `user_id`, client, resource, effective scope set, exact legacy grant reference used for the decision, status and timestamps. P0 introduces no consent row. |
 | `oauth_authorization_codes` | Unique SHA-256 code hash; transaction/authorization/client/resource/redirect/subject/PKCE/scope bindings; exact 60-second expiry and future atomic consumption timestamp. Raw code is never persisted. |
-| `oauth_sessions` *(not implemented)* | Human, client, resource, authorization, status, issued/idle-expiry/revoked timestamps and correlation. Separate from legacy `sessions`. |
-| `oauth_refresh_token_families` *(not implemented)* | Authorization/session/client/resource/subject invariants, original/current scope ceiling, status, replay timestamp and revocation reason. |
-| `oauth_refresh_tokens` *(not implemented)* | Family FK, non-reversible token hash, generation/parent, status, issued/expires/consumed/revoked timestamps. One atomic current member per active family. |
+| `oauth_sessions` | Human, client, resource, authorization, status, issued/activity/idle-expiry/revoked timestamps and correlation. Separate from legacy `sessions`; idle expiry is exactly activity plus 28,800 seconds. |
+| `oauth_refresh_token_families` | Authorization/session/client/resource/subject invariants, immutable scope ceiling, current monotonically narrowed scopes/generation, status, replay timestamp and revocation reason. |
+| `oauth_refresh_tokens` | Family FK, SHA-256 token hash, generation/same-family parent, scope snapshot, status and issued/expires/consumed/revoked timestamps. A partial unique index permits one current member per family. |
 | `oauth_signing_keys` | Public `kid`, algorithm, public-JWK fingerprint/reference, lifecycle state, publish/activate/retire timestamps and protected private-key reference only. No private key bytes. |
-| `oauth_revocations` *(not implemented)* | Token/family/session/authorization target type and opaque internal target ID, client/resource context, reason code, actor and timestamp. |
+| `oauth_revocations` | Idempotent access-jti/family/session/authorization target type and opaque internal target ID, client/resource context, reason and timestamp. Access jti records retain original token expiry. |
 
 OAuth audit events continue through the append-only legacy `audit_logs` facility initially, using only non-secret OAuth identifiers and event names. A separate audit table is unnecessary unless later scale or retention evidence requires it.
 

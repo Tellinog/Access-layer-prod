@@ -126,6 +126,23 @@ The migration contains no legacy DDL or data write and adds no OAuth session, re
 `protected_downstream_state` is present as a JSON object only for `pending`/`claimed` rows and must be SQL `NULL` for `completed`/`denied`/`expired`. Completion and denial erase it in the same status compare-and-set. OAuth activity opportunistically cleans at most 100 expired pending/claimed rows using `FOR UPDATE SKIP LOCKED`; cleanup sets `expired`, terminal time and null state atomically, is safe to repeat and has no timer/background worker. Raw downstream state never enters the database.
 
 The original Step 3C candidate migration SHA-256 was `96c37fe2a043a1aae6f813ca36db36cb1aa7ce67f2abfbff42c4883e35f72772`; hardened undeployed migration 004 supersedes it with SHA-256 `407b0fe9b3c9e053e22fac7e9640e0b4d02fe341ea6b3e7f05bb32eeaa8efede`. Live PostgreSQL 16 application and previous-binary smoke evidence must not be claimed unless actually run against a disposable database. Docker/API, `psql` and a local port-5432 server were unavailable for this run, so deterministic migration-shape tests remain the local evidence.
+
+## Step 3D OAuth token lifecycle
+
+`migrations/005_oauth_token_lifecycle.sql` is expand-only and creates exactly:
+
+| Table | Step 3D purpose |
+|---|---|
+| `oauth_sessions` | OAuth-only human/client/resource/authorization online state with an exact 28,800-second activity/idle deadline |
+| `oauth_refresh_token_families` | Immutable subject/client/resource/authorization/session binding, scope ceiling/current scopes, generation, replay and revocation state |
+| `oauth_refresh_tokens` | SHA-256-only opaque credential hashes, generation/same-family parent lineage, current/consumed/revoked/expired lifecycle and one partial-unique current member per family |
+| `oauth_revocations` | Idempotent opaque target records, including access-token jti expiry and durable family/session/authorization targets |
+
+The migration performs no `ALTER`, seed or data write and does not change migrations 001–004. References to legacy `users` remain identity-only and legacy grant state remains read-only. The Step 3D repository writes only the four lifecycle tables, `oauth_authorization_codes.consumed_at`, `oauth_signing_keys.last_signed_at` and append-only sanitized `audit_logs`; it never writes legacy sessions, refresh tokens, grants or codes.
+
+Code exchange first authenticates with SHARE locks, then UPDATE-locks only the matching authorization-code row and SHARE-locks authorization/client/resource/user/grant rows. Refresh UPDATE-locks only the refresh-token/family/session rows and SHARE-locks the related authorization/client/resource/user/grant rows. Entitlement rows remain SHARE-locked in canonical scope order. This avoids SHARE-to-UPDATE upgrades on read-only rows and preserves the required loser path where same-token concurrency observes `consumed`, commits family/session replay revocation and returns `invalid_grant`.
+
+Live application of 001→005 remains required on disposable PostgreSQL 16 when available. Deterministic shape and repository/service race tests are not a claim that PostgreSQL accepted the migration.
 # Step 2 continuity note
 
 Live Coolify evidence proves that logical volume `access_layer_postgres_data_v2` backs `/var/lib/postgresql/data` and resolves to the recorded UUID-prefixed physical volume. The source top-level declaration now matches the unchanged service mount. Do not add an explicit physical name, rename the logical/live volume, migrate data or deploy. Backup/restore evidence and the other release gates remain open. The machine database baseline is `../specs/legacy-contract-baseline.v1.json`.

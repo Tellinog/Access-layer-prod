@@ -47,7 +47,15 @@ P0 introspection uses `client_secret_basic` credentials owned by one OAuth resou
 
 OAuth vNext uses the internal Google callback `/oauth/upstream/google/callback`; it never extends the frozen legacy callback. Step 3C registers it only under the default-false flag. Exact downstream client state is kept only in short-lived authenticated-encrypted storage until returned and is never logged. Upstream Google state and nonce are hash-only.
 
-Before future Step 3D token issuance, authorization-code exchange must re-check the current OAuth client, resource, authorization and legacy grant state. Step 3C performs no exchange or token/signing work.
+Step 3D now implements that exchange re-check in an unmounted core. It hashes the raw code before lookup, UPDATE-locks only the mutable code row and SHARE-locks the current OAuth identities, human, exact legacy grant, entitlement binding/mappings/allowances and registered permissions before a compare-and-set consume. Code scopes must exactly equal the active authorization scope set. Code consumption, OAuth session/family/refresh-hash persistence, sanitized success audit and OAuth signing-key usage update are one transaction. Failed exchange state rolls back before a separate bounded sanitized denial-audit transaction; denial-audit failure returns only `temporarily_unavailable`. It never creates or changes a legacy session, refresh token, grant or code.
+
+OAuth client and resource credential verification uses only `OAUTH_CREDENTIAL_SECRET_PEPPER` with the existing salted scrypt verifier format. Configuration and the invoked core fail closed if it equals `TOOL_CLIENT_SECRET_PEPPER`; neither value is logged. It never uses the tool pepper or queries `tool_clients`. Confidential clients authenticate against current `oauth_client_credentials`; registered public clients use `none`; introspection authenticates only current `oauth_resource_credentials`.
+
+The Step 3D signer accepts only absolute local paths or local `file:` references that resolve to regular, non-empty files no larger than 64 KiB inside the realpath of `OAUTH_SIGNING_KEY_ROOT`. Relative/unsupported references, encoded traversal, symlink escape, public/private/fingerprint mismatch, and equality between the candidate RSA public `n`/`e` and the actual configured legacy key fail as a sanitized unavailable condition regardless of copied filename or inline legacy PEM. Exactly one active OAuth key without a retirement deadline may sign; old active overlap keys verify only while `retire_after > now`. Verification also requires finite integer `iat`/`exp`, bounds `iat` to the existing 60-second skew and preserves exact 900-second TTL. Successful persisted issuance alone updates `last_signed_at`.
+
+Refresh tokens contain at least 32 random bytes and remain SHA-256-only at rest. Refresh UPDATE-locks token/family/session and SHARE-locks all related read-only rows. Before signing it requires token generation/current scopes to match family state, current scopes to remain inside the family ceiling, and ceiling/current/requested scopes to remain inside the active authorization. Each valid user-activity refresh preserves human/client/resource, narrows scopes monotonically if requested and sets the OAuth session and replacement token deadline to exactly `now + 28,800 seconds`. Consumed-member reuse commits family/session revocation and the replay audit before returning `invalid_grant`; no timer, cron or heartbeat exists.
+
+Revocation/introspection remain unmounted core methods in Step 3D. Access-token revocation resolves only the exact existing OAuth audience, without requiring the resource to remain active and without legacy fallback, then persists the OAuth `jti` through original expiry; refresh revocation revokes its family/session. Resource introspection verifies only OAuth `RS256`/`at+jwt` keys and exact audience, then checks jti, OAuth session, authorization and current entitlement state. Unknown, legacy, malformed, expired, wrong-audience and inactive candidates expose only `active:false`.
 
 First-party browser clients remain BFF/server-side-token applications. Public-client rollout, SPA bearer-token storage, downstream OIDC, service principals, `client_credentials`, token exchange, `private_key_jwt` and dynamic registration are disabled/deferred.
 
@@ -134,6 +142,8 @@ Secrets:
 - `BACKUP_ENCRYPTION_KEY`
 - `LOG_IP_SALT`
 - `OAUTH_TRANSACTION_PROTECTION_KEY` when dark OAuth is enabled
+- `OAUTH_CREDENTIAL_SECRET_PEPPER` before Step 3D credential verification is invoked
+- private key files beneath `OAUTH_SIGNING_KEY_ROOT`; the root/path is not logged
 - per-tool client secrets
 
 `JWT_PRIVATE_KEY_PEM_PATH` and `JWT_PRIVATE_KEY_PEM` are alternatives. Do not set both unless the deployment platform intentionally overrides file-based keys with injected PEM content.

@@ -136,6 +136,14 @@ secret_continuity:
       verified_at: null
       evidence_reference: null
       reusable_verifier_committed: false
+    OAUTH_CREDENTIAL_SECRET_PEPPER:
+      comparison_scope: live_N_to_isolated_target
+      verified_same_value: false
+      verification_method: null
+      verified_by: null
+      verified_at: null
+      evidence_reference: null
+      reusable_verifier_committed: false
     BACKUP_ENCRYPTION_KEY:
       comparison_scope: live_N_to_isolated_target
       verified_same_value: false
@@ -187,7 +195,9 @@ configuration:
       - JWT_PUBLIC_KEY_ID
       - LOG_IP_SALT
       - LOG_LEVEL
+      - OAUTH_CREDENTIAL_SECRET_PEPPER
       - OAUTH_P0_ENABLED
+      - OAUTH_SIGNING_KEY_ROOT
       - OAUTH_TRANSACTION_PROTECTION_KEY
       - ONE_TIME_CODE_TTL_SECONDS
       - PORT
@@ -236,7 +246,9 @@ configuration:
     JWT_PUBLIC_KEY_ID: UNOBSERVED
     LOG_IP_SALT: UNOBSERVED
     LOG_LEVEL: UNOBSERVED
+    OAUTH_CREDENTIAL_SECRET_PEPPER: UNOBSERVED
     OAUTH_P0_ENABLED: UNOBSERVED
+    OAUTH_SIGNING_KEY_ROOT: UNOBSERVED
     OAUTH_TRANSACTION_PROTECTION_KEY: UNOBSERVED
     ONE_TIME_CODE_TTL_SECONDS: UNOBSERVED
     PORT: UNOBSERVED

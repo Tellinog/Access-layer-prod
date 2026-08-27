@@ -46,6 +46,8 @@ The dashboard is at `/admin`; admin and tool-management APIs are under `/v1/admi
 
 `OAUTH_P0_ENABLED` is optional and defaults to `false`; absent/false preserves the exact legacy route inventory and requires no OAuth protection key. Step 3C true additionally registers GET-only `/oauth/authorize` and `/oauth/upstream/google/callback` beside the two Step 3B reads, all without automatic HEAD siblings. `OAUTH_TRANSACTION_PROTECTION_KEY` must then be a dedicated canonical unpadded base64url encoding of exactly 32 random bytes. RFC 8414, token, revoke and introspect remain unregistered. Do not set either OAuth value in production: no callback registration, pilot/key provisioning or production action is authorised.
 
+Step 3D adds optional `OAUTH_CREDENTIAL_SECRET_PEPPER` and `OAUTH_SIGNING_KEY_ROOT` inputs for its unmounted core. Their omission does not change Step 3B/3C routes; a core operation needing them fails closed. Before a later approved Step 3E/pilot, provision a distinct pepper and an absolute dedicated OAuth key root containing only reviewed OAuth keys. Never reuse the tool-client pepper or legacy JWT key/root, and never record real values or key paths in Git. Step 3D does not modify Compose/Coolify or production secrets.
+
 ## Local Docker Compose
 
 For local development, Docker Compose can start both PostgreSQL and the Access Layer service.

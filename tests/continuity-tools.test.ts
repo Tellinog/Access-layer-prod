@@ -34,6 +34,8 @@ function completeEnvironment(): NodeJS.ProcessEnv {
     LOG_LEVEL: "info",
     ONE_TIME_CODE_TTL_SECONDS: "60",
     OAUTH_P0_ENABLED: "false",
+    OAUTH_CREDENTIAL_SECRET_PEPPER: "",
+    OAUTH_SIGNING_KEY_ROOT: "",
     PORT: "8080",
     POSTGRES_DB: "access_layer",
     POSTGRES_PASSWORD: secretSentinel,
@@ -131,11 +133,11 @@ describe("production continuity helper safety", () => {
     const { report } = collect();
     const inventory = report.source_inventory as { variables: string[] };
     expect([...inventory.variables].sort()).toEqual(sourceEnvironmentNames());
-    expect(inventory.variables).toHaveLength(43);
+    expect(inventory.variables).toHaveLength(45);
   });
 
   it("keeps runtime and entrypoint invariant and pins the approved Compose continuity correction", () => {
-    expect(sha256Lf("src/config.ts")).toBe("91692c970af969a310175a5e2c7b49dbe020598fd597ddc1773de5de11c037ce");
+    expect(sha256Lf("src/config.ts")).toBe("73c47751e7dc172c06d81cfdd0fc90daad6b8db6881e7d2ea317d949e0473e26");
     expect(sha256Lf("docker-compose.yaml")).toBe("3c91dbaccd3dadae1ef8587fba307721e72fe281aed26b969b961cc9a84630aa");
     expect(sha256Lf("docker/entrypoint.sh")).toBe("07d57fbdbb6bc09268b154c7d97afbfc5f8d5699b0378c747057393769ec6d76");
   });

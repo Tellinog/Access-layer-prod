@@ -107,6 +107,11 @@ export function loadConfig(): Config {
   const oauthTransactionProtectionKey = oauthTransactionProtectionKeyValue === undefined
     ? undefined
     : parseOAuthTransactionProtectionKey(oauthTransactionProtectionKeyValue);
+  const oauthCredentialSecretPepper = readOptional("OAUTH_CREDENTIAL_SECRET_PEPPER");
+  const oauthSigningKeyRoot = readOptional("OAUTH_SIGNING_KEY_ROOT");
+  if (oauthCredentialSecretPepper !== undefined && oauthCredentialSecretPepper.length < 16) {
+    throw new Error("OAUTH_CREDENTIAL_SECRET_PEPPER must be at least 16 characters when set");
+  }
 
   const config: Config = {
     appEnv,
@@ -129,6 +134,8 @@ export function loadConfig(): Config {
     oneTimeCodeTtlSeconds: readInt("ONE_TIME_CODE_TTL_SECONDS", 60, 15, 300),
     oauthP0Enabled,
     oauthTransactionProtectionKey,
+    oauthCredentialSecretPepper,
+    oauthSigningKeyRoot,
     sessionCookieName: readOptional("SESSION_COOKIE_NAME", "access_layer_admin_session") ?? "access_layer_admin_session",
     sessionSecret: readRequired("SESSION_SECRET"),
     toolClientSecretPepper: readRequired("TOOL_CLIENT_SECRET_PEPPER"),
@@ -147,6 +154,11 @@ export function loadConfig(): Config {
     backupApiToken: readOptional("BACKUP_API_TOKEN"),
     trustProxyHops: readInt("TRUST_PROXY_HOPS", appEnv === "production" ? 1 : 0, 0, 5)
   };
+
+  if (config.oauthCredentialSecretPepper !== undefined &&
+      config.oauthCredentialSecretPepper === config.toolClientSecretPepper) {
+    throw new Error("OAuth credential secret isolation is invalid");
+  }
 
   if (config.googleAllowedHd.length === 0) {
     throw new Error("GOOGLE_ALLOWED_HD must include at least one hosted domain");

@@ -54,6 +54,14 @@ export async function verifyToolSecret(secret: string, pepper: string, stored: s
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
+export async function hashOAuthCredentialSecret(secret: string, pepper: string): Promise<string> {
+  return hashToolSecret(secret, pepper);
+}
+
+export async function verifyOAuthCredentialSecret(secret: string, pepper: string, stored: string): Promise<boolean> {
+  return verifyToolSecret(secret, pepper, stored);
+}
+
 export function constantTimeEqualString(a: string, b: string): boolean {
   const expected = Buffer.from(a);
   const actual = Buffer.from(b);

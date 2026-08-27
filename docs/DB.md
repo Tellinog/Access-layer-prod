@@ -117,13 +117,15 @@ Before any non-empty production OAuth registration or pilot, backup/export/impor
 
 | Table | Step 3C purpose |
 |---|---|
-| `oauth_authorization_transactions` | One validated client/resource/redirect/scope/PKCE request, AEAD-protected downstream state, independent Google state/nonce hashes, correlation, 600-second expiry and pending/claimed/completed/denied lifecycle |
+| `oauth_authorization_transactions` | One validated client/resource/redirect/scope/PKCE request, short-lived AEAD-protected downstream state, independent Google state/nonce hashes, correlation, 600-second expiry and pending/claimed/completed/denied/expired lifecycle |
 | `oauth_authorizations` | The exact user, client, resource, granted scopes and legacy authorization grant used by a successful current entitlement decision |
 | `oauth_authorization_codes` | Unique SHA-256 code hash plus transaction/authorization/client/resource/user/redirect/scope/PKCE bindings, fixed 60-second expiry and future single-use consumption timestamp |
 
 The migration contains no legacy DDL or data write and adds no OAuth session, refresh or revocation entity. References to `users` and `authorization_grants` use `ON DELETE RESTRICT` to preserve authorization history. Runtime writes to legacy domain data are limited to the existing user upsert and pending-grant linking methods; entitlement lookups remain read-only and OAuth audits continue through `audit_logs`.
 
-The reviewed migration SHA-256 is `96c37fe2a043a1aae6f813ca36db36cb1aa7ce67f2abfbff42c4883e35f72772`. Live PostgreSQL 16 application and previous-binary smoke evidence must not be claimed unless actually run against a disposable database. Docker/API, `psql` and a local port-5432 server were unavailable for this run, so deterministic migration-shape tests remain the local evidence.
+`protected_downstream_state` is present as a JSON object only for `pending`/`claimed` rows and must be SQL `NULL` for `completed`/`denied`/`expired`. Completion and denial erase it in the same status compare-and-set. OAuth activity opportunistically cleans at most 100 expired pending/claimed rows using `FOR UPDATE SKIP LOCKED`; cleanup sets `expired`, terminal time and null state atomically, is safe to repeat and has no timer/background worker. Raw downstream state never enters the database.
+
+The original Step 3C candidate migration SHA-256 was `96c37fe2a043a1aae6f813ca36db36cb1aa7ce67f2abfbff42c4883e35f72772`; hardened undeployed migration 004 supersedes it with SHA-256 `407b0fe9b3c9e053e22fac7e9640e0b4d02fe341ea6b3e7f05bb32eeaa8efede`. Live PostgreSQL 16 application and previous-binary smoke evidence must not be claimed unless actually run against a disposable database. Docker/API, `psql` and a local port-5432 server were unavailable for this run, so deterministic migration-shape tests remain the local evidence.
 # Step 2 continuity note
 
 Live Coolify evidence proves that logical volume `access_layer_postgres_data_v2` backs `/var/lib/postgresql/data` and resolves to the recorded UUID-prefixed physical volume. The source top-level declaration now matches the unchanged service mount. Do not add an explicit physical name, rename the logical/live volume, migrate data or deploy. Backup/restore evidence and the other release gates remain open. The machine database baseline is `../specs/legacy-contract-baseline.v1.json`.

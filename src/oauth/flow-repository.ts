@@ -13,7 +13,7 @@ function mapTransaction(row: Record<string, unknown>): OAuthAuthorizationTransac
     requestedScopes: Array.isArray(row.requested_scopes) ? row.requested_scopes.map(String) : [],
     codeChallenge: String(row.code_challenge),
     codeChallengeMethod: "S256",
-    protectedDownstreamState: row.protected_downstream_state as Record<string, unknown>,
+    protectedDownstreamState: (row.protected_downstream_state as Record<string, unknown> | null) ?? null,
     upstreamStateHash: String(row.upstream_state_hash),
     upstreamNonceHash: String(row.upstream_nonce_hash),
     correlationId: String(row.correlation_id),
@@ -70,6 +70,28 @@ export class OAuthAuthorizationFlowRepository {
     );
   }
 
+  async expireStaleAuthorizationTransactions(completedAt: Date): Promise<number> {
+    const result = await this.db.query(
+      `WITH stale AS (
+         SELECT id
+         FROM oauth_authorization_transactions
+         WHERE status IN ('pending', 'claimed')
+           AND expires_at <= $1
+         ORDER BY expires_at, id
+         FOR UPDATE SKIP LOCKED
+         LIMIT 100
+       )
+       UPDATE oauth_authorization_transactions AS transactions
+       SET status = 'expired', completed_at = $1, protected_downstream_state = NULL
+       FROM stale
+       WHERE transactions.id = stale.id
+         AND transactions.status IN ('pending', 'claimed')
+         AND transactions.expires_at <= $1`,
+      [completedAt]
+    );
+    return result.rowCount ?? 0;
+  }
+
   async claimAuthorizationTransaction(upstreamStateHash: string, claimedAt: Date): Promise<OAuthAuthorizationTransactionRecord | null> {
     const result = await this.db.query<Record<string, unknown>>(
       `UPDATE oauth_authorization_transactions
@@ -86,7 +108,7 @@ export class OAuthAuthorizationFlowRepository {
   async denyClaimedTransaction(transactionId: string, completedAt: Date): Promise<boolean> {
     const result = await this.db.query(
       `UPDATE oauth_authorization_transactions
-       SET status = 'denied', completed_at = $2
+       SET status = 'denied', completed_at = $2, protected_downstream_state = NULL
        WHERE id = $1 AND status = 'claimed'`,
       [transactionId, completedAt]
     );
@@ -139,8 +161,8 @@ export class OAuthAuthorizationFlowRepository {
       );
       const completed = await transactionDb.query(
         `UPDATE oauth_authorization_transactions
-         SET status = 'completed', completed_at = $2
-         WHERE id = $1 AND status = 'claimed'`,
+         SET status = 'completed', completed_at = $2, protected_downstream_state = NULL
+         WHERE id = $1 AND status = 'claimed' AND expires_at > $2`,
         [input.transactionId, input.issuedAt]
       );
       if (completed.rowCount !== 1) throw new Error("OAuth authorization transaction completion failed");

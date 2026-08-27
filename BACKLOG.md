@@ -3,6 +3,7 @@
 ## BLOCKER
 
 - Confirm who receives bootstrap platform admin access after first deploy.
+- 2026-08-27 Step 3D prerequisite: authorization-code exchange must re-check the current client, resource, authorization and legacy grant state before any token issuance so disablement/revocation after code creation fails closed. Do not implement token exchange or signing in Step 3C hardening.
 - 2026-08-26 Step 3C: before any OAuth enablement, provision `OAUTH_TRANSACTION_PROTECTION_KEY` as a dedicated canonical base64url 32-byte secret through the approved secret manager and add the separate OAuth callback URI in Google Cloud without removing the legacy callback. Neither action is authorised or performed by Step 3C.
 - 2026-08-26 Step 3B: before Step 3D introduces any `protected_private_key_ref` consumer, define and test an allow-list for supported reference schemes and file roots; reject `..` traversal, relative/unsafe paths, encoded traversal and unsupported schemes before any read. Step 3B must not implement a private-key loader.
 - 2026-08-26 Step 3A hardening: before the first non-empty production OAuth registration or pilot, extend and prove backup/export/import/replace-restore coverage for all `oauth_*` state. The current legacy backup surfaces do not preserve these tables, and future `oauth_resource_entitlement_bindings` rows use `ON DELETE RESTRICT`, so a replace restore that runs `DELETE FROM tools` must use dependency-safe ordering. Do not register production OAuth state until this is implemented and restore-tested; no backup code changes are authorised in Step 3A hardening.
@@ -15,6 +16,7 @@
 
 ## RESOLVED
 
+- 2026-08-27 Step 3C hardening: terminal/expired OAuth authorization transactions now purge reversible downstream-state ciphertext atomically. A bounded opportunistic cleanup handles abandoned pending/claimed rows without a timer or background job; cleaned rows cannot be claimed or issue a code.
 - 2026-08-26 Step 3C: the default-off dark Authorization Code issuance path is implemented with migration 004, separate Google callback, protected downstream state, atomic state claim, exact entitlement revalidation and SHA-256-only 60-second codes. Token exchange and every later lifecycle remain unimplemented.
 - 2026-08-26 Step 3A: the generic OAuth dark foundation is implemented locally through one expand-only migration, a default-false optional flag, an isolated `src/oauth/` module and deterministic darkness/migration/validation tests. No protocol route, pilot, seed, transaction table, production action or legacy behavior change was introduced.
 - 2026-08-26 Step 3A historical result: `.env.example` and `.env.production.example` exposed the same 42 variable names, with optional `OAUTH_P0_ENABLED=false`; Step 3C later adds the state-only conditional protection-key input as variable 43.

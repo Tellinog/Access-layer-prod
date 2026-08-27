@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS oauth_authorization_transactions (
   requested_scopes text[] NOT NULL,
   code_challenge text NOT NULL,
   code_challenge_method text NOT NULL DEFAULT 'S256',
-  protected_downstream_state jsonb NOT NULL,
+  protected_downstream_state jsonb,
   upstream_state_hash text NOT NULL UNIQUE,
   upstream_nonce_hash text NOT NULL,
   correlation_id text NOT NULL UNIQUE,
@@ -28,8 +28,15 @@ CREATE TABLE IF NOT EXISTS oauth_authorization_transactions (
   CONSTRAINT oauth_authorization_transactions_pkce_s256 CHECK (
     code_challenge_method = 'S256' AND code_challenge ~ '^[A-Za-z0-9_-]{43}$'
   ),
-  CONSTRAINT oauth_authorization_transactions_state_envelope_object CHECK (
-    jsonb_typeof(protected_downstream_state) = 'object'
+  CONSTRAINT oauth_authorization_transactions_state_envelope_lifecycle CHECK (
+    CASE
+      WHEN status IN ('pending', 'claimed') THEN
+        protected_downstream_state IS NOT NULL AND
+        jsonb_typeof(protected_downstream_state) = 'object'
+      WHEN status IN ('completed', 'denied', 'expired') THEN
+        protected_downstream_state IS NULL
+      ELSE false
+    END
   ),
   CONSTRAINT oauth_authorization_transactions_hashes CHECK (
     upstream_state_hash ~ '^[A-Za-z0-9_-]{43}$' AND

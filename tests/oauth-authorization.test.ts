@@ -168,6 +168,22 @@ function harness(overrides: HarnessOverrides = {}) {
   } as unknown as OAuthFoundationRepository;
   const flow = {
     withDb: () => flow,
+    expireStaleAuthorizationTransactions: async (completedAt: Date) => {
+      if (
+        transaction &&
+        (transaction.status === "pending" || transaction.status === "claimed") &&
+        transaction.expiresAt <= completedAt
+      ) {
+        transaction = {
+          ...transaction,
+          status: "expired",
+          completedAt,
+          protectedDownstreamState: null
+        };
+        return 1;
+      }
+      return 0;
+    },
     createAuthorizationTransaction: async (input: Record<string, unknown>) => {
       transaction = {
         id: String(input.id),
@@ -189,13 +205,39 @@ function harness(overrides: HarnessOverrides = {}) {
       };
     },
     claimAuthorizationTransaction: async (stateHash: string, now: Date) => {
-      if (!transaction || claimed || transaction.upstreamStateHash !== stateHash || transaction.expiresAt <= now) return null;
+      if (
+        !transaction ||
+        claimed ||
+        transaction.status !== "pending" ||
+        transaction.protectedDownstreamState === null ||
+        transaction.upstreamStateHash !== stateHash ||
+        transaction.expiresAt <= now
+      ) return null;
       claimed = true;
-      return { ...transaction, status: "claimed", claimedAt: now };
+      transaction = { ...transaction, status: "claimed", claimedAt: now };
+      return transaction;
     },
-    denyClaimedTransaction: async () => claimed,
+    denyClaimedTransaction: async (_transactionId: string, completedAt: Date) => {
+      if (!transaction || transaction.status !== "claimed") return false;
+      transaction = {
+        ...transaction,
+        status: "denied",
+        completedAt,
+        protectedDownstreamState: null
+      };
+      return true;
+    },
     issueAuthorizationCode: async (input: OAuthAuthorizationCodeIssuance) => {
+      if (!transaction || transaction.status !== "claimed" || transaction.expiresAt <= input.issuedAt) {
+        throw new Error("OAuth authorization transaction completion failed");
+      }
       issuances.push(input);
+      transaction = {
+        ...transaction,
+        status: "completed",
+        completedAt: input.issuedAt,
+        protectedDownstreamState: null
+      };
       return { authorizationId: "00000000-0000-4000-8000-000000000105" };
     }
   } as unknown as OAuthAuthorizationFlowRepository;
@@ -254,6 +296,7 @@ function harness(overrides: HarnessOverrides = {}) {
     service,
     auditEvents,
     issuances,
+    flow,
     transaction: () => transaction,
     upstreamState: () => upstreamState,
     upstreamNonce: () => upstreamNonce,
@@ -280,11 +323,22 @@ describe("Step 3C migration 004", () => {
   it("constrains hash-only state/code persistence and exact 600/60 second TTLs", () => {
     expect(migration).toContain("upstream_state_hash text NOT NULL UNIQUE");
     expect(migration).toContain("upstream_nonce_hash text NOT NULL");
-    expect(migration).toContain("protected_downstream_state jsonb NOT NULL");
+    expect(migration).toContain("protected_downstream_state jsonb,");
     expect(migration).toContain("code_hash text NOT NULL UNIQUE");
     expect(migration).not.toMatch(/\b(?:downstream_state|authorization_code|raw_code)\s+text\b/i);
     expect(migration).toContain("interval '600 seconds'");
     expect(migration).toContain("interval '60 seconds'");
+  });
+
+  it("requires protected state only for live rows and forbids it for terminal rows", () => {
+    expect(migration).toContain("protected_downstream_state jsonb,");
+    expect(migration).not.toContain("protected_downstream_state jsonb NOT NULL");
+    expect(migration).toMatch(
+      /WHEN status IN \('pending', 'claimed'\) THEN\s+protected_downstream_state IS NOT NULL AND\s+jsonb_typeof\(protected_downstream_state\) = 'object'/
+    );
+    expect(migration).toMatch(
+      /WHEN status IN \('completed', 'denied', 'expired'\) THEN\s+protected_downstream_state IS NULL/
+    );
   });
 });
 
@@ -403,6 +457,7 @@ describe("Step 3C callback, entitlement and issuance", () => {
     expect(h.issuances[0].codeHash).toBe(sha256(rawCode));
     expect(h.issuances[0]).not.toHaveProperty("code");
     expect(h.issuances[0].expiresAt.getTime() - h.issuances[0].issuedAt.getTime()).toBe(OAUTH_AUTHORIZATION_CODE_TTL_MS);
+    expect(h.transaction()).toMatchObject({ status: "completed", protectedDownstreamState: null });
 
     const replay = await h.service.callback(callbackQuery, requestContext);
     expect(replay).toMatchObject({ kind: "local_error", error: "invalid_request" });
@@ -428,7 +483,9 @@ describe("Step 3C callback, entitlement and issuance", () => {
       const callbackQuery = await begin(h);
       const result = await h.service.callback(callbackQuery, requestContext);
       expect(new URL((result as { location: string }).location).searchParams.get("error")).toBe("access_denied");
+      expect(new URL((result as { location: string }).location).searchParams.get("state")).toBe(validQuery.state);
       expect(h.issuances).toHaveLength(0);
+      expect(h.transaction()).toMatchObject({ status: "denied", protectedDownstreamState: null });
     }
     const nonce = harness();
     const callbackQuery = await begin(nonce);
@@ -437,6 +494,49 @@ describe("Step 3C callback, entitlement and issuance", () => {
     const result = await nonce.service.callback(callbackQuery, requestContext);
     expect(new URL((result as { location: string }).location).searchParams.get("error")).toBe("access_denied");
     expect(nonce.issuances).toHaveLength(0);
+    expect(nonce.transaction()).toMatchObject({ status: "denied", protectedDownstreamState: null });
+  });
+
+  it("cleans expired pending and stale claimed rows idempotently and makes them unusable", async () => {
+    const pending = harness();
+    const pendingQuery = await begin(pending);
+    pending.expire();
+    expect(await pending.flow.expireStaleAuthorizationTransactions(fixedNow)).toBe(1);
+    expect(pending.transaction()).toMatchObject({ status: "expired", protectedDownstreamState: null });
+    expect(await pending.flow.expireStaleAuthorizationTransactions(fixedNow)).toBe(0);
+    expect(await pending.flow.claimAuthorizationTransaction(sha256(pendingQuery.state), fixedNow)).toBeNull();
+
+    await expect(pending.flow.issueAuthorizationCode({
+      transactionId: pending.transaction()!.id,
+      userId: user.id,
+      oauthClientId: client.id,
+      oauthResourceId: resource.id,
+      legacyAuthorizationGrantId: "00000000-0000-4000-8000-000000000106",
+      grantedScopes: ["synthetic:records:read"],
+      redirectUri: String(validQuery.redirect_uri),
+      codeChallenge: String(validQuery.code_challenge),
+      codeHash: sha256("synthetic-code"),
+      correlationId: requestContext.correlationId,
+      issuedAt: fixedNow,
+      expiresAt: new Date(fixedNow.getTime() + OAUTH_AUTHORIZATION_CODE_TTL_MS)
+    })).rejects.toThrow("completion failed");
+
+    const staleClaimed = harness();
+    const claimedQuery = await begin(staleClaimed);
+    expect(await staleClaimed.flow.claimAuthorizationTransaction(sha256(claimedQuery.state), fixedNow))
+      .toMatchObject({ status: "claimed" });
+    staleClaimed.expire();
+    expect(await staleClaimed.flow.expireStaleAuthorizationTransactions(fixedNow)).toBe(1);
+    expect(staleClaimed.transaction()).toMatchObject({ status: "expired", protectedDownstreamState: null });
+    expect(await staleClaimed.flow.expireStaleAuthorizationTransactions(fixedNow)).toBe(0);
+  });
+
+  it("still claims an active transaction exactly once", async () => {
+    const h = harness();
+    const query = await begin(h);
+    expect(await h.flow.claimAuthorizationTransaction(sha256(query.state), fixedNow))
+      .toMatchObject({ status: "claimed" });
+    expect(await h.flow.claimAuthorizationTransaction(sha256(query.state), fixedNow)).toBeNull();
   });
 
   it("revalidates registration and exact mappings after the Google round-trip", async () => {
@@ -490,7 +590,22 @@ describe("Step 3C repository boundary", () => {
   it("claims callback state atomically before any Google exchange and binds issuance completion to claimed status", () => {
     const source = readFileSync(resolve(root, "src/oauth/flow-repository.ts"), "utf8");
     expect(source).toMatch(/UPDATE oauth_authorization_transactions[\s\S]*status = 'pending'[\s\S]*expires_at > \$2[\s\S]*RETURNING \*/);
-    expect(source).toMatch(/SET status = 'completed'[\s\S]*WHERE id = \$1 AND status = 'claimed'/);
+    expect(source).toMatch(
+      /SET status = 'completed', completed_at = \$2, protected_downstream_state = NULL[\s\S]*WHERE id = \$1 AND status = 'claimed' AND expires_at > \$2/
+    );
+    expect(source).toMatch(
+      /SET status = 'denied', completed_at = \$2, protected_downstream_state = NULL[\s\S]*WHERE id = \$1 AND status = 'claimed'/
+    );
+  });
+
+  it("uses a bounded, lock-safe, idempotent expiry cleanup before claim/create activity", () => {
+    const source = readFileSync(resolve(root, "src/oauth/flow-repository.ts"), "utf8");
+    expect(source).toMatch(/status IN \('pending', 'claimed'\)[\s\S]*expires_at <= \$1[\s\S]*FOR UPDATE SKIP LOCKED[\s\S]*LIMIT 100/);
+    expect(source).toMatch(
+      /SET status = 'expired', completed_at = \$1, protected_downstream_state = NULL[\s\S]*transactions\.status IN \('pending', 'claimed'\)[\s\S]*transactions\.expires_at <= \$1/
+    );
+    const serviceSource = readFileSync(resolve(root, "src/oauth/authorization.ts"), "utf8");
+    expect(serviceSource.match(/expireStaleAuthorizationTransactions\(now\)/g)).toHaveLength(2);
   });
 
   it("suppresses automatic request logging and never logs raw authorization inputs", () => {

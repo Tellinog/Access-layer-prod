@@ -1,5 +1,30 @@
 # DEVLOG.md
 
+## 2026-08-27 - Step 3C protected-state lifecycle hardening
+
+Changed by: Codex
+Related task: Purge reversible downstream OAuth state at every terminal transition without starting Step 3D.
+
+### Changed
+
+- Hardened undeployed migration 004 in place so live authorization transactions require a protected JSON object and terminal transactions require null protected state.
+- Completion and denial now erase the protected state envelope atomically with their existing status compare-and-set. Code completion additionally refuses an expired transaction.
+- Added a bounded 100-row, `FOR UPDATE SKIP LOCKED` expiry cleanup for stale pending/claimed rows and invoked it opportunistically before creating a transaction and before callback claim. No timer, cron or background worker was introduced.
+- Added deterministic lifecycle, purge, idempotence, stale-claim, unclaimable/unissuable and exact immediate redirect-state coverage while retaining existing AEAD/tamper/AAD tests.
+
+### Behavior
+
+- Exact downstream state is decrypted into request memory before terminal transition, returned once in the current redirect and absent from completed, denied and expired database rows. Upstream state/nonce remain hash-only.
+- Cleanup, claim, completion and denial retain status/expiry predicates, so concurrent terminal or expired rows fail closed. Google exchange remains outside every SQL transaction.
+- Step 3D is not implemented. Future code exchange must re-check current client/resource/authorization/grant state before issuing tokens.
+
+### Tests/checks
+
+- TypeScript lint/build passed; Vitest passed 253 tests across 15 files; the repository Python suite passed 60 tests with 2 expected skips; and all 24 OAuth validator groups passed.
+- Continuity remained intentionally `VALID_BUT_NOT_READY` with both gates false. Non-strict platform validation passed 27 checks with seven known warnings. Migration-shape, frozen legacy/dependency/migrations 001–003 and `git diff --check` passed.
+- Hardened migration 004 SHA-256 is `407b0fe9b3c9e053e22fac7e9640e0b4d02fe341ea6b3e7f05bb32eeaa8efede`.
+- Docker/API remains unavailable, `psql` is absent and port 5432 is closed. No live PostgreSQL test or production connection occurred.
+
 ## 2026-08-26 - Step 3C dark OAuth Authorization Code issuance
 
 Changed by: Codex

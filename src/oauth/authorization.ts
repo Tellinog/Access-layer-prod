@@ -8,6 +8,7 @@ import { normalizeEmail } from "../validation.js";
 import type { OAuthUpstreamGoogleClient } from "./google.js";
 import type { OAuthAuthorizationFlowRepository } from "./flow-repository.js";
 import type { OAuthFoundationRepository } from "./repository.js";
+import type { OAuthAuthorizationTransactionRecord } from "./types.js";
 import {
   protectOAuthDownstreamState,
   unprotectOAuthDownstreamState
@@ -243,7 +244,9 @@ export class OAuthAuthorizationService {
     const upstreamNonce = randomToken("", 32);
     try {
       await this.deps.legacy.db.transaction(async (db) => {
-        await this.deps.flow.withDb(db).createAuthorizationTransaction({
+        const flow = this.deps.flow.withDb(db);
+        await flow.expireStaleAuthorizationTransactions(now);
+        await flow.createAuthorizationTransaction({
           id: transactionId,
           oauthClientId: client.id,
           oauthResourceId: resource.id,
@@ -286,7 +289,17 @@ export class OAuthAuthorizationService {
       return { kind: "local_error", error: "invalid_request", correlationId: requestContext.correlationId };
     }
     const now = (this.deps.now ?? (() => new Date()))();
-    const transaction = await this.deps.flow.claimAuthorizationTransaction(sha256(upstreamState), now);
+    let transaction: OAuthAuthorizationTransactionRecord | null;
+    try {
+      transaction = await this.deps.legacy.db.transaction(async (db) => {
+        const flow = this.deps.flow.withDb(db);
+        await flow.expireStaleAuthorizationTransactions(now);
+        return flow.claimAuthorizationTransaction(sha256(upstreamState), now);
+      });
+    } catch {
+      await auditDenied(this.deps, requestContext, "server_error");
+      return { kind: "local_error", error: "server_error", correlationId: requestContext.correlationId };
+    }
     if (!transaction) {
       await auditDenied(this.deps, requestContext, "invalid_request");
       return { kind: "local_error", error: "invalid_request", correlationId: requestContext.correlationId };

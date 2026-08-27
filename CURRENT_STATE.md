@@ -4,6 +4,15 @@
 
 V1 legacy implementation complete. Step 3C adds a local, default-off dark OAuth Authorization Code issuance path over the frozen Step 3A/3B foundation. Token exchange, signing, refresh, revoke, introspect and RFC 8414 discovery remain unimplemented.
 
+## Step 3C protected-state lifecycle hardening, 2026-08-27
+
+- The undeployed migration 004 is hardened in place: `protected_downstream_state` is nullable only so terminal rows can erase it. Database constraints require a JSON object for `pending`/`claimed` and require SQL `NULL` for `completed`/`denied`/`expired`.
+- Successful completion and denial purge the protected envelope atomically with their compare-and-set status transition. The exact decrypted state remains only in request memory long enough to construct the immediate success/error redirect; no plaintext fallback or retry copy is persisted.
+- OAuth flow activity opportunistically expires at most 100 stale pending/claimed rows per invocation using `FOR UPDATE SKIP LOCKED`, setting `expired`, `completed_at` and a null protected state in one update. Cleanup runs before transaction creation and before callback claim; it is idempotent, introduces no timer/background job and leaves Google network I/O outside database transactions.
+- Completion also requires the transaction to remain unexpired. A cleaned, terminal or concurrently changed row cannot be claimed or issue a code. Upstream Google state/nonce remain SHA-256-only and unchanged.
+- Step 3D remains out of scope. Future code exchange must re-check current client, resource, authorization and grant state before token issuance.
+- Final hardening verification passes: TypeScript lint/build; 253 Vitest tests across 15 files; Python 60 passed and 2 expected skips; all 24 OAuth validator groups; continuity as `VALID_BUT_NOT_READY` with both gates false; non-strict platform validation with 27 passes/seven known warnings; migration-shape and frozen legacy/dependency/migrations 001–003 audit; and `git diff --check`. Hardened migration 004 SHA-256 is `407b0fe9b3c9e053e22fac7e9640e0b4d02fe341ea6b3e7f05bb32eeaa8efede`. Docker remains unreachable, `psql` absent and local port 5432 closed, so no live PostgreSQL or production connection is claimed.
+
 ## Step 3C dark OAuth Authorization Code issuance, 2026-08-26
 
 - Added expand-only `migrations/004_oauth_authorization_code_flow.sql`, creating exactly `oauth_authorization_transactions`, `oauth_authorizations` and `oauth_authorization_codes`. It does not alter or write legacy tables and adds no OAuth session, refresh or revocation table.
@@ -15,7 +24,7 @@ V1 legacy implementation complete. Step 3C adds a local, default-off dark OAuth 
 - Successful issuance atomically creates one OAuth authorization and a SHA-256-only authorization-code row, completes the transaction and writes sanitized allowed/code-issued audits. The opaque code contains 32 random bytes, expires in exactly 60 seconds and appears only once in the browser redirect with exact state and `iss`.
 - Automatic request logging is silent for authorize/callback. OAuth audits contain only safe identifiers and never raw state, nonce, Google/code credentials, PKCE values, tokens, cookies or secrets.
 - `src/app.ts`, migrations 001–003, the frozen legacy spec/OpenAPI, legacy Google/JWT/JWKS/session/refresh/grant/permission behavior, dependencies, seeds, consumers, SDKs and deployment configuration remain unchanged. No production, Coolify or Google Console action occurred.
-- Final verification passes: TypeScript lint/build; 249 Vitest tests across 15 files; Python 60 passed and 2 expected skips; all 24 OAuth validator groups; continuity as `VALID_BUT_NOT_READY` with both gates false; non-strict platform validation with 27 passes/seven known warnings; frozen legacy/dependency/migration audit; and `git diff --check`. Migration 004 SHA-256 is `96c37fe2a043a1aae6f813ca36db36cb1aa7ce67f2abfbff42c4883e35f72772`. Docker has no reachable daemon, `psql` is absent and no server listens on `127.0.0.1:5432`, so live disposable PostgreSQL application and the previous-binary smoke test remain unverified; no production database was contacted.
+- Final verification for the original Step 3C candidate passed: TypeScript lint/build; 249 Vitest tests across 15 files; Python 60 passed and 2 expected skips; all 24 OAuth validator groups; continuity as `VALID_BUT_NOT_READY` with both gates false; non-strict platform validation with 27 passes/seven known warnings; frozen legacy/dependency/migration audit; and `git diff --check`. The lifecycle hardening above supersedes candidate migration checksum `96c37fe2a043a1aae6f813ca36db36cb1aa7ce67f2abfbff42c4883e35f72772`. Docker has no reachable daemon, `psql` is absent and no server listens on `127.0.0.1:5432`, so live disposable PostgreSQL application and the previous-binary smoke test remain unverified; no production database was contacted.
 
 ## Step 3B read-only OAuth metadata/JWKS dark module, 2026-08-26
 

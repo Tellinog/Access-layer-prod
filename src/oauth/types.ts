@@ -132,7 +132,7 @@ export interface OAuthAuthorizationTransactionRecord {
   requestedScopes: string[];
   codeChallenge: string;
   codeChallengeMethod: "S256";
-  protectedDownstreamState: Record<string, unknown>;
+  protectedDownstreamState: Record<string, unknown> | null;
   upstreamStateHash: string;
   upstreamNonceHash: string;
   correlationId: string;

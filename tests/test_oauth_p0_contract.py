@@ -21,6 +21,10 @@ class OAuthP0ContractTests(unittest.TestCase):
     def test_contract_is_internally_consistent(self) -> None:
         self.assertEqual([], validator.validate())
 
+    def test_yaml_loader_rejects_duplicate_mapping_keys(self) -> None:
+        with self.assertRaisesRegex(ValueError, "duplicate YAML key"):
+            validator.yaml.load("root:\n  repeated: one\n  repeated: two\n", Loader=validator.UniqueKeySafeLoader)
+
     def test_scope_grammar_is_exactly_project_domain_action(self) -> None:
         self.assertIsNotNone(validator.CAPABILITY_PATTERN.fullmatch("project:domain:action"))
         self.assertIsNone(validator.CAPABILITY_PATTERN.fullmatch("project:read"))
@@ -199,13 +203,13 @@ class OAuthP0ContractTests(unittest.TestCase):
             set(contract["credential_lifecycle_fields"]),
         )
 
-    def test_google_upstream_callback_is_separate_unadvertised_and_not_implemented(self) -> None:
+    def test_google_upstream_callback_is_separate_unadvertised_and_implemented_dark(self) -> None:
         spec = validator.load_yaml("specs/oauth-p0.v1.yml")
         upstream = spec["upstream_identity"]
         self.assertEqual("/oauth/upstream/google/callback", upstream["callback_path"])
         self.assertFalse(upstream["legacy_callback_reused"])
         self.assertFalse(upstream["advertised_as_oauth_protocol_endpoint"])
-        self.assertFalse(upstream["runtime_implemented"])
+        self.assertTrue(upstream["runtime_implemented"])
         openapi = validator.load_yaml("schemas/access-layer-oauth-v1.openapi.yaml")
         self.assertNotIn(upstream["callback_path"], openapi["paths"])
         self.assertNotIn(upstream["callback_path"], (ROOT / "src" / "app.ts").read_text(encoding="utf-8"))

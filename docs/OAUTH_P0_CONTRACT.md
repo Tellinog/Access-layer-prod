@@ -1,12 +1,12 @@
 # OAuth vNext P0 contract
 
-Status: frozen target contract; Step 3D default-off token-lifecycle core implemented but token/revoke/introspect/discovery HTTP remains unmounted and disabled
+Status: frozen protocol contract; Step 3E complete dark HTTP runtime implemented and default-disabled
 Machine source: `../specs/oauth-p0.v1.yml`
 Target OpenAPI: `../schemas/access-layer-oauth-v1.openapi.yaml`
 
 ## Boundary and compatibility
 
-P0 is an additive OAuth authorization-server contract. Step 2 created no runtime endpoint, table, migration, dependency, client registration or production configuration. Step 3A added only the disabled foundation, Step 3B added flag-gated read-only `/oauth/jwks` plus RFC 9728 metadata, and Step 3C added flag-gated authorization/code issuance. Step 3D adds four lifecycle tables and unmounted service/repository core for client authentication, exchange, signing, refresh/replay, revocation and introspection. RFC 8414 and token/revoke/introspect HTTP remain unmounted; registration APIs, seeds, pilots and production configuration remain absent. The frozen `access-layer-legacy-v1` contract remains authoritative for `/v1/*`, Google callback, JWT/JWKS, sessions, refresh tokens, grants, permissions, cookies, tool clients, Admin UI and current consumers. OAuth failure never falls back to legacy credentials, and no consumer is forced to migrate.
+P0 is an additive OAuth authorization-server contract. Step 2 created no runtime endpoint, table, migration, dependency, client registration or production configuration. Step 3A added the disabled foundation, Step 3B added flag-gated read-only `/oauth/jwks` plus RFC 9728 metadata, Step 3C added flag-gated authorization/code issuance, and Step 3D added four lifecycle tables plus the audited service/repository core. Step 3E mounts RFC 8414, token, revoke and introspect through a strict form/Basic boundary only when the default-false flag is true. Registration APIs, seeds, pilots and production configuration remain absent. The frozen `access-layer-legacy-v1` contract remains authoritative for `/v1/*`, Google callback, JWT/JWKS, sessions, refresh tokens, grants, permissions, cookies, tool clients, Admin UI and current consumers. OAuth failure never falls back to legacy credentials, and no consumer is forced to migrate.
 
 Stable RFCs are normative: RFC 6749 where applicable, RFC 6750, RFC 7636, RFC 7009, RFC 7662, RFC 8414, RFC 8707, RFC 9068, RFC 9207, RFC 9700, RFC 9728 and RFC 10017. OAuth 2.1 is an aligned work-in-progress draft profile, not a published RFC.
 
@@ -35,12 +35,16 @@ A successful redirect contains only `code`, the original `state`, and RFC 9207 `
 
 `POST /oauth/token` accepts only `application/x-www-form-urlencoded`.
 
+The Step 3E parser limits request bodies to 16 KiB and rejects malformed percent/UTF-8 encoding, duplicate names, unsupported fields, empty required values and every other media type. OAuth Basic credentials use canonical Base64 with form-decoded username/password components. `client_secret` is never accepted in the form body, and token-form `client_id` must exactly match a supplied Basic username.
+
 - `authorization_code` requires the code, exact redirect URI, `client_id`, PKCE verifier and the same single `resource`.
 - `refresh_token` requires the rotating refresh credential, `client_id` and the original resource; requested scope may only stay equal or narrow.
 - Confidential first-party clients authenticate with `client_secret_basic`.
 - Public clients use method `none` only when explicitly registered. Public-client production rollout remains disabled until a concrete consumer is approved.
 
 Token responses use `Cache-Control: no-store` and `Pragma: no-cache`. The first-party browser architecture remains a BFF: OAuth tokens and refresh material stay server-side; the browser receives only an opaque `HttpOnly`, `Secure`, `SameSite=Lax` or stricter local session cookie.
+
+Code exchange, refresh, revocation and introspection use four separate bounded rate-limit buckets. Token/code material contributes only an HMAC under `LOG_IP_SALT`; validated client or resource credential IDs may appear in bucket keys, but raw credentials and tokens never do. A bounded-rate failure is a sanitized HTTP 503 `temporarily_unavailable` response.
 
 ## Resource, audience, scope and entitlement
 

@@ -1,6 +1,6 @@
 # Legacy Compatibility
 
-> Current status: the legacy runtime surface remains frozen in `../specs/legacy-contract-baseline.v1.json`. Step 3C adds only a default-off OAuth authorization-code issuance adapter outside `src/app.ts`; absent/false retains exact legacy routes. Token exchange/signing/session/refresh/revoke/introspection and every production/pilot action remain absent. Dual-run material below remains a future constraint, not a passed N→N+1 result.
+> Current status: the legacy runtime surface remains frozen in `../specs/legacy-contract-baseline.v1.json`. Step 3E adds the complete default-off OAuth P0 HTTP adapter outside `src/app.ts`; absent/false retains the exact legacy route inventory. No production/pilot action exists. Dual-run material below remains a future constraint, not a passed N→N+1 result.
 
 ## Objective
 

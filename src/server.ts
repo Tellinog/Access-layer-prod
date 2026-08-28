@@ -6,6 +6,8 @@ import { GoogleAuthLibraryOidcClient } from "./google.js";
 import { OAuthFoundationRepository } from "./oauth/repository.js";
 import { OAuthAuthorizationFlowRepository } from "./oauth/flow-repository.js";
 import { OAuthGoogleAuthLibraryOidcClient } from "./oauth/google.js";
+import { OAuthTokenRepository } from "./oauth/token-repository.js";
+import { OAuthTokenLifecycleService } from "./oauth/token-service.js";
 import { Repositories } from "./repositories.js";
 import { TokenService } from "./token-service.js";
 
@@ -15,6 +17,7 @@ const repositories = new Repositories(db);
 const audit = new AuditLogger(repositories);
 const tokenService = new TokenService(config);
 await tokenService.init();
+const oauthTokenRepository = new OAuthTokenRepository(db);
 
 const app = await buildApplication({
   config,
@@ -22,6 +25,10 @@ const app = await buildApplication({
   oauthRepository: new OAuthFoundationRepository(db),
   oauthFlowRepository: new OAuthAuthorizationFlowRepository(db),
   oauthGoogle: new OAuthGoogleAuthLibraryOidcClient(config),
+  oauthTokenService: new OAuthTokenLifecycleService({
+    config,
+    repository: oauthTokenRepository
+  }),
   audit,
   google: new GoogleAuthLibraryOidcClient(config),
   tokenService

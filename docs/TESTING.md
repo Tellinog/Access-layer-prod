@@ -1,5 +1,17 @@
 # TESTING.md
 
+## Step 3E strict OAuth HTTP conformance
+
+`tests/oauth-http.test.ts` covers the encapsulated 16 KiB form boundary, single decoding, malformed percent/UTF-8 input, duplicate names, unknown fields, empty required values, unsupported media and oversized bodies. OAuth Basic tests require canonical Base64, exactly one raw separator and form-decoded credential components, including encoded colon/space characters; malformed Basic, Bearer, missing separators and Basic/body client mismatch fail as sanitized `invalid_client`.
+
+Token tests assert exact Step 3D service inputs for confidential and registered public-`none` boundaries, exact token wire field names and values, no-store/no-cache headers, refresh scope forwarding and status mapping for `invalid_client`, `invalid_grant`, `invalid_scope`, `invalid_target` and `temporarily_unavailable`. Submitted code/secret material is absent from errors.
+
+Revocation tests preserve wrong/unknown advisory hints and externally idempotent empty 200 output. Introspection requires resource-owned Basic and proves exact inactive output plus active access-token metadata. Discovery deep-equals the frozen issuer-preserving example, advertises no Google/P1 member, uses the bounded 300-second cache policy and exposes no HEAD sibling. Repeated requests prove code and refresh buckets are separate and rate failure is sanitized.
+
+`tests/oauth-darkness.test.ts` remains the route boundary source: false/absent deep-compares to the frozen legacy builder and keeps every OAuth route 404; true adds exactly the four Step 3E routes to the existing Step 3B/3C surface. Config tests require all three OAuth-only inputs only in true mode. The OAuth contract validator uses a duplicate-key-rejecting YAML loader and reconciled dark-runtime state without altering frozen protocol rules.
+
+Final Step 3E result: TypeScript lint/build passed; Vitest passed 298 tests across 17 files; Python passed 61 with two expected skips (63 collected); all 24 OAuth validator groups passed; continuity remained `VALID_BUT_NOT_READY` with both gates false; non-strict platform validation passed 27 checks with seven known warnings; migration/frozen-boundary and `git diff --check` passed. Migration 005 remains byte-identical with SHA-256 `aaffcb469000f62e680b5d391360fdacc4414e4280ba230e90e7fd4eee4dafbe`, and no migration 006 exists. No live PostgreSQL, real concurrency or production operation is claimed.
+
 ## Step 3D dark token-lifecycle-core conformance
 
 `tests/oauth-token-lifecycle.test.ts` verifies migration 005 creates exactly the four approved OAuth tables, contains no destructive/legacy data SQL and retains the frozen hashes for migrations 001–004. It checks the exact 28,800-second idle constraints, SHA-256 hash form, generation/same-family parent lineage, one-current-member partial index, replay state and access-jti expiry.
@@ -12,7 +24,7 @@ Final-hardening regressions require wrong RFC 7009 access/refresh hints to fall 
 
 Static repository tests require mixed lock clauses that UPDATE-lock only code or token/family/session and SHARE-lock related read-only rows, plus compare-and-set consumption and OAuth-only writes. A real disposable PostgreSQL 16 same-refresh race remains an explicit release assumption whenever Docker/PostgreSQL is unavailable; the serialized in-memory race is not presented as PostgreSQL evidence.
 
-`tests/oauth-darkness.test.ts` remains the HTTP source of truth: token/revoke/introspect/RFC 8414 stay 404 under both relevant composition states, while the exact Step 3B/3C routes and frozen legacy inventory remain green. Final command results, counts and live PostgreSQL limitations are recorded in `../DEVLOG.md`.
+At the Step 3D boundary, `tests/oauth-darkness.test.ts` required token/revoke/introspect/RFC 8414 to stay 404. Step 3E supersedes that historical true-flag expectation while retaining the false-flag and frozen legacy assertions. Final command results, counts and live PostgreSQL limitations are recorded in `../DEVLOG.md`.
 
 The previous Step 3D hardening result was: TypeScript lint/build passed; Vitest passed 278 tests across 16 files; Python passed 60 with two expected skips (62 collected); the OAuth validator passed 24 check groups; continuity was `VALID_BUT_NOT_READY` with both gates false; non-strict platform validation passed 27 checks with seven known warnings; migration/frozen-legacy/dependency checks and `git diff --check` passed. Migration 005 SHA-256 is `aaffcb469000f62e680b5d391360fdacc4414e4280ba230e90e7fd4eee4dafbe`.
 

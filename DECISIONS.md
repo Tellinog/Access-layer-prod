@@ -465,3 +465,17 @@ RFC 7009 and RFC 7662 token-type hints are advisory rather than token-class filt
 Step 3D exposes no HTTP route. `/oauth/token`, `/oauth/revoke`, `/oauth/introspect` and RFC 8414 remain unregistered until a separately approved Step 3E. The new credential pepper and signing root are optional at route-composition/config-load time so the existing Step 3B/3C dark surface remains usable for isolated tests; invoking a Step 3D operation that needs either input fails closed when it is absent.
 
 Rationale: transactional shared state closes code/refresh races and preserves audit completeness, while strict OAuth-only credentials and realpath-bound key loading prevent legacy fallback or cross-key-domain signing. Keeping the core unmounted permits review and deterministic testing without advertising or enabling the protocol surface.
+
+## D-043 - Mount the complete P0 protocol through one strict default-off HTTP boundary
+
+Status: accepted
+
+Confirmed: 2026-08-28
+
+Decision: Step 3E composes the frozen Step 3D lifecycle outside `src/app.ts` through an encapsulated OAuth-only Fastify plugin. When `OAUTH_P0_ENABLED=true`, it registers only token, revoke and introspect POST routes plus GET-only RFC 8414 metadata; false/absent registers none. The plugin owns a 16 KiB form parser, canonical OAuth Basic decoder, endpoint-specific field allow-lists, constant invalid-client challenge and four separate rate-limit buckets. Discovery uses a 300-second public cache bound matching the reviewed OAuth metadata/key publication window and has no automatic HEAD sibling.
+
+Rate keys contain validated OAuth client/resource credential IDs plus HMAC output for code/token material under the existing logging salt; raw material is forbidden. Secret-bearing OAuth POST request logging is silent. The HTTP adapter maps only between frozen internal camel-case material and frozen OAuth wire names and preserves advisory hints, revocation idempotence and exact inactive introspection output.
+
+True-mode configuration requires the transaction protection key, OAuth credential pepper and OAuth signing-key root before startup; false/default mode requires none. Persisted signing-key unavailability remains runtime 503 and never permits legacy fallback.
+
+Rationale: HTTP parsing/authentication is a separate attack boundary from the already-audited transactional core. Encapsulation prevents form handling or error behavior from leaking into frozen legacy routes, while mounting discovery only with all advertised endpoints keeps metadata truthful.

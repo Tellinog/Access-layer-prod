@@ -1,12 +1,12 @@
 # Access Layer OAuth/OIDC Authorization Server Profile
 
-Status: P0 contract frozen; runtime not implemented
+Status: P0 contract frozen; Access Layer dark runtime implemented and default-disabled
 Version: 1
-Last reviewed: 2026-08-17
+Last reviewed: 2026-08-28
 
 ## Scope
 
-This document defines the central service assumed by the template. It is not implemented by each project.
+This document defines the central service assumed by the template. Access Layer implements the P0 surface behind its default-false flag; individual projects do not reimplement it.
 
 ## Required additive surfaces
 

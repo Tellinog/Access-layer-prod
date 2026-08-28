@@ -21,7 +21,7 @@ Do not trust the email domain alone.
 
 ## OAuth vNext P0 target security
 
-The additive OAuth protocol target is frozen but not implemented. `OAUTH_P0_CONTRACT.md` and `../specs/oauth-p0.v1.yml` require Authorization Code plus Refresh Token only, PKCE `S256` for every code flow, RFC 7636 verifier grammar and exact unpadded S256 challenge grammar, exact redirects, one RFC 8707 resource, exact single audience, RFC 9068 `typ=at+jwt`, RFC 9207 response issuer, header-only bearer transport, OAuth-standard errors, refresh-family replay revocation and a dedicated OAuth key ring. Human OAuth `sub` remains Google `sub`; email, hosted domain, role and legacy permission arrays are excluded from OAuth access tokens by default.
+The additive OAuth protocol contract is frozen and implemented as a default-off dark runtime through Step 3E. `OAUTH_P0_CONTRACT.md` and `../specs/oauth-p0.v1.yml` require Authorization Code plus Refresh Token only, PKCE `S256` for every code flow, RFC 7636 verifier grammar and exact unpadded S256 challenge grammar, exact redirects, one RFC 8707 resource, exact single audience, RFC 9068 `typ=at+jwt`, RFC 9207 response issuer, header-only bearer transport, OAuth-standard errors, refresh-family replay revocation and a dedicated OAuth key ring. Human OAuth `sub` remains Google `sub`; email, hosted domain, role and legacy permission arrays are excluded from OAuth access tokens by default.
 
 Step 3B implements only a read-only, default-off metadata/JWKS surface over the Step 3A foundation; the authorization protocol remains unimplemented. `OAUTH_P0_ENABLED` defaults to `false`, requires no additional OAuth secret/key input, and leaves every new route at 404 when false/absent. When true, only GET OAuth JWKS and GET RFC 9728 protected-resource metadata are registered outside the unchanged legacy builder; automatic `HEAD` siblings are disabled.
 
@@ -60,6 +60,12 @@ Revocation/introspection remain unmounted core methods in Step 3D. Client authen
 Every successfully persisted issuance updates OAuth signing metadata with `GREATEST(COALESCE(last_signed_at, observed_at), observed_at)` under the existing active, activated and non-retiring guard. The recorded time therefore never moves backwards and remains a fail-safe basis for the 1,260-second retirement grace.
 
 First-party browser clients remain BFF/server-side-token applications. Public-client rollout, SPA bearer-token storage, downstream OIDC, service principals, `client_credentials`, token exchange, `private_key_jwt` and dynamic registration are disabled/deferred.
+
+Step 3E exposes the audited lifecycle only when `OAUTH_P0_ENABLED=true`. The three POST routes are isolated behind an OAuth-only 16 KiB `application/x-www-form-urlencoded` parser. Malformed encoding, invalid UTF-8, duplicate names, unsupported fields, empty required values, other media types and form-body `client_secret` fail before the core. OAuth Basic requires canonical Base64, exactly one raw separator and form-decoded non-empty components. Confidential token-form `client_id` must equal the Basic username; public `none` and resource-owned introspection remain exactly separated. Bearer, OAuth-client-as-resource and legacy tool-client fallback are forbidden.
+
+Code exchange, refresh, revocation and introspection use separate bounded buckets. Only validated client/credential identifiers and `LOG_IP_SALT` HMACs of presented code/token material form keys. The OAuth POST routes use silent automatic request logging, the parent logger redacts Authorization and known body credential fields, and caught errors never include submitted values. Every OAuth POST response and error is `no-store`; invalid client challenges are the constant `Basic realm="oauth"` and contain no submitted identifier.
+
+When the flag is true, configuration requires all three dedicated inputs: `OAUTH_TRANSACTION_PROTECTION_KEY`, `OAUTH_CREDENTIAL_SECRET_PEPPER` and `OAUTH_SIGNING_KEY_ROOT`. False/default mode requires none of them and retains the legacy route/startup boundary. Persisted key absence or invalidity remains sanitized runtime unavailability, never legacy-key fallback.
 
 ## Authorization / permissions
 
@@ -144,7 +150,7 @@ Secrets:
 - `BACKUP_ENCRYPTION_KEY`
 - `LOG_IP_SALT`
 - `OAUTH_TRANSACTION_PROTECTION_KEY` when dark OAuth is enabled
-- `OAUTH_CREDENTIAL_SECRET_PEPPER` before Step 3D credential verification is invoked
+- `OAUTH_CREDENTIAL_SECRET_PEPPER` whenever the Step 3E HTTP surface is enabled
 - private key files beneath `OAUTH_SIGNING_KEY_ROOT`; the root/path is not logged
 - per-tool client secrets
 

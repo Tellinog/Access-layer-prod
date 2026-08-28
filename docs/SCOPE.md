@@ -64,6 +64,12 @@ Step 3D adds only the OAuth session/refresh-family/refresh-token/revocation tabl
 
 Still out of scope are mounting `/oauth/token`, `/oauth/revoke`, `/oauth/introspect` or RFC 8414; registration/admin APIs, pilots/seeds, production secret/key provisioning or enablement, consumers/SDKs, backup implementation changes, deployment and Step 3E.
 
+## Step 3E strict HTTP boundary
+
+Step 3E mounts only `POST /oauth/token`, `POST /oauth/revoke`, `POST /oauth/introspect` and GET-only `/.well-known/oauth-authorization-server` over the frozen Step 3D core when `OAUTH_P0_ENABLED=true`. The three POST routes accept bounded form encoding only, use OAuth-specific Basic authentication, separate non-disclosing rate limits, no-store responses and sanitized OAuth errors. Discovery advertises only the mounted P0 endpoints and has no automatic HEAD sibling.
+
+When the flag is absent/false, all OAuth routes remain absent/404 and startup retains legacy-only secret requirements. Migration 006, schema/data mutation, registration/admin APIs, pilots/seeds, production/Coolify changes, real credentials/keys, consumers/SDKs, backup implementation and every P1/OIDC feature remain out of scope.
+
 ## Personas
 
 | Persona | Goal | Main needs | Notes |

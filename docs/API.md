@@ -23,6 +23,10 @@
 | `/v1/me` | Access Layer JWT or admin session |
 | `/v1/admin/*` | Platform admin role, or delegated tool admin where explicitly allowed |
 | `/v1/.well-known/jwks.json` | Public |
+| OAuth metadata/JWKS | Public, only when `OAUTH_P0_ENABLED=true` |
+| `/oauth/authorize` and OAuth upstream callback | Validated OAuth/Google transaction, only when enabled |
+| `/oauth/token`, `/oauth/revoke` | Registered OAuth client Basic or registered public `none` method, only when enabled |
+| `/oauth/introspect` | Resource-owned OAuth Basic credential, only when enabled |
 
 ## Step 3B default-off read-only OAuth routes
 
@@ -33,7 +37,7 @@ These routes exist only when `OAUTH_P0_ENABLED=true`; absent/false returns 404 a
 | GET | `/oauth/jwks` | Dedicated validated OAuth public verification keys; `Cache-Control: public, max-age=300`. Returns sanitized HTTP 503 `{ "error": "temporarily_unavailable" }` when no safe key exists. |
 | GET | `/.well-known/oauth-protected-resource/v1` | RFC 9728 metadata for `https://access-layer.unguess-internal.net/v1` and header-only Bearer transport; with no pilot scopes, `scopes_supported` is omitted. |
 
-Both Step 3B paths are GET-only; Fastify's automatic `HEAD` siblings are disabled and return 404. `/.well-known/oauth-authorization-server` remains unregistered even with the flag true. Its exact target payload is built/tested but will not advertise authorize/token/revoke/introspect until those endpoints exist. The legacy `/v1/.well-known/jwks.json` endpoint is a separate unchanged key domain.
+Both Step 3B paths are GET-only; Fastify's automatic `HEAD` siblings are disabled and return 404. At the Step 3B boundary, RFC 8414 remained unregistered. Step 3E now mounts it only alongside every endpoint it advertises. The legacy `/v1/.well-known/jwks.json` endpoint is a separate unchanged key domain.
 
 ## Step 3C default-off authorization issuance routes
 
@@ -46,11 +50,28 @@ These additional routes exist only when `OAUTH_P0_ENABLED=true` and are also GET
 
 Untrusted client or redirect input receives a local OAuth JSON error and is never redirected. After exact redirect trust, protocol errors use only `error`, exact safely retained `state` and exact `iss`; no verbose description is added. Success adds only `code`, exact state and issuer to any safe pre-registered query parameters. Automatic request logging is disabled for both paths.
 
-`/oauth/token`, `/oauth/revoke`, `/oauth/introspect` and `/.well-known/oauth-authorization-server` remain 404. There is no access/refresh token response, client authentication, signing or private-key loading in Step 3C.
+At the Step 3C boundary, `/oauth/token`, `/oauth/revoke`, `/oauth/introspect` and RFC 8414 remained 404. Step 3E supersedes only that historical mounting state; Step 3C authorization semantics are unchanged.
 
 ## Step 3D unmounted token-lifecycle core
 
-Step 3D implements the internal repository/service behavior for code exchange, OAuth client/resource credential verification, dedicated-key access-token signing, refresh rotation/replay, revocation and introspection. Revocation and introspection `token_type_hint` values are advisory: a wrong or unknown revocation hint cannot prevent lookup of the other supported token class, and introspection ignores the hint without widening its access-token-only active disclosure. Access-token jti revocation is retained through `exp` plus the frozen 60-second verifier clock-skew window. It adds no Fastify registration: `/oauth/token`, `/oauth/revoke`, `/oauth/introspect` and `/.well-known/oauth-authorization-server` still return 404 in both flag states. The target-only request/response shapes in `../schemas/access-layer-oauth-v1.openapi.yaml` remain frozen inputs for a later Step 3E mount.
+Step 3D implements the internal repository/service behavior for code exchange, OAuth client/resource credential verification, dedicated-key access-token signing, refresh rotation/replay, revocation and introspection. Revocation and introspection `token_type_hint` values are advisory: a wrong or unknown revocation hint cannot prevent lookup of the other supported token class, and introspection ignores the hint without widening its access-token-only active disclosure. Access-token jti revocation is retained through `exp` plus the frozen 60-second verifier clock-skew window. Step 3D itself added no Fastify registration; Step 3E mounts this unchanged core.
+
+## Step 3E strict default-off OAuth HTTP surface
+
+All Step 3E routes remain absent/404 when `OAUTH_P0_ENABLED` is absent/false. When true, they are added to the existing Step 3B/3C surface:
+
+| Method | Path | Result |
+|---|---|---|
+| GET | `/.well-known/oauth-authorization-server` | Exact issuer-preserving RFC 8414 metadata; `Cache-Control: public, max-age=300`; no automatic HEAD. |
+| POST | `/oauth/token` | Authorization-code exchange or activity-driven refresh; exact token wire fields, `Cache-Control: no-store`, `Pragma: no-cache`. |
+| POST | `/oauth/revoke` | RFC 7009 idempotent non-disclosing revocation; `Cache-Control: no-store`. |
+| POST | `/oauth/introspect` | RFC 7662 access-token-only exact-audience disclosure; inactive output is exactly `{"active":false}`; `Cache-Control: no-store`. |
+
+The POST routes accept only `application/x-www-form-urlencoded`, bounded to 16 KiB. Malformed percent/UTF-8 encoding, duplicates, unsupported fields, missing/empty required fields and other media types return sanitized OAuth errors. OAuth Basic uses canonical Base64 and form-decoded credential components. The form body never accepts `client_secret`; Bearer and legacy tool credentials are never fallback authentication.
+
+Confidential token/revocation callers use registered OAuth client Basic credentials and the Basic username must match token-form `client_id` when both are present. Registered public clients may use only their frozen `none` method with form `client_id`. Introspection always requires resource-owned Basic credentials whose username is `credential_id`.
+
+`invalid_client` returns 401 with `WWW-Authenticate: Basic realm="oauth"`; `invalid_request`, `unsupported_grant_type`, `invalid_grant`, `invalid_scope` and `invalid_target` return 400; `temporarily_unavailable` returns 503. Every OAuth error is sanitized and `no-store`. Code exchange, refresh, revocation and introspection have separate bounded rate limits; raw codes/tokens never enter their keys.
 
 ## Endpoints
 
@@ -118,7 +139,7 @@ See:
 
 ## Additive OAuth P0 target
 
-The complete target-only OAuth surface is documented separately in `../schemas/access-layer-oauth-v1.openapi.yaml` and `OAUTH_P0_CONTRACT.md`. With the optional flag true, the current runtime registers the two GET-only Step 3B reads and the two GET-only Step 3C issuance paths above; absent/false remains fully dark. RFC 8414 metadata, `/oauth/token`, `/oauth/revoke` and access-token-only `/oauth/introspect` remain unregistered. Step 3A's zero-route and Step 3B's read-only statements are historical phase boundaries. The historical `../schemas/openapi.yaml` and frozen `/v1/auth/google/callback` remain unchanged.
+The complete OAuth surface is documented separately in `../schemas/access-layer-oauth-v1.openapi.yaml` and `OAUTH_P0_CONTRACT.md`. With the optional flag true, the current dark runtime registers the two Step 3B reads, two Step 3C issuance paths and four Step 3E routes above; absent/false remains fully dark. Step 3A's zero-route, Step 3B's read-only state and Step 3D's unmounted state are historical phase boundaries. The historical `../schemas/openapi.yaml` and frozen `/v1/auth/google/callback` remain unchanged.
 # Step 1 machine baseline
 
 The exhaustive repository-observed route and wire-contract freeze is `../specs/legacy-contract-baseline.v1.json`. It records one known documentation drift: runtime registers `GET /v1/admin/backup/secret-material`, while the historical `../schemas/openapi.yaml` omits it. Step 1 changes neither side.

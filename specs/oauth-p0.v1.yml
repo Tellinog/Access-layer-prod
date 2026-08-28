@@ -1,6 +1,6 @@
 schema_version: 1
 profile_id: unguess-oauth-vnext-p0
-status: contract_frozen_not_implemented
+status: contract_frozen_dark_runtime_implemented
 runtime_enabled: false
 issuer: https://access-layer.unguess-internal.net
 normative_standards:
@@ -72,7 +72,7 @@ upstream_identity:
   callback_path: /oauth/upstream/google/callback
   advertised_as_oauth_protocol_endpoint: false
   legacy_callback_reused: false
-  runtime_implemented: false
+  runtime_implemented: true
   production_registration_required_before_enable: true
   legacy_production_callback_must_remain_registered: true
 token_endpoint:
@@ -301,6 +301,6 @@ compatibility:
   legacy_profile: access-layer-legacy-v1
   legacy_contract: ./legacy-contract-baseline.v1.json
   forced_migration: false
-  oauth_runtime_implemented: false
-  database_migration_created: false
+  oauth_runtime_implemented: true
+  database_migration_created: true
   legacy_fallback_on_oauth_failure: forbidden

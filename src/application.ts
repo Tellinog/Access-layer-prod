@@ -3,11 +3,13 @@ import { registerOAuthAuthorizationHttp, registerOAuthReadOnlyHttp } from "./oau
 import type { OAuthAuthorizationFlowRepository } from "./oauth/flow-repository.js";
 import type { OAuthUpstreamGoogleClient } from "./oauth/google.js";
 import type { OAuthFoundationRepository } from "./oauth/repository.js";
+import { registerOAuthTokenLifecycleHttp, type OAuthTokenHttpService } from "./oauth/token-http.js";
 
 export interface ApplicationDependencies extends AppDependencies {
   oauthRepository: OAuthFoundationRepository;
   oauthFlowRepository: OAuthAuthorizationFlowRepository;
   oauthGoogle: OAuthUpstreamGoogleClient;
+  oauthTokenService: OAuthTokenHttpService;
 }
 
 export async function buildApplication(deps: ApplicationDependencies) {
@@ -21,6 +23,10 @@ export async function buildApplication(deps: ApplicationDependencies) {
       repositories: deps.repositories,
       audit: deps.audit,
       google: deps.oauthGoogle
+    });
+    registerOAuthTokenLifecycleHttp(app, {
+      config: deps.config,
+      service: deps.oauthTokenService
     });
   }
   return app;

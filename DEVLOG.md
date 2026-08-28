@@ -1,5 +1,32 @@
 # DEVLOG.md
 
+## 2026-08-28 - Step 3E strict default-off OAuth HTTP boundary
+
+Changed by: Codex
+Related task: Mount the audited Step 3D OAuth lifecycle and RFC 8414 metadata without changing frozen legacy or Step 2/3A–3D semantics.
+
+### Changed
+
+- Added an encapsulated OAuth HTTP adapter for token, revoke and introspect form POSTs plus GET-only RFC 8414 discovery. It is composed outside `src/app.ts` and exists only under the existing default-false flag.
+- Added a dependency-free 16 KiB form parser, canonical form-aware Basic parser, strict field allow-lists, exact token wire mapping, sanitized OAuth status/challenge/cache handling and separate code/refresh/revoke/introspect rate-limit buckets whose secret material is HMAC-only.
+- Wired the audited OAuth token repository/service into runtime dependencies. True-mode config now requires the dedicated OAuth credential pepper and signing-key root in addition to the existing transaction-protection key; false/default mode remains unaffected.
+- Added 15 HTTP tests plus expanded darkness/config coverage for flag boundaries, parser/auth failures, confidential/public/resource identities, status/headers, no disclosure, advisory hints, exact inactive introspection, discovery and rate-limit separation.
+- Reconciled target OpenAPI, machine implementation-state annotations, config schema and human docs. The OAuth YAML loader now rejects duplicate mapping keys.
+
+### Boundary
+
+- Legacy `/v1/*`, `src/app.ts`, legacy Google/JWT/JWKS, sessions, refresh, grants, permissions, Admin UI, dependencies, Docker/Compose and production behavior are unchanged.
+- Migrations 001–005 are byte-identical to approved Step 3D; no migration 006 exists. Migration 005 SHA-256 remains `aaffcb469000f62e680b5d391360fdacc4414e4280ba230e90e7fd4eee4dafbe`.
+- No registration/admin API, pilot/seed, real credential/key, backup change, consumer/SDK, production secret, Coolify action or deployment occurred.
+
+### Tests/checks
+
+- TypeScript lint and build passed. Full Vitest passed 298 tests across 17 files.
+- Python unittest discovery passed 61 tests with two expected skips (63 collected). The OAuth validator passed all 24 check groups, including duplicate-YAML-key rejection.
+- Continuity returned the expected schema-valid `VALID_BUT_NOT_READY` with both gates false (exit 2). Non-strict platform validation passed 27 checks with seven known warnings.
+- Frozen legacy, dependency, Docker/Compose, `src/app.ts`, migration 001–005 byte-boundary and migration 005 hash checks passed; `git diff --check` passed.
+- Disposable PostgreSQL 16 migration application, real concurrent refresh replay, old-binary/new-schema and N→N+1 exercises remain external Step 4/release gates. Production was not contacted.
+
 ## 2026-08-27 - Step 3D final OAuth lifecycle semantics hardening
 
 Changed by: Codex

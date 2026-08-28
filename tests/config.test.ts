@@ -39,6 +39,8 @@ describe("loadConfig", () => {
   it("parses the OAuth P0 flag with the dedicated transaction protection key", () => {
     vi.stubEnv("OAUTH_P0_ENABLED", "true");
     vi.stubEnv("OAUTH_TRANSACTION_PROTECTION_KEY", Buffer.alloc(32, 7).toString("base64url"));
+    vi.stubEnv("OAUTH_CREDENTIAL_SECRET_PEPPER", "oauth-only-secret-pepper");
+    vi.stubEnv("OAUTH_SIGNING_KEY_ROOT", "C:\\oauth-keys");
 
     expect(loadConfig().oauthP0Enabled).toBe(true);
     expect(loadConfig().oauthTransactionProtectionKey).toEqual(Buffer.alloc(32, 7));
@@ -57,7 +59,7 @@ describe("loadConfig", () => {
     expect(loadConfig().oauthTransactionProtectionKey).toBeUndefined();
   });
 
-  it("keeps Step 3D core secrets optional at route-composition time and parses them separately", () => {
+  it("keeps lifecycle secrets optional while OAuth is false and requires them when the HTTP surface is enabled", () => {
     vi.stubEnv("OAUTH_CREDENTIAL_SECRET_PEPPER", undefined);
     vi.stubEnv("OAUTH_SIGNING_KEY_ROOT", undefined);
     expect(loadConfig()).toMatchObject({
@@ -74,6 +76,16 @@ describe("loadConfig", () => {
 
     vi.stubEnv("OAUTH_CREDENTIAL_SECRET_PEPPER", "too-short");
     expect(() => loadConfig()).toThrow("OAUTH_CREDENTIAL_SECRET_PEPPER");
+
+    vi.stubEnv("OAUTH_P0_ENABLED", "true");
+    vi.stubEnv("OAUTH_TRANSACTION_PROTECTION_KEY", Buffer.alloc(32, 7).toString("base64url"));
+    vi.stubEnv("OAUTH_CREDENTIAL_SECRET_PEPPER", undefined);
+    vi.stubEnv("OAUTH_SIGNING_KEY_ROOT", "C:\\oauth-keys");
+    expect(() => loadConfig()).toThrow("OAUTH_CREDENTIAL_SECRET_PEPPER");
+
+    vi.stubEnv("OAUTH_CREDENTIAL_SECRET_PEPPER", "oauth-only-secret-pepper");
+    vi.stubEnv("OAUTH_SIGNING_KEY_ROOT", undefined);
+    expect(() => loadConfig()).toThrow("OAUTH_SIGNING_KEY_ROOT");
   });
 
   it("rejects reuse of the legacy tool-client pepper without disclosing either value", () => {

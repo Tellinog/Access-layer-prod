@@ -109,6 +109,12 @@ export function loadConfig(): Config {
     : parseOAuthTransactionProtectionKey(oauthTransactionProtectionKeyValue);
   const oauthCredentialSecretPepper = readOptional("OAUTH_CREDENTIAL_SECRET_PEPPER");
   const oauthSigningKeyRoot = readOptional("OAUTH_SIGNING_KEY_ROOT");
+  if (oauthP0Enabled && oauthCredentialSecretPepper === undefined) {
+    throw new Error("Missing required environment variable OAUTH_CREDENTIAL_SECRET_PEPPER when OAUTH_P0_ENABLED=true");
+  }
+  if (oauthP0Enabled && oauthSigningKeyRoot === undefined) {
+    throw new Error("Missing required environment variable OAUTH_SIGNING_KEY_ROOT when OAUTH_P0_ENABLED=true");
+  }
   if (oauthCredentialSecretPepper !== undefined && oauthCredentialSecretPepper.length < 16) {
     throw new Error("OAUTH_CREDENTIAL_SECRET_PEPPER must be at least 16 characters when set");
   }

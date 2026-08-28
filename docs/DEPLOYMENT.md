@@ -42,10 +42,10 @@ Minimum production variables:
 - `ENABLE_REFRESH_TOKENS` defaults to `true`
 - `ACCESS_TOKEN_TTL_SECONDS` defaults to `900`; `REFRESH_TOKEN_TTL_SECONDS` defaults to `28800` and acts as the sliding inactivity timeout after each authenticated refresh.
 - `ACCESS_REQUEST_REOPEN_AFTER_DAYS` defaults to `30`
-- `OAUTH_P0_ENABLED` is optional and defaults to `false`; absent/false preserves the exact legacy route inventory.
-- `OAUTH_TRANSACTION_PROTECTION_KEY` remains optional/absent while OAuth is false and is required only when true. It must be a dedicated canonical unpadded base64url encoding of exactly 32 random bytes. Never store a real value in Git or derive it from legacy secrets.
-- `OAUTH_CREDENTIAL_SECRET_PEPPER` is an optional Step 3D core input. The core fails closed for confidential client/resource credential verification when absent; it must never equal or derive from `TOOL_CLIENT_SECRET_PEPPER`.
-- `OAUTH_SIGNING_KEY_ROOT` is an optional Step 3D core input naming an absolute dedicated local filesystem root. Token signing fails closed when absent; key references, including paths, must not be logged. Neither input is provisioned or used by the unmounted HTTP surface in Step 3D.
+- `OAUTH_P0_ENABLED` is optional and defaults to `false`; absent/false preserves the exact legacy route inventory and requires no OAuth-only input.
+- `OAUTH_TRANSACTION_PROTECTION_KEY` is required only when OAuth is true. It must be a dedicated canonical unpadded base64url encoding of exactly 32 random bytes. Never store a real value in Git or derive it from legacy secrets.
+- `OAUTH_CREDENTIAL_SECRET_PEPPER` is required only when OAuth is true. It must contain at least 16 characters and must never equal or derive from `TOOL_CLIENT_SECRET_PEPPER`.
+- `OAUTH_SIGNING_KEY_ROOT` is required only when OAuth is true and names an absolute dedicated local filesystem root. Key references, including paths, must not be logged. Missing or invalid persisted signing material remains a sanitized runtime 503 rather than permission to use the legacy key.
 
 ## Infrastructure
 
@@ -97,7 +97,7 @@ When `RUN_SEED_ON_START=true`, the seed reconciles the reserved `access-admin` r
 9. Register pilot tool.
 10. Run end-to-end tests.
 
-The historical Step 3A foundation and Step 3B read surface did not authorise production OAuth changes. Step 3C adds only local default-off issuance, and Step 3D adds only an unmounted local core; neither authorises a production flag/key/pepper/root, Google callback, pilot, key provisioning or registration change. Production remains blocked by the continuity/release gates below.
+Steps 3A–3E implement the complete OAuth P0 surface only for local/default-off dark operation. They do not authorise a production flag/key/pepper/root, Google callback registration, pilot, key provisioning, controlled registration or deploy. Production remains blocked by the continuity/release gates below.
 
 ## Rollback
 

@@ -137,7 +137,7 @@ describe("production continuity helper safety", () => {
   });
 
   it("keeps runtime and entrypoint invariant and pins the approved Compose continuity correction", () => {
-    expect(sha256Lf("src/config.ts")).toBe("73c47751e7dc172c06d81cfdd0fc90daad6b8db6881e7d2ea317d949e0473e26");
+    expect(sha256Lf("src/config.ts")).toBe("0a63490a7f51cda34c63b0cce1f71ed021fc7b303ea15398e2d163df318b0c23");
     expect(sha256Lf("docker-compose.yaml")).toBe("3c91dbaccd3dadae1ef8587fba307721e72fe281aed26b969b961cc9a84630aa");
     expect(sha256Lf("docker/entrypoint.sh")).toBe("07d57fbdbb6bc09268b154c7d97afbfc5f8d5699b0378c747057393769ec6d76");
   });

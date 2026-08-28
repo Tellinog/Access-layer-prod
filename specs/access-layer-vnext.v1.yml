@@ -1,7 +1,7 @@
 schema_version: 1
 profile_id: unguess-oauth-oidc-v1
 proposal: B
-status: p0_contract_frozen_runtime_disabled
+status: p0_contract_frozen_dark_runtime_implemented_default_disabled
 contract: ./oauth-p0.v1.yml
 legacy_compatibility:
   required: true
@@ -46,7 +46,7 @@ security:
   human_subject_source: user.google_sub
   oauth_signing_key_namespace: dedicated
   legacy_signing_key_reuse: forbidden
-  oauth_runtime_implemented: false
+  oauth_runtime_implemented: true
 deferred_p1:
   - client_credentials
   - token_exchange

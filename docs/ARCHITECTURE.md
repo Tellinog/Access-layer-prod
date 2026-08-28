@@ -149,6 +149,20 @@ resource credential -> OAuth JWT local verify -> jti/session/authorization/entit
 
 The signer reads only a single active, non-retiring OAuth key under the dedicated realpath-confined root and rejects derived RSA public identity equality with the configured legacy key. Denied code exchange auditing uses a separate bounded transaction because the main exchange transaction rolls back. Exact OAuth resource lookup keeps jti revocation durable while a resource is disabled. The legacy signer/JWKS and all legacy persistence remain separate. Step 3D routes are deliberately absent; the earlier sentence describing token/session components as absent records the Step 3C boundary.
 
+Step 3E adds only an HTTP adapter around that core:
+
+```text
+default-false composer
+  |-- false -> no OAuth plugin/routes; legacy startup requirements only
+  `-- true  -> 16 KiB form parser + OAuth Basic parser
+                 |-- /oauth/token      -> code/refresh-specific rate bucket -> Step 3D service
+                 |-- /oauth/revoke     -> revocation rate bucket ----------> Step 3D service
+                 |-- /oauth/introspect -> resource rate bucket ------------> Step 3D service
+                 `-- RFC 8414 GET only -> exact pure metadata builder
+```
+
+The form parser and routes are Fastify-encapsulated so enabling OAuth does not add form parsing to legacy routes. Route logging is silent for secret-bearing OAuth POSTs, credentials are redacted by the parent logger, and rate keys contain only validated identifiers plus HMAC output. RFC 8414 is mounted only now that every advertised P0 endpoint exists and has no automatic HEAD route.
+
 ## Risks
 
 | Risk | Mitigation |

@@ -98,7 +98,7 @@
     "OAUTH_P0_ENABLED": {
       "type": "boolean",
       "default": false,
-      "description": "Optional default-false OAuth P0 flag. Step 3C additionally registers the dark authorization-code issuance routes when true."
+      "description": "Optional default-false OAuth P0 flag. Step 3E mounts the complete dark P0 HTTP surface only when true."
     },
     "OAUTH_TRANSACTION_PROTECTION_KEY": {
       "type": "string",
@@ -110,12 +110,12 @@
     "OAUTH_CREDENTIAL_SECRET_PEPPER": {
       "type": "string",
       "minLength": 16,
-      "description": "Dedicated OAuth client/resource credential pepper. It is not the legacy tool-client pepper and is required before invoking the Step 3D core."
+      "description": "Dedicated OAuth client/resource credential pepper. It is not the legacy tool-client pepper and is required when OAUTH_P0_ENABLED is true."
     },
     "OAUTH_SIGNING_KEY_ROOT": {
       "type": "string",
       "minLength": 1,
-      "description": "Dedicated absolute local filesystem root for OAuth private signing-key references. It is required before invoking OAuth token issuance."
+      "description": "Dedicated absolute local filesystem root for OAuth private signing-key references. It is required when OAUTH_P0_ENABLED is true."
     },
     "SESSION_COOKIE_NAME": {
       "type": "string"
@@ -182,7 +182,7 @@
   "allOf": [
     {
       "if": {"properties": {"OAUTH_P0_ENABLED": {"const": true}}, "required": ["OAUTH_P0_ENABLED"]},
-      "then": {"required": ["OAUTH_TRANSACTION_PROTECTION_KEY"]}
+      "then": {"required": ["OAUTH_TRANSACTION_PROTECTION_KEY", "OAUTH_CREDENTIAL_SECRET_PEPPER", "OAUTH_SIGNING_KEY_ROOT"]}
     }
   ]
 }

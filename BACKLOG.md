@@ -15,6 +15,7 @@
 
 ## RESOLVED
 
+- 2026-08-28 Step 3E: the audited Step 3D lifecycle is mounted through a default-off strict form/Basic HTTP adapter with separate non-disclosing rate limits and exact RFC 8414 discovery. False/absent remains all-OAuth 404; no migration, pilot, registration or production action was added.
 - 2026-08-27 Step 3D: authorization-code exchange now re-checks current client/resource/authorization/user/exact mappings and the exact active legacy grant inside the code-consumption transaction. Refresh applies the same fail-closed entitlement rules.
 - 2026-08-27 Step 3D: the OAuth private-key loader accepts only local references confined by realpath to the dedicated root and rejects traversal, symlink escape, unsupported/relative references, non-regular/oversized files, the legacy key and public/private/fingerprint mismatch.
 - 2026-08-27 Step 3D hardening: mixed row locks no longer upgrade read-only rows; code and refresh persisted scope/generation invariants fail closed; legacy/OAuth RSA and pepper identity reuse is rejected; overlap retirement, future `iat`, disabled-resource revocation durability and separate sanitized code-denial audit behavior are covered by local tests.
@@ -84,7 +85,7 @@
 - Full SIEM integration.
 - Dedicated SDK packages per framework.
 - Immutable append-only log storage with WORM retention.
-- OAuth authorization-server discovery routing and token/revoke/introspect HTTP endpoints remain outside Step 3D. Registration/admin HTTP APIs, pilot records, production client/resource/scope/mapping/credential registration and any enablement remain deferred until separately approved steps and the release gates pass.
+- OAuth registration/admin HTTP APIs, pilot records, production client/resource/scope/mapping/credential registration and any enablement remain deferred until separately approved steps and the release gates pass. Step 3E completes only the default-off protocol mount.
 - OAuth P1 features: service principals, `client_credentials`, token exchange, `private_key_jwt`, downstream OIDC ID Token/UserInfo/discovery and dynamic client registration.
 - Native OAuth entitlement domains; every P0 resource instead requires exactly one existing `legacy_tool` entitlement-only binding.
 - UNGUESS Platform SDK dependency adoption and telemetry SDK integration.

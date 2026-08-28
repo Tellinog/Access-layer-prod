@@ -1,6 +1,6 @@
 # API_PAYLOADS.md
 
-> This file documents the frozen legacy `/v1/*` payloads. Additive OAuth P0 wire shapes and synthetic fixtures are in `OAUTH_P0_CONTRACT.md`, `../schemas/access-layer-oauth-v1.openapi.yaml`, and `../examples/oauth/`. They are target contracts, not runtime behavior.
+> This file documents the frozen legacy `/v1/*` payloads. Additive OAuth P0 wire shapes and synthetic fixtures are in `OAUTH_P0_CONTRACT.md`, `../schemas/access-layer-oauth-v1.openapi.yaml`, and `../examples/oauth/`; Step 3E implements those shapes only behind the default-false flag.
 
 ## Start auth request
 

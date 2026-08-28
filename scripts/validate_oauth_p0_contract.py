@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the frozen OAuth P0 contract without exercising runtime behavior."""
+"""Validate the frozen OAuth P0 contract and its dark runtime boundary."""
 
 from __future__ import annotations
 
@@ -44,12 +44,32 @@ LEGACY_PERMISSION_KEY_PATTERN = r"^[a-z0-9-]+(?::[a-z0-9-]+)+$"
 BASE64URL_UINT_PATTERN = r"^(?:[A-Za-z0-9_-]{4})*(?:[A-Za-z0-9_-]{2,3})?$"
 
 
+class UniqueKeySafeLoader(yaml.SafeLoader):
+    """Fail closed instead of silently accepting last-key-wins YAML."""
+
+
+def _construct_unique_mapping(loader: UniqueKeySafeLoader, node: yaml.MappingNode, deep: bool = False) -> dict[Any, Any]:
+    mapping: dict[Any, Any] = {}
+    for key_node, value_node in node.value:
+        key = loader.construct_object(key_node, deep=deep)
+        if key in mapping:
+            raise ValueError(f"duplicate YAML key {key!r} at line {key_node.start_mark.line + 1}")
+        mapping[key] = loader.construct_object(value_node, deep=deep)
+    return mapping
+
+
+UniqueKeySafeLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+    _construct_unique_mapping,
+)
+
+
 def load_json(path: str) -> Any:
     return json.loads((ROOT / path).read_text(encoding="utf-8"))
 
 
 def load_yaml(path: str) -> Any:
-    return yaml.safe_load((ROOT / path).read_text(encoding="utf-8"))
+    return yaml.load((ROOT / path).read_text(encoding="utf-8"), Loader=UniqueKeySafeLoader)
 
 
 def schema_errors(instance: Any, schema: dict[str, Any], registry: Registry | None = None) -> list[str]:
@@ -115,8 +135,11 @@ def validate() -> list[str]:
     if "PERMISSION_KEY_REGEX = /^[a-z0-9-]+(?::[a-z0-9-]+)+$/" not in runtime_validation:
         errors.append("runtime legacy permission-key grammar no longer matches the frozen machine contract")
 
-    if spec.get("status") != "contract_frozen_not_implemented" or spec.get("runtime_enabled") is not False:
-        errors.append("OAuth P0 machine profile must remain frozen and runtime-disabled")
+    if spec.get("status") != "contract_frozen_dark_runtime_implemented" or spec.get("runtime_enabled") is not False:
+        errors.append("OAuth P0 machine profile must remain frozen, implemented dark, and disabled by default")
+    compatibility_state = spec.get("compatibility", {})
+    if compatibility_state.get("oauth_runtime_implemented") is not True or compatibility_state.get("database_migration_created") is not True:
+        errors.append("OAuth P0 implementation-state annotations are stale")
     if spec.get("oauth_2_1_alignment", {}).get("final_rfc_claimed") is not False:
         errors.append("OAuth 2.1 must not be represented as a final RFC")
     if set(openapi.get("paths", {})) != EXPECTED_PATHS:
@@ -394,8 +417,8 @@ def validate() -> list[str]:
         errors.append("machine profile does not freeze the separate Google upstream callback")
     if upstream.get("legacy_callback_reused") is not False or upstream.get("advertised_as_oauth_protocol_endpoint") is not False:
         errors.append("Google upstream callback must remain separate and non-advertised")
-    if upstream.get("runtime_implemented") is not False:
-        errors.append("Google upstream callback is incorrectly marked implemented")
+    if upstream.get("runtime_implemented") is not True:
+        errors.append("Google upstream callback dark runtime state is stale")
     downstream_state = spec.get("authorization_code", {}).get("downstream_client_state", {})
     if downstream_state.get("response_round_trip") != "exact_original_value":
         errors.append("machine profile does not preserve exact downstream client state")
@@ -459,7 +482,7 @@ def validate() -> list[str]:
         for path in ("src/app.ts", "migrations/001_initial.sql", "migrations/002_audit_tool_delete_fk.sql")
     )
     if re.search(r"/oauth/|CREATE TABLE(?: IF NOT EXISTS)? oauth_", runtime_and_migrations, re.I):
-        errors.append("OAuth runtime handler or migration exists during the contract-only step")
+        errors.append("OAuth runtime leaked into the frozen legacy builder or migrations")
 
     return sorted(set(errors))
 

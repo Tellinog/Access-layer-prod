@@ -1,12 +1,12 @@
 openapi: 3.1.0
 info:
-  title: Access Layer OAuth vNext P0 target contract
-  version: 1.0.0-p0-contract
+  title: Access Layer OAuth vNext P0 dark runtime contract
+  version: 1.0.0-p0-step3e
   description: >-
-    Frozen additive OAuth authorization-server contract. These endpoints are
-    not implemented or enabled. The existing /v1/* contract is separate and
-    unchanged. Stable RFCs are normative; OAuth 2.1 is only a draft-aligned
-    profile.
+    Frozen additive OAuth authorization-server contract implemented behind the
+    default-false OAUTH_P0_ENABLED flag. The existing /v1/* contract is separate
+    and unchanged. No production enablement or pilot exists. Stable RFCs are
+    normative; OAuth 2.1 is only a draft-aligned profile.
 servers:
   - url: https://access-layer.unguess-internal.net
 security: []
@@ -20,7 +20,8 @@ paths:
           description: P0 metadata advertising only enabled P0 capabilities
           headers:
             Cache-Control:
-              schema: {type: string}
+              required: true
+              schema: {type: string, const: 'public, max-age=300'}
           content:
             application/json:
               schema: {$ref: '#/components/schemas/AuthorizationServerMetadata'}
@@ -123,6 +124,7 @@ paths:
               schema: {$ref: '#/components/schemas/TokenResponse'}
         '400': {$ref: '#/components/responses/OAuthError'}
         '401': {$ref: '#/components/responses/OAuthInvalidClient'}
+        '503': {$ref: '#/components/responses/OAuthUnavailable'}
   /oauth/revoke:
     post:
       operationId: oauthRevoke
@@ -144,8 +146,13 @@ paths:
       responses:
         '200':
           description: Revocation request processed without token-existence disclosure
+          headers:
+            Cache-Control:
+              required: true
+              schema: {type: string, const: no-store}
         '400': {$ref: '#/components/responses/OAuthError'}
         '401': {$ref: '#/components/responses/OAuthInvalidClient'}
+        '503': {$ref: '#/components/responses/OAuthUnavailable'}
   /oauth/introspect:
     post:
       operationId: oauthIntrospect
@@ -178,6 +185,8 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/IntrospectionResponse'}
         '401': {$ref: '#/components/responses/OAuthInvalidClient'}
+        '400': {$ref: '#/components/responses/OAuthError'}
+        '503': {$ref: '#/components/responses/OAuthUnavailable'}
   /oauth/jwks:
     get:
       operationId: oauthJwks
@@ -214,6 +223,10 @@ components:
   responses:
     OAuthError:
       description: Standard OAuth protocol error
+      headers:
+        Cache-Control:
+          required: true
+          schema: {type: string, const: no-store}
       content:
         application/json:
           schema: {$ref: '#/components/schemas/OAuthError'}
@@ -221,7 +234,20 @@ components:
       description: Client authentication failed
       headers:
         WWW-Authenticate:
-          schema: {type: string}
+          required: true
+          schema: {type: string, const: 'Basic realm="oauth"'}
+        Cache-Control:
+          required: true
+          schema: {type: string, const: no-store}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/OAuthError'}
+    OAuthUnavailable:
+      description: OAuth dependency or bounded rate-limit capacity is temporarily unavailable
+      headers:
+        Cache-Control:
+          required: true
+          schema: {type: string, const: no-store}
       content:
         application/json:
           schema: {$ref: '#/components/schemas/OAuthError'}

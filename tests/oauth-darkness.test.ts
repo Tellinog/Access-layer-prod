@@ -15,6 +15,7 @@ import {
 import { OAuthFoundationRepository } from "../src/oauth/repository.js";
 import { OAuthAuthorizationFlowRepository } from "../src/oauth/flow-repository.js";
 import type { OAuthUpstreamGoogleClient } from "../src/oauth/google.js";
+import type { OAuthTokenHttpService } from "../src/oauth/token-http.js";
 import type { OAuthSigningKeyPublicMetadata } from "../src/oauth/types.js";
 import type { Repositories } from "../src/repositories.js";
 import type { TokenService } from "../src/token-service.js";
@@ -54,6 +55,8 @@ const baseConfig: Config = {
   oneTimeCodeTtlSeconds: 60,
   oauthP0Enabled: false,
   oauthTransactionProtectionKey: Buffer.alloc(32, 7),
+  oauthCredentialSecretPepper: "synthetic-oauth-pepper",
+  oauthSigningKeyRoot: "C:\\synthetic-oauth-keys",
   sessionCookieName: "access_layer_admin_session",
   sessionSecret: "synthetic-session-secret",
   toolClientSecretPepper: "synthetic-tool-pepper",
@@ -154,7 +157,8 @@ async function applicationWithFlag(
     ...common,
     oauthRepository: new OAuthFoundationRepository(db),
     oauthFlowRepository: new OAuthAuthorizationFlowRepository(db),
-    oauthGoogle: {} as OAuthUpstreamGoogleClient
+    oauthGoogle: {} as OAuthUpstreamGoogleClient,
+    oauthTokenService: {} as OAuthTokenHttpService
   });
   openApps.push(app);
   return { app, db, common };
@@ -315,23 +319,25 @@ describe("Step 3B OAuth dark HTTP composition", () => {
     const legacyOnly = await buildApp(common);
     openApps.push(legacyOnly);
     expect(app.printRoutes()).toBe(legacyOnly.printRoutes());
-    for (const url of ["/oauth/jwks", "/.well-known/oauth-protected-resource/v1", "/.well-known/oauth-authorization-server"]) {
+    for (const url of ["/oauth/jwks", "/oauth/authorize", "/oauth/upstream/google/callback", "/.well-known/oauth-protected-resource/v1", "/.well-known/oauth-authorization-server"]) {
       expect((await app.inject({ method: "GET", url })).statusCode).toBe(404);
+    }
+    for (const url of ["/oauth/token", "/oauth/revoke", "/oauth/introspect"]) {
+      expect((await app.inject({ method: "POST", url })).statusCode).toBe(404);
     }
   });
 
-  it("keeps every protocol route outside the approved Step 3C issuance surface dark when the flag is true", async () => {
+  it("mounts exactly the approved Step 3E routes in addition to the Step 3B/3C surface when true", async () => {
     const { app } = await applicationWithFlag(true);
-    for (const [method, url] of [
-      ["GET", "/.well-known/oauth-authorization-server"],
-      ["POST", "/oauth/token"],
-      ["POST", "/oauth/revoke"],
-      ["POST", "/oauth/introspect"]
-    ] as const) {
-      expect((await app.inject({ method, url })).statusCode).toBe(404);
+    expect((await app.inject({ method: "GET", url: "/.well-known/oauth-authorization-server" })).statusCode).toBe(200);
+    for (const url of ["/oauth/token", "/oauth/revoke", "/oauth/introspect"]) {
+      expect((await app.inject({ method: "POST", url })).statusCode).not.toBe(404);
     }
     expect((await app.inject({ method: "GET", url: "/oauth/authorize" })).statusCode).not.toBe(404);
     expect((await app.inject({ method: "GET", url: "/oauth/upstream/google/callback" })).statusCode).not.toBe(404);
+    for (const url of ["/.well-known/oauth-authorization-server", "/oauth/token", "/oauth/revoke", "/oauth/introspect"]) {
+      expect((await app.inject({ method: "HEAD", url })).statusCode).toBe(404);
+    }
   });
 
   it("exposes no automatic HEAD sibling for either enabled Step 3B GET route", async () => {

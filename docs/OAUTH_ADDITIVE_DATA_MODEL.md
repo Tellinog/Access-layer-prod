@@ -1,6 +1,6 @@
 # Proposed additive OAuth data model
 
-Status: Step 3A foundation, Step 3C authorization issuance and Step 3D unmounted token/session/refresh/revocation core implemented; HTTP protocol mounting remains deferred.
+Status: Step 3A foundation, Step 3C authorization issuance, Step 3D token lifecycle and Step 3E strict default-off HTTP mounting implemented; no further migration is added.
 
 ## Migration boundary
 

@@ -76,19 +76,32 @@ function form(values: Record<string, string>): string {
 }
 
 class FakeOAuthTokenService implements OAuthTokenHttpService {
-  exchangeAuthorizationCode = vi.fn(async (): Promise<OAuthTokenResponseMaterial> => tokenMaterial);
-  refresh = vi.fn(async (): Promise<OAuthTokenResponseMaterial> => tokenMaterial);
-  revoke = vi.fn(async (): Promise<void> => undefined);
-  introspect = vi.fn(async (): Promise<OAuthIntrospectionResult> => ({ active: false }));
+  exchangeAuthorizationCode = vi.fn(async (
+    _input: Parameters<OAuthTokenHttpService["exchangeAuthorizationCode"]>[0]
+  ): Promise<OAuthTokenResponseMaterial> => tokenMaterial);
+  refresh = vi.fn(async (
+    _input: Parameters<OAuthTokenHttpService["refresh"]>[0]
+  ): Promise<OAuthTokenResponseMaterial> => tokenMaterial);
+  revoke = vi.fn(async (
+    _input: Parameters<OAuthTokenHttpService["revoke"]>[0]
+  ): Promise<void> => undefined);
+  introspect = vi.fn(async (
+    _input: Parameters<OAuthTokenHttpService["introspect"]>[0]
+  ): Promise<OAuthIntrospectionResult> => ({ active: false }));
 }
 
 const openApps: Awaited<ReturnType<typeof buildApplication>>[] = [];
 
-async function testApp(service: OAuthTokenHttpService, oauthP0Enabled = true) {
+async function testApp(
+  service: OAuthTokenHttpService,
+  oauthP0Enabled = true,
+  configOverride: Partial<Config> = {},
+  audit: AuditLogger = {} as AuditLogger
+) {
   const app = await buildApplication({
-    config: { ...config, oauthP0Enabled },
+    config: { ...config, oauthP0Enabled, ...configOverride },
     repositories: {} as Repositories,
-    audit: {} as AuditLogger,
+    audit,
     google: {} as GoogleOidcClient,
     tokenService: { getJwks: () => ({ keys: [] }) } as unknown as TokenService,
     oauthRepository: {} as OAuthFoundationRepository,
@@ -310,5 +323,125 @@ describe("Step 3E revocation, introspection, discovery, and rate limits", () => 
     });
     expect(refresh.statusCode).toBe(200);
     expect(service.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("normalizes the inherited global 240-per-minute boundary to an exact OAuth 503", async () => {
+    const service = new FakeOAuthTokenService();
+    const app = await testApp(service);
+    const basicSecret = "parent-limit-basic-secret";
+    let response;
+    let rejectedToken = "";
+    for (let index = 0; index < 241; index += 1) {
+      rejectedToken = `parent-limit-token-${index}`;
+      response = await app.inject({
+        method: "POST",
+        url: "/oauth/revoke",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          authorization: basic("client.one", basicSecret)
+        },
+        payload: form({ token: rejectedToken })
+      });
+    }
+    expect(response?.statusCode).toBe(503);
+    expect(response?.json()).toEqual({ error: "temporarily_unavailable" });
+    expect(response?.headers["cache-control"]).toBe("no-store");
+    expect(response?.body).not.toContain(rejectedToken);
+    expect(response?.body).not.toContain(basicSecret);
+    expect(service.revoke).toHaveBeenCalledTimes(240);
+    expect(new Set(service.revoke.mock.calls.map(([input]) => input.token)).size).toBe(240);
+  });
+
+  it("keeps OAuth credentials and token material out of HTTP errors and captured automatic logs", async () => {
+    const service = new FakeOAuthTokenService();
+    service.exchangeAuthorizationCode.mockRejectedValueOnce(new OAuthCoreError("invalid_grant"));
+    service.refresh.mockRejectedValueOnce(new OAuthCoreError("invalid_grant"));
+    service.revoke.mockRejectedValueOnce(new OAuthCoreError("temporarily_unavailable"));
+    const auditWrite = vi.fn(async () => undefined);
+    const capturedWrites: string[] = [];
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(((chunk: string | Uint8Array) => {
+      capturedWrites.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write);
+    try {
+      const app = await testApp(
+        service,
+        true,
+        { logLevel: "info" },
+        { write: auditWrite } as unknown as AuditLogger
+      );
+      const authorizationCode = "raw-authorization-code-never-disclose";
+      const pkceVerifier = "raw-pkce-verifier-never-disclose-1234567890";
+      const basicSecret = "raw-basic-secret-never-disclose";
+      const accessToken = "raw-access-token-never-disclose";
+      const refreshToken = "raw-refresh-token-never-disclose";
+      const responses = [
+        await app.inject({
+          method: "POST",
+          url: "/oauth/token",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            authorization: basic("client.one", basicSecret)
+          },
+          payload: form({
+            grant_type: "authorization_code",
+            code: authorizationCode,
+            redirect_uri: "https://client.invalid/callback",
+            client_id: "client.one",
+            code_verifier: pkceVerifier,
+            resource: "https://resource.invalid/api"
+          })
+        }),
+        await app.inject({
+          method: "POST",
+          url: "/oauth/token",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            authorization: basic("client.one", basicSecret)
+          },
+          payload: form({
+            grant_type: "refresh_token",
+            refresh_token: refreshToken,
+            client_id: "client.one",
+            resource: "https://resource.invalid/api"
+          })
+        }),
+        await app.inject({
+          method: "POST",
+          url: "/oauth/revoke",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            authorization: basic("client.one", basicSecret)
+          },
+          payload: form({ token: accessToken })
+        })
+      ];
+      expect(responses.map((response) => response.statusCode)).toEqual([400, 400, 503]);
+      const observableMaterial = [
+        ...responses.map((response) => response.body),
+        ...capturedWrites,
+        JSON.stringify(auditWrite.mock.calls)
+      ].join("\n");
+      for (const secret of [authorizationCode, pkceVerifier, basicSecret, accessToken, refreshToken]) {
+        expect(observableMaterial).not.toContain(secret);
+      }
+      expect(auditWrite).not.toHaveBeenCalled();
+      const oauthHttpSource = readFileSync(resolve(import.meta.dirname, "../src/oauth/token-http.ts"), "utf8");
+      expect(oauthHttpSource.match(/\{ logLevel: "silent" \}/g)).toHaveLength(3);
+      const parentSource = readFileSync(resolve(import.meta.dirname, "../src/app.ts"), "utf8");
+      for (const redactionPath of [
+        "req.headers.authorization",
+        "body.code",
+        "body.token",
+        "body.refresh_token",
+        "body.client_secret",
+        "access_token",
+        "refresh_token"
+      ]) {
+        expect(parentSource).toContain(`"${redactionPath}"`);
+      }
+    } finally {
+      writeSpy.mockRestore();
+    }
   });
 });

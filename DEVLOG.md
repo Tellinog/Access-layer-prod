@@ -1,5 +1,29 @@
 # DEVLOG.md
 
+## 2026-08-28 - Step 3E inherited rate-limit and non-disclosure hardening
+
+Changed by: Codex
+Related task: Close the candidate Step 3E parent/global rate-limit error-boundary defect without changing the frozen protocol, lifecycle or legacy runtime.
+
+### Changed
+
+- Hardened only the OAuth HTTP error normalizer so an inherited Fastify/rate-limit HTTP 429 is classified as `temporarily_unavailable` before generic 4xx request normalization. The root global 240/minute limiter and all four dedicated OAuth bucket configurations are unchanged.
+- Added an integration regression that submits 241 valid revocation requests with distinct token-derived dedicated keys. The first 240 reach the service and the parent-rejected request is exactly HTTP 503 `{ "error": "temporarily_unavailable" }` with `Cache-Control: no-store` and no submitted token or Basic secret.
+- Added captured info-level logging/error evidence for raw authorization code, PKCE verifier, Basic secret, access token and refresh token. All three OAuth POST routes remain log-silent, parent redaction paths remain present, the HTTP boundary emits no additional audit, and the existing Step 3D audit tests continue to prove sanitized lifecycle audit material.
+
+### Boundary
+
+- `src/app.ts`, the global legacy limiter, `/v1/*`, legacy Google/JWT/JWKS/session/grant/refresh behavior, package files, Docker/Compose, consumers and production configuration are unchanged.
+- Migrations 001–005 remain byte-identical to candidate `c35c4bb`; no migration 006 exists. Migration 005 SHA-256 remains `aaffcb469000f62e680b5d391360fdacc4414e4280ba230e90e7fd4eee4dafbe`.
+- No protocol/lifecycle/entitlement decision, pilot, seed, registration API, production secret/key, Coolify operation or Step 4 work was introduced.
+
+### Tests/checks
+
+- TypeScript lint/build passed. Full Vitest passed 300 tests across 17 files, including 17 Step 3E HTTP tests and the existing false-darkness/exact-discovery/dedicated-rate coverage.
+- Python unittest discovery passed 61 tests with two expected skips (63 collected). The OAuth validator passed all 24 check groups.
+- Production continuity remained schema-valid `VALID_BUT_NOT_READY` with both gates false (expected exit 2). Non-strict platform validation passed 27 checks with seven known warnings.
+- Frozen migration/legacy/dependency/Docker/Compose boundaries and `git diff --check` passed. No live PostgreSQL, production or deployment operation was performed.
+
 ## 2026-08-28 - Step 3E strict default-off OAuth HTTP boundary
 
 Changed by: Codex

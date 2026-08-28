@@ -152,6 +152,7 @@ function sendOAuthError(reply: FastifyReply, error: OAuthHttpErrorCode) {
 function normalizedError(error: unknown): OAuthHttpErrorCode {
   if (error instanceof OAuthHttpError || error instanceof OAuthCoreError) return error.code;
   const statusCode = (error as { statusCode?: unknown } | null)?.statusCode;
+  if (statusCode === 429) return "temporarily_unavailable";
   if (typeof statusCode === "number" && statusCode >= 400 && statusCode < 500) return "invalid_request";
   return "temporarily_unavailable";
 }

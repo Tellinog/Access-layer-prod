@@ -38,6 +38,8 @@ OAuth credential, authorization-code and refresh-token material is included only
 
 The encrypted backup plaintext includes `client_id` and `client_secret_hash` in the `tool_clients` section. Access Layer intentionally does not store tool client secrets in plaintext, so existing plaintext `tls_...` values cannot be recovered from the database or the backup.
 
+All seven legacy and 17 OAuth table reads execute through one transaction-bound PostgreSQL connection. The transaction establishes `REPEATABLE READ, READ ONLY` before the first table `SELECT`, so one export represents one consistent MVCC snapshot without a write lock or `SERIALIZABLE` isolation.
+
 Existing tool client secrets continue to work after restore only if the restored environment uses the same `TOOL_CLIENT_SECRET_PEPPER` that was used when the secrets were created. If that pepper is lost or changed, restore still imports the tool clients and client IDs, but clients must be rotated and downstream tools must receive new secrets.
 
 OAuth client and resource credentials likewise remain usable only with the same external `OAUTH_CREDENTIAL_SECRET_PEPPER`. A restored pending/claimed OAuth transaction can be decrypted only with the same external `OAUTH_TRANSACTION_PROTECTION_KEY`. The referenced OAuth private signing-key files and their `OAUTH_SIGNING_KEY_ROOT` storage remain external continuity material.
@@ -65,6 +67,8 @@ The export does not include these legacy ephemeral or high-churn tables:
 - `.env` files or Coolify secrets
 
 The OAuth tables listed above are included even when they contain active OAuth sessions or hash-only token lifecycle rows. No export query recovers or synthesizes a raw OAuth client/resource secret, authorization code, access token, refresh token or private signing key.
+
+The frozen top-level `contents.sessions` and `contents.refresh_tokens` flags are legacy-oriented metadata describing the excluded legacy tables. They do not negate the explicit `data.oauth_sessions`, `data.oauth_refresh_token_families` or `data.oauth_refresh_tokens` sections in a current full Step 4A backup. The metadata is not changed because `src/app.ts` and the legacy backup envelope remain frozen.
 
 Keep these runtime secrets in your password manager / Coolify secrets backup:
 
@@ -161,6 +165,8 @@ The encrypted envelope, endpoint and plaintext backup identity remain `access-la
 - a legacy-only merge (`replace_existing=false`) does not touch existing OAuth rows;
 - every replace (`replace_existing=true`) deletes OAuth dependants before legacy parents, so restoring a legacy-only snapshot intentionally leaves zero OAuth rows and cannot be blocked by the entitlement binding's `tools` foreign key;
 - a full backup restores legacy parents first, then OAuth parents and dependants in one transaction. Credential rotation parents use a second linking pass, and refresh tokens are validated and inserted by family/generation order.
+
+Before the import transaction opens, client and resource credential parent chains must resolve within the same owner and terminate at `NULL`; missing, cross-owner, self-parent and multi-row cycles are rejected. Every refresh family must contain exactly one token generation for each integer in `0..current_generation`, no generation above the marker, a null parent at generation zero and an immediate same-family generation-minus-one parent thereafter. Repository-detected structural or lineage failures carry sanitized HTTP 400 validation semantics and do not expose backup rows or protected material.
 
 Import count responses keep the original seven keys for a legacy-only backup. A full OAuth backup adds the 17 OAuth count keys.
 

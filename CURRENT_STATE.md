@@ -2,11 +2,20 @@
 
 ## Phase
 
-V1 legacy implementation complete. Step 4A extends the existing encrypted version-1 backup repository contract to every current OAuth table while preserving legacy-only backups and the frozen runtime boundary. OAuth remains default-off; no pilot, production registration, key/secret provisioning, real restore or production enablement exists.
+V1 legacy implementation complete. Step 4A extends and hardens the existing encrypted version-1 backup repository contract for every current OAuth table while preserving legacy-only backups and the frozen runtime boundary. OAuth remains default-off; no pilot, production registration, key/secret provisioning, real restore or production enablement exists.
+
+## Step 4A snapshot and lineage hardening, 2026-08-29
+
+- `Repositories.exportBackup()` now opens exactly one transaction-bound connection, establishes PostgreSQL `REPEATABLE READ, READ ONLY` before the first table read and executes all seven legacy plus 17 OAuth `SELECT`s through that connection. Columns, section order, deterministic ordering and response shape are unchanged.
+- Import prevalidation now rejects every refresh generation set other than exactly `0..current_generation`, including generations above the family marker. Generation zero must have no parent and every later generation must point to the same-family immediate predecessor.
+- Client and resource credential rotation parents still restore in a second pass independent of input order, but missing/cross-owner/self parents and any multi-row cycle now fail before the import transaction. Every accepted chain terminates at `NULL`.
+- Repository-detected backup structure and lineage failures are sanitized errors carrying HTTP 400 semantics, so the unchanged global handler returns legacy `VALIDATION_ERROR`; no backup row or protected material is included in the error.
+- The accepted version-1 shape, successful legacy/full count responses, encrypted endpoints, `src/app.ts`, OpenAPI, migrations 001–005, packages, Docker/Compose, OAuth/legacy protocol, SDKs/consumers and deployment remain unchanged. Step 4B remains unexecuted.
+- Final hardening validation passed: TypeScript lint/build; 315 Vitest tests across 18 files; 61 Python tests with two expected skips; all 24 OAuth validator groups; continuity as expected `VALID_BUT_NOT_READY` with both gates false; non-strict platform validation with 27 passes/seven known warnings; migration/frozen-blob checks and `git diff --check`. Migration 005 remains `aaffcb469000f62e680b5d391360fdacc4414e4280ba230e90e7fd4eee4dafbe`; `src/app.ts` remains approved Git blob `6eaf4d2c3564eb851abbd23371be5a2e2d6a1f12`.
 
 ## Step 4A OAuth backup/export/import coverage, 2026-08-28
 
-- `Repositories.exportBackup()` now exports explicit, deterministically ordered persisted columns for exactly all 17 current `oauth_*` tables in addition to the unchanged seven mandatory legacy sections.
+- `Repositories.exportBackup()` exports explicit, deterministically ordered persisted columns for exactly all 17 current `oauth_*` tables in addition to the unchanged seven mandatory legacy sections; the hardening section above supersedes the candidate's multi-pool-query execution detail.
 - The export contains only stored credential/code/refresh hashes, protected downstream-state ciphertext, public signing metadata/fingerprint and the protected private-key reference. It never recovers raw client/resource secrets, codes, access/refresh tokens, private signing-key contents or environment secrets.
 - Version-1 legacy-only backups remain valid. OAuth sections are optional only as a complete 17-array set; partial sets fail before a transaction begins. Legacy-only merge leaves OAuth rows untouched, while any replace deletes OAuth dependants first so the `tools` RESTRICT binding cannot block the existing legacy replacement sequence.
 - Full import uses one transaction, restores legacy parents before OAuth parents/dependants, resolves credential rotation self-links in a second pass and validates/sorts refresh-token lineage by family and generation. Invalid lineage fails closed and write failures roll back the complete import.

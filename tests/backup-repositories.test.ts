@@ -47,16 +47,23 @@ class RecordingDb implements Db {
   transactionCalls = 0;
   rollbackCalls = 0;
   failOn: RegExp | null = null;
-  private transactional = false;
   private pendingMutations: string[] = [];
 
   async query<T extends QueryResultRow = QueryResultRow>(sql: string, params: unknown[] = []): Promise<QueryResult<T>> {
-    this.queries.push({ sql, params, transactional: this.transactional });
+    return this.recordQuery<T>(sql, params, false);
+  }
+
+  private async recordQuery<T extends QueryResultRow>(
+    sql: string,
+    params: unknown[],
+    transactional: boolean
+  ): Promise<QueryResult<T>> {
+    this.queries.push({ sql, params, transactional });
     if (this.failOn?.test(sql)) {
       throw new Error("synthetic database failure");
     }
     if (/^\s*(?:INSERT|UPDATE|DELETE)\b/i.test(sql)) {
-      (this.transactional ? this.pendingMutations : this.committedMutations).push(sql);
+      (transactional ? this.pendingMutations : this.committedMutations).push(sql);
     }
     const table = sql.match(/\bFROM\s+([a-z_]+)/i)?.[1];
     return result(table ? ([{ section: table }] as unknown as T[]) : []);
@@ -64,10 +71,15 @@ class RecordingDb implements Db {
 
   async transaction<T>(fn: (db: Db) => Promise<T>): Promise<T> {
     this.transactionCalls += 1;
-    this.transactional = true;
     this.pendingMutations = [];
+    const transactionDb: Db = {
+      query: <Row extends QueryResultRow = QueryResultRow>(sql: string, params: unknown[] = []) =>
+        this.recordQuery<Row>(sql, params, true),
+      transaction: <Value>(nested: (db: Db) => Promise<Value>) => nested(transactionDb),
+      close: async () => undefined
+    };
     try {
-      const value = await fn(this);
+      const value = await fn(transactionDb);
       this.committedMutations.push(...this.pendingMutations);
       return value;
     } catch (error) {
@@ -75,7 +87,6 @@ class RecordingDb implements Db {
       throw error;
     } finally {
       this.pendingMutations = [];
-      this.transactional = false;
     }
   }
 
@@ -105,14 +116,23 @@ describe("OAuth backup repository coverage", () => {
       "migrations/005_oauth_token_lifecycle.sql"
     ].flatMap((path) => [...readFileSync(resolve(import.meta.dirname, "..", path), "utf8").matchAll(/CREATE TABLE IF NOT EXISTS (oauth_[a-z_]+)/g)].map((match) => match[1]));
     expect(migrationTables).toEqual([...oauthSections]);
-    expect(db.queries).toHaveLength(24);
-    for (const query of db.queries) {
+    expect(db.transactionCalls).toBe(1);
+    expect(db.queries[0]).toEqual({
+      sql: "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY",
+      params: [],
+      transactional: true
+    });
+    const tableReads = db.queries.slice(1);
+    expect(tableReads).toHaveLength(24);
+    expect(tableReads.every((query) => query.transactional)).toBe(true);
+    expect(db.queries.some((query) => !query.transactional)).toBe(false);
+    for (const query of tableReads) {
       expect(query.sql).toMatch(/^SELECT\s+/);
       expect(query.sql).not.toMatch(/SELECT\s+\*/i);
       expect(query.sql).toMatch(/ORDER BY\s+/i);
     }
 
-    const oauthSql = db.queries.slice(legacySections.length).map((query) => query.sql).join("\n");
+    const oauthSql = tableReads.slice(legacySections.length).map((query) => query.sql).join("\n");
     expect(oauthSql).toContain("secret_hash");
     expect(oauthSql).toContain("code_hash");
     expect(oauthSql).toContain("token_hash");
@@ -127,19 +147,19 @@ describe("OAuth backup repository coverage", () => {
     const missingLegacy = legacyBackup();
     delete missingLegacy.users;
     await expect(new Repositories(missingLegacyDb).importBackup(missingLegacy, { replaceExisting: false }))
-      .rejects.toThrow("Invalid backup section users");
+      .rejects.toMatchObject({ name: "BackupValidationError", message: "Invalid backup data", statusCode: 400 });
     expect(missingLegacyDb.transactionCalls).toBe(0);
 
     const partialDb = new RecordingDb();
     await expect(new Repositories(partialDb).importBackup({ ...legacyBackup(), oauth_clients: [] }, { replaceExisting: true }))
-      .rejects.toThrow("Invalid backup OAuth section set");
+      .rejects.toMatchObject({ name: "BackupValidationError", message: "Invalid backup data", statusCode: 400 });
     expect(partialDb.transactionCalls).toBe(0);
 
     const wrongTypeDb = new RecordingDb();
     const wrongType = fullBackup();
     wrongType.oauth_revocations = {};
     await expect(new Repositories(wrongTypeDb).importBackup(wrongType, { replaceExisting: true }))
-      .rejects.toThrow("Invalid backup section oauth_revocations");
+      .rejects.toMatchObject({ name: "BackupValidationError", message: "Invalid backup data", statusCode: 400 });
     expect(wrongTypeDb.transactionCalls).toBe(0);
   });
 
@@ -265,6 +285,88 @@ describe("OAuth backup repository coverage", () => {
     ]);
   });
 
+  it.each([
+    {
+      label: "a two-row client cycle",
+      section: "oauth_client_credentials",
+      rows: [
+        { id: "client-a", oauth_client_id: "client", secret_hash: "sensitive-client-hash", rotation_parent_id: "client-b" },
+        { id: "client-b", oauth_client_id: "client", secret_hash: "sensitive-client-hash", rotation_parent_id: "client-a" }
+      ]
+    },
+    {
+      label: "a longer resource cycle",
+      section: "oauth_resource_credentials",
+      rows: [
+        { id: "resource-a", oauth_resource_id: "resource", secret_hash: "sensitive-resource-hash", rotation_parent_id: "resource-b" },
+        { id: "resource-b", oauth_resource_id: "resource", secret_hash: "sensitive-resource-hash", rotation_parent_id: "resource-c" },
+        { id: "resource-c", oauth_resource_id: "resource", secret_hash: "sensitive-resource-hash", rotation_parent_id: "resource-a" }
+      ]
+    }
+  ])("rejects $label before opening the import transaction", async ({ section, rows }) => {
+    const db = new RecordingDb();
+    const backup = fullBackup();
+    backup[section] = rows;
+
+    const error = await new Repositories(db).importBackup(backup, { replaceExisting: true })
+      .then(() => null, (caught: unknown) => caught);
+    expect(error).toMatchObject({ name: "BackupValidationError", message: "Invalid backup data", statusCode: 400 });
+    expect(String(error)).not.toContain("sensitive-");
+    expect(db.transactionCalls).toBe(0);
+    expect(db.queries).toHaveLength(0);
+  });
+
+  it.each([
+    {
+      label: "a generation above current_generation",
+      families: [{ id: "family", current_generation: 0 }],
+      tokens: [
+        { id: "zero", oauth_refresh_token_family_id: "family", generation: 0, parent_refresh_token_id: null },
+        { id: "one", oauth_refresh_token_family_id: "family", generation: 1, parent_refresh_token_id: "zero" }
+      ]
+    },
+    {
+      label: "a gap inside the required generation range",
+      families: [{ id: "family", current_generation: 2 }],
+      tokens: [
+        { id: "zero", oauth_refresh_token_family_id: "family", generation: 0, parent_refresh_token_id: null },
+        { id: "two", oauth_refresh_token_family_id: "family", generation: 2, parent_refresh_token_id: "zero" }
+      ]
+    },
+    {
+      label: "a parent on generation zero",
+      families: [{ id: "family", current_generation: 0 }],
+      tokens: [{ id: "zero", oauth_refresh_token_family_id: "family", generation: 0, parent_refresh_token_id: "zero" }]
+    },
+    {
+      label: "a missing explicit null parent on generation zero",
+      families: [{ id: "family", current_generation: 0 }],
+      tokens: [{ id: "zero", oauth_refresh_token_family_id: "family", generation: 0 }]
+    },
+    {
+      label: "a cross-family immediate parent",
+      families: [
+        { id: "family-a", current_generation: 1 },
+        { id: "family-b", current_generation: 0 }
+      ],
+      tokens: [
+        { id: "a-zero", oauth_refresh_token_family_id: "family-a", generation: 0, parent_refresh_token_id: null },
+        { id: "a-one", oauth_refresh_token_family_id: "family-a", generation: 1, parent_refresh_token_id: "b-zero" },
+        { id: "b-zero", oauth_refresh_token_family_id: "family-b", generation: 0, parent_refresh_token_id: null }
+      ]
+    }
+  ])("rejects refresh lineage with $label before writes", async ({ families, tokens }) => {
+    const db = new RecordingDb();
+    const backup = fullBackup();
+    backup.oauth_refresh_token_families = families;
+    backup.oauth_refresh_tokens = tokens;
+
+    await expect(new Repositories(db).importBackup(backup, { replaceExisting: true }))
+      .rejects.toMatchObject({ name: "BackupValidationError", message: "Invalid backup data", statusCode: 400 });
+    expect(db.transactionCalls).toBe(0);
+    expect(db.queries).toHaveLength(0);
+  });
+
   it("fails closed on inconsistent refresh lineage before writes", async () => {
     const db = new RecordingDb();
     const backup = fullBackup();
@@ -275,7 +377,7 @@ describe("OAuth backup repository coverage", () => {
     ];
 
     await expect(new Repositories(db).importBackup(backup, { replaceExisting: true }))
-      .rejects.toThrow("Invalid oauth_refresh_tokens lineage");
+      .rejects.toMatchObject({ name: "BackupValidationError", message: "Invalid backup data", statusCode: 400 });
     expect(db.transactionCalls).toBe(0);
     expect(db.queries).toHaveLength(0);
   });

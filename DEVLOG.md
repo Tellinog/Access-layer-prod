@@ -1,5 +1,30 @@
 # DEVLOG.md
 
+## 2026-08-29 - Step 4A snapshot and lineage hardening
+
+Changed by: Codex
+Related task: Close the candidate Step 4A torn-export and fail-closed lineage/classification findings without changing backup shape, successful responses or the frozen runtime.
+
+### Changed
+
+- Refactored `Repositories.exportBackup()` to use one transaction-bound PostgreSQL connection, establish `REPEATABLE READ, READ ONLY` before the first table read, and route all seven legacy plus 17 OAuth `SELECT`s through that snapshot. Explicit columns, section order and deterministic `ORDER BY` clauses remain unchanged.
+- Tightened refresh-family validation so token generations equal exactly `0..current_generation`; extra, missing, duplicate, wrong-parent and cross-family lineage is rejected before the import transaction.
+- Tightened client/resource credential rotation validation so every owner-local parent chain is input-order-independent, acyclic and terminates at `NULL`; missing, cross-owner, self-parent and multi-row cycles fail before writes.
+- Classified deterministic repository backup structure/lineage failures as sanitized HTTP-400-compatible errors. The unchanged global handler therefore returns legacy `VALIDATION_ERROR` without exposing backup rows, hashes, ciphertext or key references.
+- Expanded deterministic backup tests for the single snapshot, transaction routing, exact refresh range, credential cycles and caller-validation semantics. Updated Step 4A backup, security, compatibility, database, testing, state, decision and backlog documentation.
+
+### Tests/checks
+
+- TypeScript lint/build passed. Full Vitest passed 315 tests across 18 files, including 14 backup repository tests.
+- Python unittest discovery passed 61 tests with two expected skips (63 collected). The ignored `.platform-deps` cache was temporarily moved under the excluded `.venv` for scanning and restored in `finally`; no dependency file changed.
+- The OAuth validator passed all 24 groups. Continuity remained expected `VALID_BUT_NOT_READY` with both gates false (exit 2). Non-strict platform validation passed 27 checks with seven known warnings.
+- Migration/blob/OpenAPI/package/Docker/Compose frozen-boundary checks and `git diff --check` passed. Migration 005 remains SHA-256 `aaffcb469000f62e680b5d391360fdacc4414e4280ba230e90e7fd4eee4dafbe`; `src/app.ts` remains approved blob `6eaf4d2c3564eb851abbd23371be5a2e2d6a1f12`.
+
+### Boundary
+
+- `BACKUP_VERSION=1`, the encrypted envelope/endpoints, seven legacy and exact 17 OAuth sections, successful count responses, `src/app.ts`, OpenAPI, migrations 001–005, packages, Docker/Compose, OAuth/legacy protocol, SDKs/consumers and deployment are unchanged.
+- No migration 006, production/Coolify access, pilot/seed data, real key/secret, restore, E2E/concurrency or Step 4B action was introduced.
+
 ## 2026-08-29 - Step 4A OAuth backup/export/import coverage
 
 Changed by: Codex

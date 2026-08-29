@@ -1,5 +1,13 @@
 # TESTING.md
 
+## Step 4A snapshot and lineage hardening conformance
+
+The export regression uses distinct pool/root and transaction-bound query recorders. It requires exactly one transaction, `SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY` as the first callback statement, and all 24 explicit deterministic table `SELECT`s through only the transaction-bound `Db`.
+
+Import regressions require the refresh generation set to equal exactly `0..current_generation`, covering current zero with an extra generation, internal gaps, an illegal root parent, missing/wrong and cross-family parents. Separate client and resource fixtures reject two-row and longer credential rotation cycles before a transaction, while the existing unordered acyclic-chain test continues to prove second-pass restoration. Partial OAuth sets and invalid lineage expose only a sanitized backup-validation error with `statusCode=400`, which the frozen global handler maps to legacy `VALIDATION_ERROR`/400.
+
+Final hardening result: TypeScript lint/build passed; Vitest passed 315 tests across 18 files, including 14 backup repository tests; Python passed 61 tests with two expected skips (63 collected); the OAuth validator passed all 24 groups; continuity remained `VALID_BUT_NOT_READY` with both gates false; and non-strict platform validation passed 27 checks with seven known warnings. Migration 005 and the approved `src/app.ts` blob witnesses passed, no migration 006 exists, and `git diff --check` passed. No real PostgreSQL restore is claimed.
+
 ## Step 4A OAuth backup repository conformance
 
 `tests/backup-repositories.test.ts` verifies that export returns the unchanged seven legacy sections plus exactly all 17 current OAuth sections. Every query names persisted columns, uses deterministic ordering and excludes raw OAuth client/resource secrets, authorization codes, access/refresh tokens, private-key contents and environment secrets while retaining only stored hashes, protected ciphertext, public signing metadata/fingerprint and the protected key reference.

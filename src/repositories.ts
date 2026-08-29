@@ -77,10 +77,19 @@ const OAUTH_BACKUP_SECTIONS = [
 
 type OAuthBackupSection = (typeof OAUTH_BACKUP_SECTIONS)[number];
 
+class BackupValidationError extends Error {
+  readonly statusCode = 400;
+
+  constructor() {
+    super("Invalid backup data");
+    this.name = "BackupValidationError";
+  }
+}
+
 function backupRows(data: Record<string, unknown>, key: string): BackupRow[] {
   const value = data[key];
   if (!Array.isArray(value)) {
-    throw new Error(`Invalid backup section ${key}`);
+    throw new BackupValidationError();
   }
   return value as BackupRow[];
 }
@@ -91,7 +100,7 @@ function oauthBackupRows(data: Record<string, unknown>): Record<OAuthBackupSecti
     return null;
   }
   if (present.length !== OAUTH_BACKUP_SECTIONS.length) {
-    throw new Error("Invalid backup OAuth section set");
+    throw new BackupValidationError();
   }
   return Object.fromEntries(OAUTH_BACKUP_SECTIONS.map((key) => [key, backupRows(data, key)])) as Record<
     OAuthBackupSection,
@@ -102,7 +111,7 @@ function oauthBackupRows(data: Record<string, unknown>): Record<OAuthBackupSecti
 function requiredRowId(row: BackupRow, field: string, section: string): string {
   const value = row[field];
   if (typeof value !== "string" || value.length === 0) {
-    throw new Error(`Invalid ${section} ${field}`);
+    throw new BackupValidationError();
   }
   return value;
 }
@@ -111,8 +120,9 @@ function validateCredentialLineage(rows: BackupRow[], section: string, ownerFiel
   const byId = new Map<string, BackupRow>();
   for (const row of rows) {
     const id = requiredRowId(row, "id", section);
+    requiredRowId(row, ownerField, section);
     if (byId.has(id)) {
-      throw new Error(`Invalid ${section} duplicate id`);
+      throw new BackupValidationError();
     }
     byId.set(id, row);
   }
@@ -120,15 +130,37 @@ function validateCredentialLineage(rows: BackupRow[], section: string, ownerFiel
   for (const row of rows) {
     const id = requiredRowId(row, "id", section);
     const parentId = row.rotation_parent_id;
-    if (parentId === null || parentId === undefined) {
+    if (parentId === null) {
       continue;
     }
     if (typeof parentId !== "string" || parentId === id) {
-      throw new Error(`Invalid ${section} rotation lineage`);
+      throw new BackupValidationError();
     }
     const parent = byId.get(parentId);
     if (!parent || parent[ownerField] !== row[ownerField]) {
-      throw new Error(`Invalid ${section} rotation lineage`);
+      throw new BackupValidationError();
+    }
+  }
+
+  const validated = new Set<string>();
+  for (const startId of byId.keys()) {
+    if (validated.has(startId)) {
+      continue;
+    }
+    const path: string[] = [];
+    const visiting = new Set<string>();
+    let currentId: string | null = startId;
+    while (currentId !== null && !validated.has(currentId)) {
+      if (visiting.has(currentId)) {
+        throw new BackupValidationError();
+      }
+      visiting.add(currentId);
+      path.push(currentId);
+      const parentId: unknown = byId.get(currentId)?.rotation_parent_id;
+      currentId = typeof parentId === "string" ? parentId : null;
+    }
+    for (const id of path) {
+      validated.add(id);
     }
   }
 
@@ -143,7 +175,7 @@ function validateAndSortRefreshLineage(families: BackupRow[], tokens: BackupRow[
   for (const family of families) {
     const familyId = requiredRowId(family, "id", "oauth_refresh_token_families");
     if (familyById.has(familyId) || !Number.isInteger(family.current_generation) || Number(family.current_generation) < 0) {
-      throw new Error("Invalid oauth_refresh_token_families lineage");
+      throw new BackupValidationError();
     }
     familyById.set(familyId, family);
   }
@@ -155,11 +187,11 @@ function validateAndSortRefreshLineage(families: BackupRow[], tokens: BackupRow[
     const familyId = requiredRowId(token, "oauth_refresh_token_family_id", "oauth_refresh_tokens");
     const generation = token.generation;
     if (tokenById.has(tokenId) || !familyById.has(familyId) || !Number.isInteger(generation) || Number(generation) < 0) {
-      throw new Error("Invalid oauth_refresh_tokens lineage");
+      throw new BackupValidationError();
     }
     const familyGenerations = generationByFamily.get(familyId) ?? new Map<number, BackupRow>();
     if (familyGenerations.has(Number(generation))) {
-      throw new Error("Invalid oauth_refresh_tokens lineage");
+      throw new BackupValidationError();
     }
     familyGenerations.set(Number(generation), token);
     generationByFamily.set(familyId, familyGenerations);
@@ -169,12 +201,12 @@ function validateAndSortRefreshLineage(families: BackupRow[], tokens: BackupRow[
   for (const [familyId, family] of familyById) {
     const familyGenerations = generationByFamily.get(familyId);
     const currentGeneration = Number(family.current_generation);
-    if (!familyGenerations || !familyGenerations.has(0) || !familyGenerations.has(currentGeneration)) {
-      throw new Error("Invalid oauth_refresh_tokens lineage");
+    if (!familyGenerations || familyGenerations.size !== currentGeneration + 1) {
+      throw new BackupValidationError();
     }
     for (let generation = 0; generation <= currentGeneration; generation += 1) {
       if (!familyGenerations.has(generation)) {
-        throw new Error("Invalid oauth_refresh_tokens lineage");
+        throw new BackupValidationError();
       }
     }
   }
@@ -185,17 +217,17 @@ function validateAndSortRefreshLineage(families: BackupRow[], tokens: BackupRow[
     const generation = Number(token.generation);
     const parentId = token.parent_refresh_token_id;
     if (generation === 0) {
-      if (parentId !== null && parentId !== undefined) {
-        throw new Error("Invalid oauth_refresh_tokens lineage");
+      if (parentId !== null) {
+        throw new BackupValidationError();
       }
       continue;
     }
     if (typeof parentId !== "string" || parentId === tokenId) {
-      throw new Error("Invalid oauth_refresh_tokens lineage");
+      throw new BackupValidationError();
     }
     const parent = tokenById.get(parentId);
     if (!parent || parent.oauth_refresh_token_family_id !== familyId || Number(parent.generation) !== generation - 1) {
-      throw new Error("Invalid oauth_refresh_tokens lineage");
+      throw new BackupValidationError();
     }
   }
 
@@ -1109,7 +1141,9 @@ export class Repositories {
   }
 
   async exportBackup(): Promise<Record<string, unknown>> {
-    const [
+    return this.db.transaction(async (tx) => {
+      await tx.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY");
+      const [
       users,
       tools,
       toolClients,
@@ -1134,75 +1168,75 @@ export class Repositories {
       oauthRefreshTokenFamilies,
       oauthRefreshTokens,
       oauthRevocations
-    ] = await Promise.all([
-      this.db.query(`SELECT id, google_sub, email::text AS email, email_normalized::text AS email_normalized,
+      ] = await Promise.all([
+      tx.query(`SELECT id, google_sub, email::text AS email, email_normalized::text AS email_normalized,
           email_verified, hd, display_name, picture_url, status, first_seen_at, last_seen_at, created_at, updated_at
         FROM users ORDER BY created_at ASC, id ASC`),
-      this.db.query(`SELECT id, slug, display_name, description, status, allowed_return_urls, owner_email::text AS owner_email,
+      tx.query(`SELECT id, slug, display_name, description, status, allowed_return_urls, owner_email::text AS owner_email,
           created_at, updated_at
         FROM tools ORDER BY created_at ASC, id ASC`),
-      this.db.query(`SELECT id, tool_id, client_id, client_secret_hash, status, created_at, last_used_at
+      tx.query(`SELECT id, tool_id, client_id, client_secret_hash, status, created_at, last_used_at
         FROM tool_clients ORDER BY created_at ASC, id ASC`),
-      this.db.query(`SELECT id, tool_id, permission_key, description, created_at
+      tx.query(`SELECT id, tool_id, permission_key, description, created_at
         FROM tool_permissions ORDER BY created_at ASC, id ASC`),
-      this.db.query(`SELECT id, tool_id, user_id, email_normalized::text AS email_normalized, role, permissions, status,
+      tx.query(`SELECT id, tool_id, user_id, email_normalized::text AS email_normalized, role, permissions, status,
           valid_from, valid_until, created_by_user_id, revoked_by_user_id, revoked_at, created_at, updated_at
         FROM authorization_grants ORDER BY created_at ASC, id ASC`),
-      this.db.query(`SELECT id, user_id, tool_id, created_by_user_id, created_at
+      tx.query(`SELECT id, user_id, tool_id, created_by_user_id, created_at
         FROM admin_tool_assignments ORDER BY created_at ASC, id ASC`),
-      this.db.query(`SELECT id, tool_id, tool_slug, user_id, google_sub, email::text AS email, email_normalized::text AS email_normalized,
+      tx.query(`SELECT id, tool_id, tool_slug, user_id, google_sub, email::text AS email, email_normalized::text AS email_normalized,
           hd, display_name, status, reason_code, attempts_count, first_seen_at, last_seen_at, last_correlation_id,
           request_ip_hash, user_agent_hash, reviewed_by_user_id, reviewed_at, review_note, grant_id, created_at, updated_at
         FROM access_requests ORDER BY created_at ASC, id ASC`),
-      this.db.query(`SELECT id, client_id, client_name, client_type, token_endpoint_auth_method, grant_types, status,
+      tx.query(`SELECT id, client_id, client_name, client_type, token_endpoint_auth_method, grant_types, status,
           owner_team, owner_contact, created_at, updated_at
         FROM oauth_clients ORDER BY created_at ASC, id ASC`),
-      this.db.query(`SELECT id, oauth_client_id, secret_hash, status, created_at, activated_at, expires_at, retired_at,
+      tx.query(`SELECT id, oauth_client_id, secret_hash, status, created_at, activated_at, expires_at, retired_at,
           rotation_parent_id
         FROM oauth_client_credentials ORDER BY created_at ASC, id ASC`),
-      this.db.query(`SELECT id, oauth_client_id, redirect_uri, created_at
+      tx.query(`SELECT id, oauth_client_id, redirect_uri, created_at
         FROM oauth_client_redirect_uris ORDER BY created_at ASC, id ASC`),
-      this.db.query(`SELECT id, resource_id, display_name, status, owner_team, owner_contact, audience_policy,
+      tx.query(`SELECT id, resource_id, display_name, status, owner_team, owner_contact, audience_policy,
           protected_resource_metadata_url, created_at, updated_at
         FROM oauth_resources ORDER BY created_at ASC, id ASC`),
-      this.db.query(`SELECT id, oauth_resource_id, credential_id, secret_hash, authentication_method, status, created_at,
+      tx.query(`SELECT id, oauth_resource_id, credential_id, secret_hash, authentication_method, status, created_at,
           activated_at, rotated_at, expires_at, retired_at, rotation_parent_id
         FROM oauth_resource_credentials ORDER BY created_at ASC, id ASC`),
-      this.db.query(`SELECT id, oauth_resource_id, binding_type, legacy_tool_id, status, created_at, disabled_at
+      tx.query(`SELECT id, oauth_resource_id, binding_type, legacy_tool_id, status, created_at, disabled_at
         FROM oauth_resource_entitlement_bindings ORDER BY created_at ASC, id ASC`),
-      this.db.query(`SELECT id, scope, description, status, created_at, updated_at
+      tx.query(`SELECT id, scope, description, status, created_at, updated_at
         FROM oauth_scopes ORDER BY created_at ASC, id ASC`),
-      this.db.query(`SELECT id, oauth_resource_id, oauth_scope_id, legacy_permission_key, status, created_at, updated_at
+      tx.query(`SELECT id, oauth_resource_id, oauth_scope_id, legacy_permission_key, status, created_at, updated_at
         FROM oauth_resource_scopes ORDER BY created_at ASC, id ASC`),
-      this.db.query(`SELECT id, oauth_client_id, oauth_resource_id, oauth_scope_id, status, created_at
+      tx.query(`SELECT id, oauth_client_id, oauth_resource_id, oauth_scope_id, status, created_at
         FROM oauth_client_resource_scopes ORDER BY created_at ASC, id ASC`),
-      this.db.query(`SELECT id, key_namespace, kid, algorithm, public_jwk, public_key_fingerprint_sha256,
+      tx.query(`SELECT id, key_namespace, kid, algorithm, public_jwk, public_key_fingerprint_sha256,
           protected_private_key_ref, status, published_at, activates_at, last_signed_at, retire_after, retired_at, created_at
         FROM oauth_signing_keys ORDER BY created_at ASC, id ASC`),
-      this.db.query(`SELECT id, oauth_client_id, oauth_resource_id, redirect_uri, requested_scopes, code_challenge,
+      tx.query(`SELECT id, oauth_client_id, oauth_resource_id, redirect_uri, requested_scopes, code_challenge,
           code_challenge_method, protected_downstream_state, upstream_state_hash, upstream_nonce_hash, correlation_id,
           status, expires_at, claimed_at, completed_at, created_at
         FROM oauth_authorization_transactions ORDER BY created_at ASC, id ASC`),
-      this.db.query(`SELECT id, oauth_authorization_transaction_id, user_id, oauth_client_id, oauth_resource_id,
+      tx.query(`SELECT id, oauth_authorization_transaction_id, user_id, oauth_client_id, oauth_resource_id,
           granted_scopes, legacy_authorization_grant_id, correlation_id, status, created_at, updated_at
         FROM oauth_authorizations ORDER BY created_at ASC, id ASC`),
-      this.db.query(`SELECT id, code_hash, oauth_authorization_transaction_id, oauth_authorization_id, oauth_client_id,
+      tx.query(`SELECT id, code_hash, oauth_authorization_transaction_id, oauth_authorization_id, oauth_client_id,
           oauth_resource_id, user_id, redirect_uri, granted_scopes, code_challenge, code_challenge_method, correlation_id,
           issued_at, expires_at, consumed_at
         FROM oauth_authorization_codes ORDER BY issued_at ASC, id ASC`),
-      this.db.query(`SELECT id, oauth_authorization_id, user_id, oauth_client_id, oauth_resource_id, status,
+      tx.query(`SELECT id, oauth_authorization_id, user_id, oauth_client_id, oauth_resource_id, status,
           correlation_id, issued_at, last_activity_at, idle_expires_at, revoked_at, revocation_reason
         FROM oauth_sessions ORDER BY issued_at ASC, id ASC`),
-      this.db.query(`SELECT id, oauth_authorization_id, oauth_session_id, user_id, oauth_client_id, oauth_resource_id,
+      tx.query(`SELECT id, oauth_authorization_id, oauth_session_id, user_id, oauth_client_id, oauth_resource_id,
           scope_ceiling, current_scopes, current_generation, status, replay_detected_at, revoked_at, revocation_reason, created_at
         FROM oauth_refresh_token_families ORDER BY created_at ASC, id ASC`),
-      this.db.query(`SELECT id, oauth_refresh_token_family_id, token_hash, generation, parent_refresh_token_id, scopes,
+      tx.query(`SELECT id, oauth_refresh_token_family_id, token_hash, generation, parent_refresh_token_id, scopes,
           status, issued_at, expires_at, consumed_at, revoked_at
         FROM oauth_refresh_tokens ORDER BY oauth_refresh_token_family_id ASC, generation ASC, id ASC`),
-      this.db.query(`SELECT id, target_type, target_id, oauth_client_id, oauth_resource_id, reason_code, revoked_at, expires_at
+      tx.query(`SELECT id, target_type, target_id, oauth_client_id, oauth_resource_id, reason_code, revoked_at, expires_at
         FROM oauth_revocations ORDER BY revoked_at ASC, target_type ASC, target_id ASC, id ASC`)
     ]);
-    return {
+      return {
       users: users.rows,
       tools: tools.rows,
       tool_clients: toolClients.rows,
@@ -1227,7 +1261,8 @@ export class Repositories {
       oauth_refresh_token_families: oauthRefreshTokenFamilies.rows,
       oauth_refresh_tokens: oauthRefreshTokens.rows,
       oauth_revocations: oauthRevocations.rows
-    };
+      };
+    });
   }
 
   async importBackup(data: Record<string, unknown>, options: { replaceExisting: boolean }): Promise<Record<string, number>> {

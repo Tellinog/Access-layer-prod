@@ -43,6 +43,169 @@ function mapGrant(row: Record<string, unknown>): AuthorizationGrant {
   };
 }
 
+type BackupRow = Record<string, unknown>;
+
+const LEGACY_BACKUP_SECTIONS = [
+  "users",
+  "tools",
+  "tool_clients",
+  "tool_permissions",
+  "authorization_grants",
+  "admin_tool_assignments",
+  "access_requests"
+] as const;
+
+const OAUTH_BACKUP_SECTIONS = [
+  "oauth_clients",
+  "oauth_client_credentials",
+  "oauth_client_redirect_uris",
+  "oauth_resources",
+  "oauth_resource_credentials",
+  "oauth_resource_entitlement_bindings",
+  "oauth_scopes",
+  "oauth_resource_scopes",
+  "oauth_client_resource_scopes",
+  "oauth_signing_keys",
+  "oauth_authorization_transactions",
+  "oauth_authorizations",
+  "oauth_authorization_codes",
+  "oauth_sessions",
+  "oauth_refresh_token_families",
+  "oauth_refresh_tokens",
+  "oauth_revocations"
+] as const;
+
+type OAuthBackupSection = (typeof OAUTH_BACKUP_SECTIONS)[number];
+
+function backupRows(data: Record<string, unknown>, key: string): BackupRow[] {
+  const value = data[key];
+  if (!Array.isArray(value)) {
+    throw new Error(`Invalid backup section ${key}`);
+  }
+  return value as BackupRow[];
+}
+
+function oauthBackupRows(data: Record<string, unknown>): Record<OAuthBackupSection, BackupRow[]> | null {
+  const present = OAUTH_BACKUP_SECTIONS.filter((key) => Object.prototype.hasOwnProperty.call(data, key));
+  if (present.length === 0) {
+    return null;
+  }
+  if (present.length !== OAUTH_BACKUP_SECTIONS.length) {
+    throw new Error("Invalid backup OAuth section set");
+  }
+  return Object.fromEntries(OAUTH_BACKUP_SECTIONS.map((key) => [key, backupRows(data, key)])) as Record<
+    OAuthBackupSection,
+    BackupRow[]
+  >;
+}
+
+function requiredRowId(row: BackupRow, field: string, section: string): string {
+  const value = row[field];
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`Invalid ${section} ${field}`);
+  }
+  return value;
+}
+
+function validateCredentialLineage(rows: BackupRow[], section: string, ownerField: string): BackupRow[] {
+  const byId = new Map<string, BackupRow>();
+  for (const row of rows) {
+    const id = requiredRowId(row, "id", section);
+    if (byId.has(id)) {
+      throw new Error(`Invalid ${section} duplicate id`);
+    }
+    byId.set(id, row);
+  }
+
+  for (const row of rows) {
+    const id = requiredRowId(row, "id", section);
+    const parentId = row.rotation_parent_id;
+    if (parentId === null || parentId === undefined) {
+      continue;
+    }
+    if (typeof parentId !== "string" || parentId === id) {
+      throw new Error(`Invalid ${section} rotation lineage`);
+    }
+    const parent = byId.get(parentId);
+    if (!parent || parent[ownerField] !== row[ownerField]) {
+      throw new Error(`Invalid ${section} rotation lineage`);
+    }
+  }
+
+  return [...rows].sort((left, right) => {
+    const created = String(left.created_at ?? "").localeCompare(String(right.created_at ?? ""));
+    return created || String(left.id).localeCompare(String(right.id));
+  });
+}
+
+function validateAndSortRefreshLineage(families: BackupRow[], tokens: BackupRow[]): BackupRow[] {
+  const familyById = new Map<string, BackupRow>();
+  for (const family of families) {
+    const familyId = requiredRowId(family, "id", "oauth_refresh_token_families");
+    if (familyById.has(familyId) || !Number.isInteger(family.current_generation) || Number(family.current_generation) < 0) {
+      throw new Error("Invalid oauth_refresh_token_families lineage");
+    }
+    familyById.set(familyId, family);
+  }
+
+  const tokenById = new Map<string, BackupRow>();
+  const generationByFamily = new Map<string, Map<number, BackupRow>>();
+  for (const token of tokens) {
+    const tokenId = requiredRowId(token, "id", "oauth_refresh_tokens");
+    const familyId = requiredRowId(token, "oauth_refresh_token_family_id", "oauth_refresh_tokens");
+    const generation = token.generation;
+    if (tokenById.has(tokenId) || !familyById.has(familyId) || !Number.isInteger(generation) || Number(generation) < 0) {
+      throw new Error("Invalid oauth_refresh_tokens lineage");
+    }
+    const familyGenerations = generationByFamily.get(familyId) ?? new Map<number, BackupRow>();
+    if (familyGenerations.has(Number(generation))) {
+      throw new Error("Invalid oauth_refresh_tokens lineage");
+    }
+    familyGenerations.set(Number(generation), token);
+    generationByFamily.set(familyId, familyGenerations);
+    tokenById.set(tokenId, token);
+  }
+
+  for (const [familyId, family] of familyById) {
+    const familyGenerations = generationByFamily.get(familyId);
+    const currentGeneration = Number(family.current_generation);
+    if (!familyGenerations || !familyGenerations.has(0) || !familyGenerations.has(currentGeneration)) {
+      throw new Error("Invalid oauth_refresh_tokens lineage");
+    }
+    for (let generation = 0; generation <= currentGeneration; generation += 1) {
+      if (!familyGenerations.has(generation)) {
+        throw new Error("Invalid oauth_refresh_tokens lineage");
+      }
+    }
+  }
+
+  for (const token of tokens) {
+    const tokenId = String(token.id);
+    const familyId = String(token.oauth_refresh_token_family_id);
+    const generation = Number(token.generation);
+    const parentId = token.parent_refresh_token_id;
+    if (generation === 0) {
+      if (parentId !== null && parentId !== undefined) {
+        throw new Error("Invalid oauth_refresh_tokens lineage");
+      }
+      continue;
+    }
+    if (typeof parentId !== "string" || parentId === tokenId) {
+      throw new Error("Invalid oauth_refresh_tokens lineage");
+    }
+    const parent = tokenById.get(parentId);
+    if (!parent || parent.oauth_refresh_token_family_id !== familyId || Number(parent.generation) !== generation - 1) {
+      throw new Error("Invalid oauth_refresh_tokens lineage");
+    }
+  }
+
+  return [...tokens].sort((left, right) => {
+    const family = String(left.oauth_refresh_token_family_id).localeCompare(String(right.oauth_refresh_token_family_id));
+    const generation = Number(left.generation) - Number(right.generation);
+    return family || generation || String(left.id).localeCompare(String(right.id));
+  });
+}
+
 export class Repositories {
   constructor(public readonly db: Db) {}
 
@@ -946,7 +1109,32 @@ export class Repositories {
   }
 
   async exportBackup(): Promise<Record<string, unknown>> {
-    const [users, tools, toolClients, toolPermissions, authorizationGrants, adminToolAssignments, accessRequests] = await Promise.all([
+    const [
+      users,
+      tools,
+      toolClients,
+      toolPermissions,
+      authorizationGrants,
+      adminToolAssignments,
+      accessRequests,
+      oauthClients,
+      oauthClientCredentials,
+      oauthClientRedirectUris,
+      oauthResources,
+      oauthResourceCredentials,
+      oauthResourceEntitlementBindings,
+      oauthScopes,
+      oauthResourceScopes,
+      oauthClientResourceScopes,
+      oauthSigningKeys,
+      oauthAuthorizationTransactions,
+      oauthAuthorizations,
+      oauthAuthorizationCodes,
+      oauthSessions,
+      oauthRefreshTokenFamilies,
+      oauthRefreshTokens,
+      oauthRevocations
+    ] = await Promise.all([
       this.db.query(`SELECT id, google_sub, email::text AS email, email_normalized::text AS email_normalized,
           email_verified, hd, display_name, picture_url, status, first_seen_at, last_seen_at, created_at, updated_at
         FROM users ORDER BY created_at ASC, id ASC`),
@@ -965,7 +1153,54 @@ export class Repositories {
       this.db.query(`SELECT id, tool_id, tool_slug, user_id, google_sub, email::text AS email, email_normalized::text AS email_normalized,
           hd, display_name, status, reason_code, attempts_count, first_seen_at, last_seen_at, last_correlation_id,
           request_ip_hash, user_agent_hash, reviewed_by_user_id, reviewed_at, review_note, grant_id, created_at, updated_at
-        FROM access_requests ORDER BY created_at ASC, id ASC`)
+        FROM access_requests ORDER BY created_at ASC, id ASC`),
+      this.db.query(`SELECT id, client_id, client_name, client_type, token_endpoint_auth_method, grant_types, status,
+          owner_team, owner_contact, created_at, updated_at
+        FROM oauth_clients ORDER BY created_at ASC, id ASC`),
+      this.db.query(`SELECT id, oauth_client_id, secret_hash, status, created_at, activated_at, expires_at, retired_at,
+          rotation_parent_id
+        FROM oauth_client_credentials ORDER BY created_at ASC, id ASC`),
+      this.db.query(`SELECT id, oauth_client_id, redirect_uri, created_at
+        FROM oauth_client_redirect_uris ORDER BY created_at ASC, id ASC`),
+      this.db.query(`SELECT id, resource_id, display_name, status, owner_team, owner_contact, audience_policy,
+          protected_resource_metadata_url, created_at, updated_at
+        FROM oauth_resources ORDER BY created_at ASC, id ASC`),
+      this.db.query(`SELECT id, oauth_resource_id, credential_id, secret_hash, authentication_method, status, created_at,
+          activated_at, rotated_at, expires_at, retired_at, rotation_parent_id
+        FROM oauth_resource_credentials ORDER BY created_at ASC, id ASC`),
+      this.db.query(`SELECT id, oauth_resource_id, binding_type, legacy_tool_id, status, created_at, disabled_at
+        FROM oauth_resource_entitlement_bindings ORDER BY created_at ASC, id ASC`),
+      this.db.query(`SELECT id, scope, description, status, created_at, updated_at
+        FROM oauth_scopes ORDER BY created_at ASC, id ASC`),
+      this.db.query(`SELECT id, oauth_resource_id, oauth_scope_id, legacy_permission_key, status, created_at, updated_at
+        FROM oauth_resource_scopes ORDER BY created_at ASC, id ASC`),
+      this.db.query(`SELECT id, oauth_client_id, oauth_resource_id, oauth_scope_id, status, created_at
+        FROM oauth_client_resource_scopes ORDER BY created_at ASC, id ASC`),
+      this.db.query(`SELECT id, key_namespace, kid, algorithm, public_jwk, public_key_fingerprint_sha256,
+          protected_private_key_ref, status, published_at, activates_at, last_signed_at, retire_after, retired_at, created_at
+        FROM oauth_signing_keys ORDER BY created_at ASC, id ASC`),
+      this.db.query(`SELECT id, oauth_client_id, oauth_resource_id, redirect_uri, requested_scopes, code_challenge,
+          code_challenge_method, protected_downstream_state, upstream_state_hash, upstream_nonce_hash, correlation_id,
+          status, expires_at, claimed_at, completed_at, created_at
+        FROM oauth_authorization_transactions ORDER BY created_at ASC, id ASC`),
+      this.db.query(`SELECT id, oauth_authorization_transaction_id, user_id, oauth_client_id, oauth_resource_id,
+          granted_scopes, legacy_authorization_grant_id, correlation_id, status, created_at, updated_at
+        FROM oauth_authorizations ORDER BY created_at ASC, id ASC`),
+      this.db.query(`SELECT id, code_hash, oauth_authorization_transaction_id, oauth_authorization_id, oauth_client_id,
+          oauth_resource_id, user_id, redirect_uri, granted_scopes, code_challenge, code_challenge_method, correlation_id,
+          issued_at, expires_at, consumed_at
+        FROM oauth_authorization_codes ORDER BY issued_at ASC, id ASC`),
+      this.db.query(`SELECT id, oauth_authorization_id, user_id, oauth_client_id, oauth_resource_id, status,
+          correlation_id, issued_at, last_activity_at, idle_expires_at, revoked_at, revocation_reason
+        FROM oauth_sessions ORDER BY issued_at ASC, id ASC`),
+      this.db.query(`SELECT id, oauth_authorization_id, oauth_session_id, user_id, oauth_client_id, oauth_resource_id,
+          scope_ceiling, current_scopes, current_generation, status, replay_detected_at, revoked_at, revocation_reason, created_at
+        FROM oauth_refresh_token_families ORDER BY created_at ASC, id ASC`),
+      this.db.query(`SELECT id, oauth_refresh_token_family_id, token_hash, generation, parent_refresh_token_id, scopes,
+          status, issued_at, expires_at, consumed_at, revoked_at
+        FROM oauth_refresh_tokens ORDER BY oauth_refresh_token_family_id ASC, generation ASC, id ASC`),
+      this.db.query(`SELECT id, target_type, target_id, oauth_client_id, oauth_resource_id, reason_code, revoked_at, expires_at
+        FROM oauth_revocations ORDER BY revoked_at ASC, target_type ASC, target_id ASC, id ASC`)
     ]);
     return {
       users: users.rows,
@@ -974,31 +1209,89 @@ export class Repositories {
       tool_permissions: toolPermissions.rows,
       authorization_grants: authorizationGrants.rows,
       admin_tool_assignments: adminToolAssignments.rows,
-      access_requests: accessRequests.rows
+      access_requests: accessRequests.rows,
+      oauth_clients: oauthClients.rows,
+      oauth_client_credentials: oauthClientCredentials.rows,
+      oauth_client_redirect_uris: oauthClientRedirectUris.rows,
+      oauth_resources: oauthResources.rows,
+      oauth_resource_credentials: oauthResourceCredentials.rows,
+      oauth_resource_entitlement_bindings: oauthResourceEntitlementBindings.rows,
+      oauth_scopes: oauthScopes.rows,
+      oauth_resource_scopes: oauthResourceScopes.rows,
+      oauth_client_resource_scopes: oauthClientResourceScopes.rows,
+      oauth_signing_keys: oauthSigningKeys.rows,
+      oauth_authorization_transactions: oauthAuthorizationTransactions.rows,
+      oauth_authorizations: oauthAuthorizations.rows,
+      oauth_authorization_codes: oauthAuthorizationCodes.rows,
+      oauth_sessions: oauthSessions.rows,
+      oauth_refresh_token_families: oauthRefreshTokenFamilies.rows,
+      oauth_refresh_tokens: oauthRefreshTokens.rows,
+      oauth_revocations: oauthRevocations.rows
     };
   }
 
   async importBackup(data: Record<string, unknown>, options: { replaceExisting: boolean }): Promise<Record<string, number>> {
-    const rows = (key: string): Record<string, unknown>[] => {
-      const value = data[key];
-      if (!Array.isArray(value)) {
-        throw new Error(`Invalid backup section ${key}`);
+    const legacyRows = Object.fromEntries(LEGACY_BACKUP_SECTIONS.map((key) => [key, backupRows(data, key)])) as Record<
+      (typeof LEGACY_BACKUP_SECTIONS)[number],
+      BackupRow[]
+    >;
+    const oauthRows = oauthBackupRows(data);
+    const clientCredentials = oauthRows
+      ? validateCredentialLineage(oauthRows.oauth_client_credentials, "oauth_client_credentials", "oauth_client_id")
+      : [];
+    const resourceCredentials = oauthRows
+      ? validateCredentialLineage(oauthRows.oauth_resource_credentials, "oauth_resource_credentials", "oauth_resource_id")
+      : [];
+    const refreshTokens = oauthRows
+      ? validateAndSortRefreshLineage(oauthRows.oauth_refresh_token_families, oauthRows.oauth_refresh_tokens)
+      : [];
+    const counts: Record<string, number> = Object.fromEntries(
+      LEGACY_BACKUP_SECTIONS.map((key) => [key, legacyRows[key].length])
+    );
+    if (oauthRows) {
+      for (const key of OAUTH_BACKUP_SECTIONS) {
+        counts[key] = oauthRows[key].length;
       }
-      return value as Record<string, unknown>[];
-    };
-    const counts = {
-      users: rows("users").length,
-      tools: rows("tools").length,
-      tool_clients: rows("tool_clients").length,
-      tool_permissions: rows("tool_permissions").length,
-      authorization_grants: rows("authorization_grants").length,
-      admin_tool_assignments: rows("admin_tool_assignments").length,
-      access_requests: rows("access_requests").length
-    };
+    }
 
     await this.db.transaction(async (tx) => {
       const query = (sql: string, params: unknown[] = []) => tx.query(sql, params);
+      const upsert = async (
+        table: string,
+        sectionRows: BackupRow[],
+        columns: ReadonlyArray<{ name: string; cast?: "jsonb" }>
+      ): Promise<void> => {
+        const names = columns.map((column) => column.name);
+        const placeholders = columns.map((column, index) => `$${index + 1}${column.cast ? `::${column.cast}` : ""}`);
+        const updates = names.slice(1).map((name) => `${name} = EXCLUDED.${name}`);
+        const sql = `INSERT INTO ${table} (${names.join(", ")}) VALUES (${placeholders.join(", ")}) ON CONFLICT (id) DO UPDATE SET ${updates.join(", ")}`;
+        for (const row of sectionRows) {
+          const params = columns.map((column) => {
+            const value = row[column.name];
+            return column.cast === "jsonb" && value !== null && value !== undefined ? JSON.stringify(value) : value ?? null;
+          });
+          await query(sql, params);
+        }
+      };
+
       if (options.replaceExisting) {
+        await query("DELETE FROM oauth_revocations");
+        await query("DELETE FROM oauth_refresh_tokens");
+        await query("DELETE FROM oauth_refresh_token_families");
+        await query("DELETE FROM oauth_sessions");
+        await query("DELETE FROM oauth_authorization_codes");
+        await query("DELETE FROM oauth_authorizations");
+        await query("DELETE FROM oauth_authorization_transactions");
+        await query("DELETE FROM oauth_client_resource_scopes");
+        await query("DELETE FROM oauth_resource_scopes");
+        await query("DELETE FROM oauth_resource_entitlement_bindings");
+        await query("DELETE FROM oauth_resource_credentials");
+        await query("DELETE FROM oauth_client_redirect_uris");
+        await query("DELETE FROM oauth_client_credentials");
+        await query("DELETE FROM oauth_signing_keys");
+        await query("DELETE FROM oauth_scopes");
+        await query("DELETE FROM oauth_resources");
+        await query("DELETE FROM oauth_clients");
         await query("DELETE FROM audit_logs");
         await query("DELETE FROM refresh_tokens");
         await query("DELETE FROM one_time_codes");
@@ -1013,141 +1306,132 @@ export class Repositories {
         await query("DELETE FROM users");
       }
 
-      for (const row of rows("users")) {
-        await query(
-          `INSERT INTO users (id, google_sub, email, email_normalized, email_verified, hd, display_name, picture_url, status,
-             first_seen_at, last_seen_at, created_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-           ON CONFLICT (id) DO UPDATE SET
-             google_sub = EXCLUDED.google_sub,
-             email = EXCLUDED.email,
-             email_normalized = EXCLUDED.email_normalized,
-             email_verified = EXCLUDED.email_verified,
-             hd = EXCLUDED.hd,
-             display_name = EXCLUDED.display_name,
-             picture_url = EXCLUDED.picture_url,
-             status = EXCLUDED.status,
-             first_seen_at = EXCLUDED.first_seen_at,
-             last_seen_at = EXCLUDED.last_seen_at,
-             created_at = EXCLUDED.created_at,
-             updated_at = EXCLUDED.updated_at`,
-          [row.id, row.google_sub, row.email, row.email_normalized, row.email_verified, row.hd, row.display_name ?? null, row.picture_url ?? null, row.status, row.first_seen_at, row.last_seen_at, row.created_at, row.updated_at]
-        );
+      await upsert("users", legacyRows.users, [
+        { name: "id" }, { name: "google_sub" }, { name: "email" }, { name: "email_normalized" },
+        { name: "email_verified" }, { name: "hd" }, { name: "display_name" }, { name: "picture_url" },
+        { name: "status" }, { name: "first_seen_at" }, { name: "last_seen_at" }, { name: "created_at" }, { name: "updated_at" }
+      ]);
+      await upsert("tools", legacyRows.tools, [
+        { name: "id" }, { name: "slug" }, { name: "display_name" }, { name: "description" }, { name: "status" },
+        { name: "allowed_return_urls", cast: "jsonb" }, { name: "owner_email" }, { name: "created_at" }, { name: "updated_at" }
+      ]);
+      await upsert("tool_clients", legacyRows.tool_clients, [
+        { name: "id" }, { name: "tool_id" }, { name: "client_id" }, { name: "client_secret_hash" },
+        { name: "status" }, { name: "created_at" }, { name: "last_used_at" }
+      ]);
+      await upsert("tool_permissions", legacyRows.tool_permissions, [
+        { name: "id" }, { name: "tool_id" }, { name: "permission_key" }, { name: "description" }, { name: "created_at" }
+      ]);
+      await upsert("authorization_grants", legacyRows.authorization_grants, [
+        { name: "id" }, { name: "tool_id" }, { name: "user_id" }, { name: "email_normalized" }, { name: "role" },
+        { name: "permissions", cast: "jsonb" }, { name: "status" }, { name: "valid_from" }, { name: "valid_until" },
+        { name: "created_by_user_id" }, { name: "revoked_by_user_id" }, { name: "revoked_at" },
+        { name: "created_at" }, { name: "updated_at" }
+      ]);
+      await upsert("admin_tool_assignments", legacyRows.admin_tool_assignments, [
+        { name: "id" }, { name: "user_id" }, { name: "tool_id" }, { name: "created_by_user_id" }, { name: "created_at" }
+      ]);
+      await upsert("access_requests", legacyRows.access_requests, [
+        { name: "id" }, { name: "tool_id" }, { name: "tool_slug" }, { name: "user_id" }, { name: "google_sub" },
+        { name: "email" }, { name: "email_normalized" }, { name: "hd" }, { name: "display_name" }, { name: "status" },
+        { name: "reason_code" }, { name: "attempts_count" }, { name: "first_seen_at" }, { name: "last_seen_at" },
+        { name: "last_correlation_id" }, { name: "request_ip_hash" }, { name: "user_agent_hash" },
+        { name: "reviewed_by_user_id" }, { name: "reviewed_at" }, { name: "review_note" }, { name: "grant_id" },
+        { name: "created_at" }, { name: "updated_at" }
+      ]);
+
+      if (!oauthRows) {
+        return;
       }
 
-      for (const row of rows("tools")) {
-        await query(
-          `INSERT INTO tools (id, slug, display_name, description, status, allowed_return_urls, owner_email, created_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9)
-           ON CONFLICT (id) DO UPDATE SET
-             slug = EXCLUDED.slug,
-             display_name = EXCLUDED.display_name,
-             description = EXCLUDED.description,
-             status = EXCLUDED.status,
-             allowed_return_urls = EXCLUDED.allowed_return_urls,
-             owner_email = EXCLUDED.owner_email,
-             created_at = EXCLUDED.created_at,
-             updated_at = EXCLUDED.updated_at`,
-          [row.id, row.slug, row.display_name, row.description ?? null, row.status, JSON.stringify(row.allowed_return_urls ?? []), row.owner_email ?? null, row.created_at, row.updated_at]
-        );
+      await upsert("oauth_clients", oauthRows.oauth_clients, [
+        { name: "id" }, { name: "client_id" }, { name: "client_name" }, { name: "client_type" },
+        { name: "token_endpoint_auth_method" }, { name: "grant_types" }, { name: "status" }, { name: "owner_team" },
+        { name: "owner_contact" }, { name: "created_at" }, { name: "updated_at" }
+      ]);
+      await upsert("oauth_resources", oauthRows.oauth_resources, [
+        { name: "id" }, { name: "resource_id" }, { name: "display_name" }, { name: "status" }, { name: "owner_team" },
+        { name: "owner_contact" }, { name: "audience_policy" }, { name: "protected_resource_metadata_url" },
+        { name: "created_at" }, { name: "updated_at" }
+      ]);
+      await upsert("oauth_scopes", oauthRows.oauth_scopes, [
+        { name: "id" }, { name: "scope" }, { name: "description" }, { name: "status" }, { name: "created_at" }, { name: "updated_at" }
+      ]);
+      await upsert("oauth_signing_keys", oauthRows.oauth_signing_keys, [
+        { name: "id" }, { name: "key_namespace" }, { name: "kid" }, { name: "algorithm" },
+        { name: "public_jwk", cast: "jsonb" }, { name: "public_key_fingerprint_sha256" },
+        { name: "protected_private_key_ref" }, { name: "status" }, { name: "published_at" }, { name: "activates_at" },
+        { name: "last_signed_at" }, { name: "retire_after" }, { name: "retired_at" }, { name: "created_at" }
+      ]);
+      await upsert("oauth_client_credentials", clientCredentials, [
+        { name: "id" }, { name: "oauth_client_id" }, { name: "secret_hash" }, { name: "status" },
+        { name: "created_at" }, { name: "activated_at" }, { name: "expires_at" }, { name: "retired_at" }
+      ]);
+      for (const row of clientCredentials) {
+        await query("UPDATE oauth_client_credentials SET rotation_parent_id = $2 WHERE id = $1", [row.id, row.rotation_parent_id ?? null]);
       }
-
-      for (const row of rows("tool_clients")) {
-        await query(
-          `INSERT INTO tool_clients (id, tool_id, client_id, client_secret_hash, status, created_at, last_used_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7)
-           ON CONFLICT (id) DO UPDATE SET
-             tool_id = EXCLUDED.tool_id,
-             client_id = EXCLUDED.client_id,
-             client_secret_hash = EXCLUDED.client_secret_hash,
-             status = EXCLUDED.status,
-             created_at = EXCLUDED.created_at,
-             last_used_at = EXCLUDED.last_used_at`,
-          [row.id, row.tool_id, row.client_id, row.client_secret_hash, row.status, row.created_at, row.last_used_at ?? null]
-        );
+      await upsert("oauth_resource_credentials", resourceCredentials, [
+        { name: "id" }, { name: "oauth_resource_id" }, { name: "credential_id" }, { name: "secret_hash" },
+        { name: "authentication_method" }, { name: "status" }, { name: "created_at" }, { name: "activated_at" },
+        { name: "rotated_at" }, { name: "expires_at" }, { name: "retired_at" }
+      ]);
+      for (const row of resourceCredentials) {
+        await query("UPDATE oauth_resource_credentials SET rotation_parent_id = $2 WHERE id = $1", [row.id, row.rotation_parent_id ?? null]);
       }
-
-      for (const row of rows("tool_permissions")) {
-        await query(
-          `INSERT INTO tool_permissions (id, tool_id, permission_key, description, created_at)
-           VALUES ($1,$2,$3,$4,$5)
-           ON CONFLICT (id) DO UPDATE SET
-             tool_id = EXCLUDED.tool_id,
-             permission_key = EXCLUDED.permission_key,
-             description = EXCLUDED.description,
-             created_at = EXCLUDED.created_at`,
-          [row.id, row.tool_id, row.permission_key, row.description ?? null, row.created_at]
-        );
-      }
-
-      for (const row of rows("authorization_grants")) {
-        await query(
-          `INSERT INTO authorization_grants (id, tool_id, user_id, email_normalized, role, permissions, status, valid_from, valid_until,
-             created_by_user_id, revoked_by_user_id, revoked_at, created_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$11,$12,$13,$14)
-           ON CONFLICT (id) DO UPDATE SET
-             tool_id = EXCLUDED.tool_id,
-             user_id = EXCLUDED.user_id,
-             email_normalized = EXCLUDED.email_normalized,
-             role = EXCLUDED.role,
-             permissions = EXCLUDED.permissions,
-             status = EXCLUDED.status,
-             valid_from = EXCLUDED.valid_from,
-             valid_until = EXCLUDED.valid_until,
-             created_by_user_id = EXCLUDED.created_by_user_id,
-             revoked_by_user_id = EXCLUDED.revoked_by_user_id,
-             revoked_at = EXCLUDED.revoked_at,
-             created_at = EXCLUDED.created_at,
-             updated_at = EXCLUDED.updated_at`,
-          [row.id, row.tool_id, row.user_id ?? null, row.email_normalized ?? null, row.role, JSON.stringify(row.permissions ?? []), row.status, row.valid_from, row.valid_until ?? null, row.created_by_user_id ?? null, row.revoked_by_user_id ?? null, row.revoked_at ?? null, row.created_at, row.updated_at]
-        );
-      }
-
-      for (const row of rows("admin_tool_assignments")) {
-        await query(
-          `INSERT INTO admin_tool_assignments (id, user_id, tool_id, created_by_user_id, created_at)
-           VALUES ($1,$2,$3,$4,$5)
-           ON CONFLICT (id) DO UPDATE SET
-             user_id = EXCLUDED.user_id,
-             tool_id = EXCLUDED.tool_id,
-             created_by_user_id = EXCLUDED.created_by_user_id,
-             created_at = EXCLUDED.created_at`,
-          [row.id, row.user_id, row.tool_id, row.created_by_user_id ?? null, row.created_at]
-        );
-      }
-
-      for (const row of rows("access_requests")) {
-        await query(
-          `INSERT INTO access_requests (id, tool_id, tool_slug, user_id, google_sub, email, email_normalized, hd, display_name, status,
-             reason_code, attempts_count, first_seen_at, last_seen_at, last_correlation_id, request_ip_hash, user_agent_hash,
-             reviewed_by_user_id, reviewed_at, review_note, grant_id, created_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
-           ON CONFLICT (id) DO UPDATE SET
-             tool_id = EXCLUDED.tool_id,
-             tool_slug = EXCLUDED.tool_slug,
-             user_id = EXCLUDED.user_id,
-             google_sub = EXCLUDED.google_sub,
-             email = EXCLUDED.email,
-             email_normalized = EXCLUDED.email_normalized,
-             hd = EXCLUDED.hd,
-             display_name = EXCLUDED.display_name,
-             status = EXCLUDED.status,
-             reason_code = EXCLUDED.reason_code,
-             attempts_count = EXCLUDED.attempts_count,
-             first_seen_at = EXCLUDED.first_seen_at,
-             last_seen_at = EXCLUDED.last_seen_at,
-             last_correlation_id = EXCLUDED.last_correlation_id,
-             request_ip_hash = EXCLUDED.request_ip_hash,
-             user_agent_hash = EXCLUDED.user_agent_hash,
-             reviewed_by_user_id = EXCLUDED.reviewed_by_user_id,
-             reviewed_at = EXCLUDED.reviewed_at,
-             review_note = EXCLUDED.review_note,
-             grant_id = EXCLUDED.grant_id,
-             created_at = EXCLUDED.created_at,
-             updated_at = EXCLUDED.updated_at`,
-          [row.id, row.tool_id, row.tool_slug, row.user_id ?? null, row.google_sub ?? null, row.email, row.email_normalized, row.hd, row.display_name ?? null, row.status, row.reason_code, row.attempts_count, row.first_seen_at, row.last_seen_at, row.last_correlation_id, row.request_ip_hash ?? null, row.user_agent_hash ?? null, row.reviewed_by_user_id ?? null, row.reviewed_at ?? null, row.review_note ?? null, row.grant_id ?? null, row.created_at, row.updated_at]
-        );
-      }
+      await upsert("oauth_client_redirect_uris", oauthRows.oauth_client_redirect_uris, [
+        { name: "id" }, { name: "oauth_client_id" }, { name: "redirect_uri" }, { name: "created_at" }
+      ]);
+      await upsert("oauth_resource_entitlement_bindings", oauthRows.oauth_resource_entitlement_bindings, [
+        { name: "id" }, { name: "oauth_resource_id" }, { name: "binding_type" }, { name: "legacy_tool_id" },
+        { name: "status" }, { name: "created_at" }, { name: "disabled_at" }
+      ]);
+      await upsert("oauth_resource_scopes", oauthRows.oauth_resource_scopes, [
+        { name: "id" }, { name: "oauth_resource_id" }, { name: "oauth_scope_id" }, { name: "legacy_permission_key" },
+        { name: "status" }, { name: "created_at" }, { name: "updated_at" }
+      ]);
+      await upsert("oauth_client_resource_scopes", oauthRows.oauth_client_resource_scopes, [
+        { name: "id" }, { name: "oauth_client_id" }, { name: "oauth_resource_id" }, { name: "oauth_scope_id" },
+        { name: "status" }, { name: "created_at" }
+      ]);
+      await upsert("oauth_authorization_transactions", oauthRows.oauth_authorization_transactions, [
+        { name: "id" }, { name: "oauth_client_id" }, { name: "oauth_resource_id" }, { name: "redirect_uri" },
+        { name: "requested_scopes" }, { name: "code_challenge" }, { name: "code_challenge_method" },
+        { name: "protected_downstream_state", cast: "jsonb" }, { name: "upstream_state_hash" },
+        { name: "upstream_nonce_hash" }, { name: "correlation_id" }, { name: "status" }, { name: "expires_at" },
+        { name: "claimed_at" }, { name: "completed_at" }, { name: "created_at" }
+      ]);
+      await upsert("oauth_authorizations", oauthRows.oauth_authorizations, [
+        { name: "id" }, { name: "oauth_authorization_transaction_id" }, { name: "user_id" }, { name: "oauth_client_id" },
+        { name: "oauth_resource_id" }, { name: "granted_scopes" }, { name: "legacy_authorization_grant_id" },
+        { name: "correlation_id" }, { name: "status" }, { name: "created_at" }, { name: "updated_at" }
+      ]);
+      await upsert("oauth_authorization_codes", oauthRows.oauth_authorization_codes, [
+        { name: "id" }, { name: "code_hash" }, { name: "oauth_authorization_transaction_id" },
+        { name: "oauth_authorization_id" }, { name: "oauth_client_id" }, { name: "oauth_resource_id" }, { name: "user_id" },
+        { name: "redirect_uri" }, { name: "granted_scopes" }, { name: "code_challenge" },
+        { name: "code_challenge_method" }, { name: "correlation_id" }, { name: "issued_at" },
+        { name: "expires_at" }, { name: "consumed_at" }
+      ]);
+      await upsert("oauth_sessions", oauthRows.oauth_sessions, [
+        { name: "id" }, { name: "oauth_authorization_id" }, { name: "user_id" }, { name: "oauth_client_id" },
+        { name: "oauth_resource_id" }, { name: "status" }, { name: "correlation_id" }, { name: "issued_at" },
+        { name: "last_activity_at" }, { name: "idle_expires_at" }, { name: "revoked_at" }, { name: "revocation_reason" }
+      ]);
+      await upsert("oauth_refresh_token_families", oauthRows.oauth_refresh_token_families, [
+        { name: "id" }, { name: "oauth_authorization_id" }, { name: "oauth_session_id" }, { name: "user_id" },
+        { name: "oauth_client_id" }, { name: "oauth_resource_id" }, { name: "scope_ceiling" }, { name: "current_scopes" },
+        { name: "current_generation" }, { name: "status" }, { name: "replay_detected_at" }, { name: "revoked_at" },
+        { name: "revocation_reason" }, { name: "created_at" }
+      ]);
+      await upsert("oauth_refresh_tokens", refreshTokens, [
+        { name: "id" }, { name: "oauth_refresh_token_family_id" }, { name: "token_hash" }, { name: "generation" },
+        { name: "parent_refresh_token_id" }, { name: "scopes" }, { name: "status" }, { name: "issued_at" },
+        { name: "expires_at" }, { name: "consumed_at" }, { name: "revoked_at" }
+      ]);
+      await upsert("oauth_revocations", oauthRows.oauth_revocations, [
+        { name: "id" }, { name: "target_type" }, { name: "target_id" }, { name: "oauth_client_id" },
+        { name: "oauth_resource_id" }, { name: "reason_code" }, { name: "revoked_at" }, { name: "expires_at" }
+      ]);
     });
 
     return counts;

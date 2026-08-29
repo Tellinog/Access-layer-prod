@@ -1,6 +1,6 @@
 # Legacy Compatibility
 
-> Current status: the legacy runtime surface remains frozen in `../specs/legacy-contract-baseline.v1.json`. Step 3E adds the complete default-off OAuth P0 HTTP adapter outside `src/app.ts`; absent/false retains the exact legacy route inventory. No production/pilot action exists. Dual-run material below remains a future constraint, not a passed N→N+1 result.
+> Current status: the legacy runtime surface remains frozen in `../specs/legacy-contract-baseline.v1.json`. Step 3E adds the complete default-off OAuth P0 HTTP adapter outside `src/app.ts`; absent/false retains the exact legacy route inventory. Step 4A extends only the encrypted version-1 backup data sections while retaining legacy-only import compatibility. No production/pilot action exists. Dual-run material below remains a future constraint, not a passed N→N+1 result.
 
 ## Objective
 
@@ -88,6 +88,14 @@ Required scenario:
 5. verify no user, grant, legacy session or refresh token is lost.
 
 Database migrations must therefore be backward-compatible during the rollback window.
+
+## Step 4A backup compatibility
+
+The seven legacy version-1 backup sections remain mandatory and unchanged. Existing legacy-only backups still import and return only their original seven count keys. With merge semantics they leave OAuth rows untouched; with replace semantics they intentionally remove OAuth dependants before the existing legacy deletion sequence, then restore the older snapshot with zero OAuth rows.
+
+A current full backup adds exactly all 17 `oauth_*` sections permitted by the existing additive data object. Partial OAuth section sets fail before writes. Full import remains one transaction and restores legacy parents before OAuth records, including two-pass credential rotation links and deterministic refresh family/generation lineage. `src/app.ts`, `/v1/*`, the encrypted envelope/version, the historical OpenAPI and migrations 001–005 are unchanged.
+
+This is repository-level import/export evidence, not the real PostgreSQL restore or N→N+1 evidence required by Step 4B and later gates.
 
 ## Feature flags
 

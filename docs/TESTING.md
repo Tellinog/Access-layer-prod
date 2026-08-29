@@ -1,5 +1,15 @@
 # TESTING.md
 
+## Step 4A OAuth backup repository conformance
+
+`tests/backup-repositories.test.ts` verifies that export returns the unchanged seven legacy sections plus exactly all 17 current OAuth sections. Every query names persisted columns, uses deterministic ordering and excludes raw OAuth client/resource secrets, authorization codes, access/refresh tokens, private-key contents and environment secrets while retaining only stored hashes, protected ciphertext, public signing metadata/fingerprint and the protected key reference.
+
+Import tests require all seven legacy arrays and enforce zero-or-all-17 OAuth arrays before opening a transaction. They prove that legacy-only merge emits no OAuth SQL, legacy-only replace deletes all OAuth dependants before the existing legacy sequence, full import orders legacy/OAuth parents safely, credential rotation self-links use a second pass independent of input order, refresh rows are validated/sorted by family and generation, inconsistent lineage fails before writes and a synthetic database failure rolls back the complete transaction.
+
+`tests/legacy-contract-baseline.test.ts` additionally pins the normalized Git blob for `src/app.ts` to the approved Step 3E blob `6eaf4d2c3564eb851abbd23371be5a2e2d6a1f12`, while the existing baseline continues to pin legacy sources, routes, errors, migrations, OpenAPI and Compose. Step 4A adds no live PostgreSQL test; the real encrypted backup/replace restore is Step 4B.
+
+Final Step 4A result: TypeScript lint/build passed; Vitest passed 308 tests across 18 files; Python passed 61 tests with two expected skips (63 collected); the OAuth validator passed all 24 groups; continuity remained `VALID_BUT_NOT_READY` with both gates false; and non-strict platform validation passed 27 checks with seven known warnings. Migration 005 and the approved `src/app.ts` blob witnesses passed, no migration 006 exists, and `git diff --check` passed. No real PostgreSQL restore is claimed.
+
 ## Step 3E strict OAuth HTTP conformance
 
 `tests/oauth-http.test.ts` covers the encapsulated 16 KiB form boundary, single decoding, malformed percent/UTF-8 input, duplicate names, unknown fields, empty required values, unsupported media and oversized bodies. OAuth Basic tests require canonical Base64, exactly one raw separator and form-decoded credential components, including encoded colon/space characters; malformed Basic, Bearer, missing separators and Basic/body client mismatch fail as sanitized `invalid_client`.

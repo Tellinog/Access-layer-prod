@@ -22,6 +22,11 @@ function sha256Lf(path: string): string {
   return createHash("sha256").update(source, "utf8").digest("hex");
 }
 
+function gitBlobSha1(path: string): string {
+  const source = Buffer.from(text(path), "utf8");
+  return createHash("sha1").update(`blob ${source.length}\0`).update(source).digest("hex");
+}
+
 describe("legacy compatibility baseline", () => {
   it("pins the current runtime, Compose, OpenAPI and migration source", () => {
     for (const [path, expected] of Object.entries(baseline.source_sha256_lf)) {
@@ -30,6 +35,10 @@ describe("legacy compatibility baseline", () => {
     for (const migration of baseline.database.migrations) {
       expect(sha256Lf(migration.path), migration.path).toBe(migration.sha256_lf);
     }
+  });
+
+  it("keeps src/app.ts byte-identical to the approved Step 3E blob", () => {
+    expect(gitBlobSha1("src/app.ts")).toBe("6eaf4d2c3564eb851abbd23371be5a2e2d6a1f12");
   });
 
   it("allows only the additive default-false OAuth configuration outside the frozen legacy config witness", () => {

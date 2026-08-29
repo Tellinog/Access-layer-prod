@@ -1,5 +1,31 @@
 # DEVLOG.md
 
+## 2026-08-29 - Step 4A OAuth backup/export/import coverage
+
+Changed by: Codex
+Related task: Close the repository-level OAuth backup/restore gap without enabling OAuth, changing protocol semantics or executing a real restore.
+
+### Changed
+
+- Extended `Repositories.exportBackup()` with explicit, deterministically ordered persisted columns for exactly all 17 current `oauth_*` tables, alongside the unchanged seven mandatory legacy sections.
+- Extended version-1 import compatibility so zero OAuth sections remains a valid legacy-only snapshot while any OAuth presence requires the complete 17-array set before transaction entry. Legacy-only merge emits no OAuth writes; replace removes OAuth dependants before the existing legacy delete sequence.
+- Restored full snapshots in one transaction with legacy parents first, OAuth parents/dependants second, two-pass client/resource credential rotation links and validated family/generation refresh-token lineage. Inconsistent lineage fails before writes and database failures roll back the complete import.
+- Added seven deterministic backup repository tests plus an approved Step 3E `src/app.ts` Git-blob witness. Updated backup, security, legacy compatibility, database, scope, testing, current-state, decision and backlog documentation.
+
+### Security and compatibility boundary
+
+- Backup data contains only persisted credential/code/refresh hashes, protected downstream-state ciphertext, public JWK/fingerprint and protected private-key references. Raw OAuth client/resource secrets, codes, access/refresh tokens, private-key contents and environment secrets are never selected.
+- OAuth credential pepper, transaction-protection key, signing-key root/private files and runtime secrets remain external continuity material. The legacy secret-material endpoint is unchanged.
+- `BACKUP_VERSION=1`, the encrypted envelope/endpoints, `src/app.ts`, `schemas/openapi.yaml`, migrations 001–005, package/dependency files, Docker/Compose, OAuth protocol modules, SDKs/consumers and production configuration are unchanged. No migration 006 exists and no production system was contacted.
+
+### Tests/checks
+
+- TypeScript lint and build passed. Full Vitest passed 308 tests across 18 files, including seven new backup tests and the existing frozen legacy/OAuth suites.
+- Python unittest discovery passed 61 tests with two expected pristine-template skips (63 collected). The ignored `.platform-deps` dependency cache was temporarily moved beneath the already excluded `.venv` only for scanning and restored immediately; no dependency file was changed.
+- The OAuth validator passed all 24 check groups. Continuity remained schema-valid `VALID_BUT_NOT_READY` with both gates false (expected exit 2). Non-strict platform validation passed 27 checks with seven known warnings.
+- Migration 005 remains SHA-256 `aaffcb469000f62e680b5d391360fdacc4414e4280ba230e90e7fd4eee4dafbe`; migrations remain exactly 001–005; `src/app.ts` matches approved blob `6eaf4d2c3564eb851abbd23371be5a2e2d6a1f12`; OpenAPI/package witnesses and `git diff --check` passed.
+- No real PostgreSQL export/restore, OAuth E2E, concurrent refresh race, previous-binary/schema smoke, N→N+1 or production operation is claimed. Those remain Step 4B/later gates.
+
 ## 2026-08-28 - Step 3E inherited rate-limit and non-disclosure hardening
 
 Changed by: Codex

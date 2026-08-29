@@ -158,6 +158,10 @@ Secrets:
 
 Encrypted backup exports use `BACKUP_ENCRYPTION_KEY`. Admin-only restore secret material export may return `TOOL_CLIENT_SECRET_PEPPER` and `BACKUP_ENCRYPTION_KEY`, but cannot return existing per-tool client secrets because those are stored only as hashes.
 
+Step 4A extends that same encrypted version-1 database backup to every current `oauth_*` table. Exported OAuth credential, authorization-code and refresh-token values are only their persisted non-reversible hashes; downstream state is only its persisted authenticated-encrypted envelope; signing records contain only public JWK/fingerprint metadata and the protected private-key reference. Raw OAuth client/resource secrets, codes, access/refresh tokens, private signing-key contents and environment secrets are never backup members.
+
+The OAuth credential pepper, transaction-protection key, signing-key root and referenced private signing-key files remain external continuity material. They are not added to the legacy secret-material endpoint. A database restore without the matching external material cannot authenticate restored OAuth credentials, decrypt a still-pending protected transaction or sign with the referenced OAuth key. Step 4A does not prove a real restore; that requires the isolated Step 4B exercise.
+
 ## Logging and privacy
 
 Allowed audit identity fields:

@@ -109,7 +109,7 @@ Exact mapping coverage, proof that every mapped permission is registered for the
 
 `OAUTH_ADDITIVE_DATA_MODEL.md` continues to define the later transaction entities as a frozen proposal. Step 3A implements only the ten foundation tables above and does not rename, reuse or reinterpret any legacy table.
 
-Before any non-empty production OAuth registration or pilot, backup/export/import/replace-restore must preserve all `oauth_*` state and prove dependency-safe ordering around `oauth_resource_entitlement_bindings` and legacy `tools`. Current legacy backup surfaces do not meet that requirement. Step 3A hardening records this as a blocker and does not modify backup behavior.
+Step 4A later closes the repository-level backup gap for all 17 current `oauth_*` tables and makes replace deletion dependency-safe around `oauth_resource_entitlement_bindings` and legacy `tools`. A real encrypted export/replace restore on disposable PostgreSQL 16 remains required in Step 4B before any non-empty production OAuth registration or pilot.
 
 ## Step 3C OAuth authorization issuance
 
@@ -145,6 +145,14 @@ Code exchange first authenticates with SHARE locks, then UPDATE-locks only the m
 For `oauth_revocations.target_type = 'access_token_jti'`, `expires_at` is the online revocation-retention deadline (`JWT exp + 60-second verifier skew`), not a rewrite of the JWT expiry. Repeated inserts retain the greatest deadline. `oauth_signing_keys.last_signed_at` updates also use a guarded SQL maximum, preventing clock rollback from shortening the signing-key retirement grace.
 
 Live application of 001→005 remains required on disposable PostgreSQL 16 when available. Deterministic shape and repository/service race tests are not a claim that PostgreSQL accepted the migration.
+
+## Step 4A OAuth backup/import ordering
+
+The existing version-1 encrypted backup now carries explicit, deterministically ordered persisted columns for all ten Step 3A, three Step 3C and four Step 3D OAuth tables. The seven legacy arrays remain mandatory; the OAuth arrays are optional only as a complete 17-section set. Partial sets fail before a transaction begins.
+
+Replace deletes OAuth dependants before the existing legacy deletion sequence, including removing the entitlement bridge before `tools`. Full import restores legacy parents, then OAuth clients/resources/scopes/signing metadata, credentials/redirects/entitlement mappings, authorization state, sessions/families/tokens and revocations in one transaction. Credential rotation parents are linked after every credential row exists. Refresh-token parents are validated and inserted by family/generation order; missing, cross-family or non-contiguous lineage fails closed.
+
+This repository behavior preserves hash/protected/reference forms only and introduces no migration. External OAuth peppers, transaction protection, signing-key files/root and runtime secrets remain outside the database backup. Step 4B must still execute the real isolated PostgreSQL restore.
 # Step 2 continuity note
 
 Live Coolify evidence proves that logical volume `access_layer_postgres_data_v2` backs `/var/lib/postgresql/data` and resolves to the recorded UUID-prefixed physical volume. The source top-level declaration now matches the unchanged service mount. Do not add an explicit physical name, rename the logical/live volume, migrate data or deploy. Backup/restore evidence and the other release gates remain open. The machine database baseline is `../specs/legacy-contract-baseline.v1.json`.

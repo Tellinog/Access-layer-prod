@@ -14,9 +14,33 @@ The JSON export includes:
 - `admin_tool_assignments`
 - `access_requests`
 
+Step 4A adds all 17 current OAuth tables to the same version-1 payload:
+
+- `oauth_clients`
+- `oauth_client_credentials`
+- `oauth_client_redirect_uris`
+- `oauth_resources`
+- `oauth_resource_credentials`
+- `oauth_resource_entitlement_bindings`
+- `oauth_scopes`
+- `oauth_resource_scopes`
+- `oauth_client_resource_scopes`
+- `oauth_signing_keys`
+- `oauth_authorization_transactions`
+- `oauth_authorizations`
+- `oauth_authorization_codes`
+- `oauth_sessions`
+- `oauth_refresh_token_families`
+- `oauth_refresh_tokens`
+- `oauth_revocations`
+
+OAuth credential, authorization-code and refresh-token material is included only in its already stored non-reversible hash form. Pending/claimed downstream state remains only as its authenticated-encrypted database envelope. Signing records include the public JWK, public fingerprint and protected private-key reference, never the private key contents.
+
 The encrypted backup plaintext includes `client_id` and `client_secret_hash` in the `tool_clients` section. Access Layer intentionally does not store tool client secrets in plaintext, so existing plaintext `tls_...` values cannot be recovered from the database or the backup.
 
 Existing tool client secrets continue to work after restore only if the restored environment uses the same `TOOL_CLIENT_SECRET_PEPPER` that was used when the secrets were created. If that pepper is lost or changed, restore still imports the tool clients and client IDs, but clients must be rotated and downstream tools must receive new secrets.
+
+OAuth client and resource credentials likewise remain usable only with the same external `OAUTH_CREDENTIAL_SECRET_PEPPER`. A restored pending/claimed OAuth transaction can be decrypted only with the same external `OAUTH_TRANSACTION_PROTECTION_KEY`. The referenced OAuth private signing-key files and their `OAUTH_SIGNING_KEY_ROOT` storage remain external continuity material.
 
 The API and Admin UI export an encrypted envelope with:
 
@@ -29,16 +53,18 @@ Production requires `BACKUP_ENCRYPTION_KEY`. Keep that key outside the backup.
 
 ## What the backup does not include
 
-The export does not include ephemeral or high-churn runtime data:
+The export does not include these legacy ephemeral or high-churn tables:
 
-- active sessions
-- refresh tokens
-- one-time auth codes
-- OAuth auth requests
+- legacy `sessions`
+- legacy `refresh_tokens`
+- legacy `one_time_codes`
+- legacy `auth_requests`
 - audit logs
 - raw Google OAuth secrets
-- JWT private/public key material
+- legacy JWT private/public key material
 - `.env` files or Coolify secrets
+
+The OAuth tables listed above are included even when they contain active OAuth sessions or hash-only token lifecycle rows. No export query recovers or synthesizes a raw OAuth client/resource secret, authorization code, access token, refresh token or private signing key.
 
 Keep these runtime secrets in your password manager / Coolify secrets backup:
 
@@ -52,6 +78,10 @@ Keep these runtime secrets in your password manager / Coolify secrets backup:
 - `GOOGLE_REDIRECT_URI`
 - `POSTGRES_PASSWORD`
 - `BACKUP_API_TOKEN` if enabled
+- `OAUTH_CREDENTIAL_SECRET_PEPPER`
+- `OAUTH_TRANSACTION_PROTECTION_KEY`
+- `OAUTH_SIGNING_KEY_ROOT` and every referenced OAuth private signing-key file
+- other runtime secrets required by the restored environment
 
 ## Admin UI download
 
@@ -121,6 +151,20 @@ For most disaster-recovery scenarios:
 4. Import the encrypted JSON backup with `replace_existing=true`.
 5. Restart the application.
 6. Rotate any tool client secrets if the pepper was not preserved.
+
+## Version-1 import compatibility
+
+The encrypted envelope, endpoint and plaintext backup identity remain `access-layer-backup` version `1`. The seven legacy data sections remain mandatory. The 17 OAuth sections are optional only as one complete set:
+
+- zero OAuth sections is a valid legacy-only backup;
+- one or more but fewer than all 17 OAuth sections is rejected before database writes;
+- a legacy-only merge (`replace_existing=false`) does not touch existing OAuth rows;
+- every replace (`replace_existing=true`) deletes OAuth dependants before legacy parents, so restoring a legacy-only snapshot intentionally leaves zero OAuth rows and cannot be blocked by the entitlement binding's `tools` foreign key;
+- a full backup restores legacy parents first, then OAuth parents and dependants in one transaction. Credential rotation parents use a second linking pass, and refresh tokens are validated and inserted by family/generation order.
+
+Import count responses keep the original seven keys for a legacy-only backup. A full OAuth backup adds the 17 OAuth count keys.
+
+Step 4A provides deterministic repository/test evidence only. A real encrypted export and replace restore against disposable PostgreSQL 16 is Step 4B and has not been claimed here.
 
 ## Security notes
 

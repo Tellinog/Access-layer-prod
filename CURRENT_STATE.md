@@ -2,7 +2,18 @@
 
 ## Phase
 
-V1 legacy implementation complete. Step 3E mounts the complete frozen OAuth P0 protocol over the audited Step 3A–3D foundation through a strict, local, default-off HTTP boundary. No OAuth pilot, production registration, key/secret provisioning or production enablement exists.
+V1 legacy implementation complete. Step 4A extends the existing encrypted version-1 backup repository contract to every current OAuth table while preserving legacy-only backups and the frozen runtime boundary. OAuth remains default-off; no pilot, production registration, key/secret provisioning, real restore or production enablement exists.
+
+## Step 4A OAuth backup/export/import coverage, 2026-08-28
+
+- `Repositories.exportBackup()` now exports explicit, deterministically ordered persisted columns for exactly all 17 current `oauth_*` tables in addition to the unchanged seven mandatory legacy sections.
+- The export contains only stored credential/code/refresh hashes, protected downstream-state ciphertext, public signing metadata/fingerprint and the protected private-key reference. It never recovers raw client/resource secrets, codes, access/refresh tokens, private signing-key contents or environment secrets.
+- Version-1 legacy-only backups remain valid. OAuth sections are optional only as a complete 17-array set; partial sets fail before a transaction begins. Legacy-only merge leaves OAuth rows untouched, while any replace deletes OAuth dependants first so the `tools` RESTRICT binding cannot block the existing legacy replacement sequence.
+- Full import uses one transaction, restores legacy parents before OAuth parents/dependants, resolves credential rotation self-links in a second pass and validates/sorts refresh-token lineage by family and generation. Invalid lineage fails closed and write failures roll back the complete import.
+- `BACKUP_VERSION=1`, the encrypted envelope/endpoints, legacy secret-material endpoint, `schemas/openapi.yaml`, `src/app.ts`, migrations 001–005, dependencies, Docker/Compose, OAuth protocol behavior, SDKs/consumers and deployment configuration remain unchanged. No migration 006 exists.
+- OAuth credential pepper, transaction-protection key, signing root/private key files and all runtime secrets remain external continuity material and are not added to the database backup or legacy secret-material endpoint.
+- Deterministic repository tests cover export shape/secret safety, all-or-none validation, legacy merge/replace, FK ordering, two-pass credential links, refresh lineage and rollback. A real encrypted export/replace restore against disposable PostgreSQL 16 remains Step 4B and is not claimed.
+- Final repository validation passed: TypeScript lint/build; 308 Vitest tests across 18 files; 61 Python tests with two expected skips; all 24 OAuth validator groups; continuity as expected `VALID_BUT_NOT_READY` with both gates false; non-strict platform validation with 27 passes/seven known warnings; migration/blob/OpenAPI/package boundary checks and `git diff --check`. Migration 005 remains `aaffcb469000f62e680b5d391360fdacc4414e4280ba230e90e7fd4eee4dafbe`; `src/app.ts` remains approved Git blob `6eaf4d2c3564eb851abbd23371be5a2e2d6a1f12`.
 
 ## Step 3E strict default-off OAuth HTTP boundary, 2026-08-28
 

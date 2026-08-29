@@ -479,3 +479,17 @@ Rate keys contain validated OAuth client/resource credential IDs plus HMAC outpu
 True-mode configuration requires the transaction protection key, OAuth credential pepper and OAuth signing-key root before startup; false/default mode requires none. Persisted signing-key unavailability remains runtime 503 and never permits legacy fallback.
 
 Rationale: HTTP parsing/authentication is a separate attack boundary from the already-audited transactional core. Encapsulation prevents form handling or error behavior from leaking into frozen legacy routes, while mounting discovery only with all advertised endpoints keeps metadata truthful.
+
+## D-044 - Extend version-1 backups with an all-or-none OAuth state set
+
+Status: accepted
+
+Confirmed: 2026-08-28
+
+Decision: retain the existing encrypted envelope, `access-layer-backup` version `1`, endpoints and seven mandatory legacy sections. A current export adds exactly the 17 tables created by migrations 003–005 using explicit persisted columns and deterministic order. An import containing no OAuth section is a compatible legacy-only snapshot; an import containing any current OAuth section must contain all 17 as arrays before writes begin.
+
+Legacy-only merge does not touch OAuth rows. Every replace deletes OAuth dependants before the existing legacy replacement sequence, so an older snapshot intentionally restores zero OAuth state without violating the `oauth_resource_entitlement_bindings` restriction on `tools`. Full import is one transaction: legacy parents precede OAuth parents/dependants, credential rotation links use a second pass independent of input order, and refresh-token rows are validated and inserted in deterministic family/generation lineage order.
+
+Only persisted protected forms are portable: credential/code/refresh hashes, protected downstream-state ciphertext, public JWK/fingerprint and protected private-key reference. Raw OAuth secrets, codes, access/refresh tokens, private key contents and environment secrets are forbidden. `OAUTH_CREDENTIAL_SECRET_PEPPER`, `OAUTH_TRANSACTION_PROTECTION_KEY`, `OAUTH_SIGNING_KEY_ROOT`, referenced private key files and other runtime secrets remain external continuity material; the legacy secret-material endpoint is not expanded.
+
+Rationale: keeping the additive data inside version 1 preserves existing backup consumers while making current OAuth state portable and replacement FK-safe. External cryptographic material cannot be reconstructed from database state, and repository tests are not a substitute for the separately authorised real PostgreSQL restore in Step 4B.

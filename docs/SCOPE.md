@@ -70,6 +70,12 @@ Step 3E mounts only `POST /oauth/token`, `POST /oauth/revoke`, `POST /oauth/intr
 
 When the flag is absent/false, all OAuth routes remain absent/404 and startup retains legacy-only secret requirements. Migration 006, schema/data mutation, registration/admin APIs, pilots/seeds, production/Coolify changes, real credentials/keys, consumers/SDKs, backup implementation and every P1/OIDC feature remain out of scope.
 
+## Step 4A encrypted backup coverage boundary
+
+Step 4A extends only `Repositories.exportBackup()` and `importBackup()` so the existing encrypted version-1 backup can carry all 17 current OAuth tables. It preserves legacy-only snapshots, enforces all-or-none OAuth sections, uses FK-safe replace/insert ordering, resolves credential self-links and validates deterministic refresh lineage in one import transaction.
+
+Still out of scope are a real PostgreSQL restore, OAuth E2E/concurrency/old-binary execution, pilot registration, enablement, real secrets/keys, Google Cloud, production/Coolify, SDK/consumer, protocol, migration, dependency, OpenAPI and legacy runtime changes. Those executable release checks remain Step 4B or later.
+
 ## Personas
 
 | Persona | Goal | Main needs | Notes |

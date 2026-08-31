@@ -506,21 +506,54 @@ async function exerciseConcurrentRefreshReplay(input: {
     now: new Date()
   });
   const databaseErrorOffset = input.observedDb.state.errors.length;
-  const responses = await withTimeout(Promise.all([
+  const responsePromise = Promise.all([
     refresh(input.app, initial.refresh_token),
     refresh(input.app, initial.refresh_token)
-  ]), `real refresh concurrency iteration ${input.iteration}`, 20_000);
+  ]);
+  let timedOut = false;
+  let responses: Awaited<ReturnType<typeof refresh>>[] = [];
+  try {
+    responses = await withTimeout(responsePromise, `real refresh concurrency iteration ${input.iteration}`, 20_000);
+  } catch (error) {
+    timedOut = error instanceof Error && error.message.startsWith("TIMEOUT:");
+    if (!timedOut) throw error;
+    try {
+      responses = await withTimeout(responsePromise, `real refresh concurrency diagnostic drain ${input.iteration}`, 5_000);
+    } catch {
+      responses = [];
+    }
+  }
+  const databaseErrors = input.observedDb.state.errors.slice(databaseErrorOffset);
+  let lineage: Record<string, unknown>;
+  try {
+    lineage = await withTimeout(refreshLineageDiagnostic(input.db, initialClaims.sid),
+      `real refresh concurrency lineage diagnostic ${input.iteration}`, 5_000);
+  } catch {
+    lineage = { row_count: -1, diagnostic_query_completed: false };
+  }
   const diagnostic = {
     iteration: input.iteration,
     responses: responses.map(responseDiagnostic),
-    database_errors: input.observedDb.state.errors.slice(databaseErrorOffset),
-    lineage: await refreshLineageDiagnostic(input.db, initialClaims.sid)
+    database_errors: databaseErrors,
+    classification: {
+      timeout: timedOut,
+      deadlock: databaseErrors.some((error) => error.sqlstate === "40P01"),
+      rate_limited: responses.some((response) => response.statusCode === 429),
+      constraint_failure: databaseErrors.some((error) => error.sqlstate === "23514"),
+      other_database_error: databaseErrors.some((error) => !["40P01", "23514"].includes(error.sqlstate)),
+      other_http_5xx: responses.some((response) => response.statusCode >= 500)
+    },
+    lineage
   };
+  assert(timedOut === false,
+    `concurrency must complete before timeout; diagnostic=${stable(diagnostic)}`);
   assert(responses.filter((response) => response.statusCode === 200).length === 1,
     `concurrency must have exactly one rotation success; diagnostic=${stable(diagnostic)}`);
   assert(responses.filter((response) => response.statusCode === 400 && response.json().error === "invalid_grant").length === 1,
     `concurrency must have exactly one invalid_grant replay outcome; diagnostic=${stable(diagnostic)}`);
-  assert(diagnostic.database_errors.length === 0,
+  assert(diagnostic.classification.rate_limited === false && diagnostic.classification.other_http_5xx === false,
+    `concurrency must have no rate-limit or HTTP 5xx outcome; diagnostic=${stable(diagnostic)}`);
+  assert(databaseErrors.length === 0,
     `concurrency must not cause a database error; diagnostic=${stable(diagnostic)}`);
   const winner = responses.find((response) => response.statusCode === 200);
   assert(winner, `concurrency winner response must exist; diagnostic=${stable(diagnostic)}`);
@@ -533,7 +566,6 @@ async function exerciseConcurrentRefreshReplay(input: {
   });
   assert(winnerClaims.sid === initialClaims.sid,
     `concurrency winner must preserve the OAuth session; diagnostic=${stable(diagnostic)}`);
-  const lineage = diagnostic.lineage as Record<string, unknown>;
   assert(lineage.row_count === 1,
     `concurrency lineage must resolve to one family; diagnostic=${stable(diagnostic)}`);
   assert(lineage.family_status === "revoked" && lineage.session_status === "revoked" && lineage.replay_detected === true,

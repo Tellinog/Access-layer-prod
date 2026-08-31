@@ -222,26 +222,45 @@ class SnapshotGateDb implements Db {
   }
 }
 
-class ObservedDb implements Db {
-  readonly state: { lastError: string };
+type SanitizedDatabaseError = {
+  sqlstate: string;
+  constraint: string | null;
+  query_tag: string;
+};
 
-  constructor(private readonly delegate: Db, state = { lastError: "none" }) {
+function sanitizedQueryTag(sql: string): string {
+  if (sql.includes("FOR UPDATE OF code")) return "lock_authorization_code";
+  if (sql.includes("FOR UPDATE OF token, family, session")) return "lock_refresh_token";
+  if (sql.includes("UPDATE oauth_refresh_token_families") && sql.includes("replay_detected_at")) return "revoke_refresh_family";
+  if (sql.includes("UPDATE oauth_sessions") && sql.includes("refresh_family_id")) return "revoke_oauth_session";
+  if (sql.includes("UPDATE oauth_refresh_tokens") && sql.includes("status = 'revoked'")) return "revoke_current_refresh_token";
+  if (sql.includes("INSERT INTO oauth_revocations")) return "persist_durable_revocation";
+  if (sql.includes("INSERT INTO audit_events")) return "persist_audit_event";
+  if (sql.includes("UPDATE oauth_refresh_tokens") && sql.includes("status = 'consumed'")) return "consume_refresh_token";
+  if (sql.includes("INSERT INTO oauth_refresh_tokens")) return "persist_refresh_token";
+  if (sql.includes("INSERT INTO oauth_sessions")) return "persist_oauth_session";
+  if (sql.includes("oauth_signing_keys")) return "oauth_signing_key";
+  return "other_database_operation";
+}
+
+class ObservedDb implements Db {
+  readonly state: { errors: SanitizedDatabaseError[] };
+
+  constructor(private readonly delegate: Db, state = { errors: [] as SanitizedDatabaseError[] }) {
     this.state = state;
   }
   async query<R extends import("pg").QueryResultRow = import("pg").QueryResultRow>(sql: string, params: unknown[] = []) {
     try {
       return await this.delegate.query<R>(sql, params);
     } catch (error) {
-      const pgError = error as { code?: unknown; constraint?: unknown; table?: unknown; routine?: unknown; position?: unknown };
-      const queryTag = sql.includes("FOR UPDATE OF code") ? "lock_authorization_code"
-        : sql.includes("INSERT INTO oauth_sessions") ? "persist_oauth_session"
-        : sql.includes("oauth_refresh_token_families") ? "refresh_family"
-        : sql.includes("oauth_signing_keys") ? "oauth_signing_key"
-        : sql.trim().split(/\s+/).slice(0, 3).join("_").toLowerCase();
-      this.state.lastError = [queryTag, pgError.code, typeof pgError.position === "string" ? `position-${pgError.position}` : undefined,
-        pgError.table, pgError.constraint, pgError.routine]
-        .filter((value) => typeof value === "string")
-        .join(":") || "non-postgres-error";
+      const pgError = error as { code?: unknown; constraint?: unknown };
+      const sqlstate = typeof pgError.code === "string" && /^[0-9A-Z]{5}$/.test(pgError.code)
+        ? pgError.code
+        : "NON_PG_ERROR";
+      const constraint = typeof pgError.constraint === "string" && /^[a-z0-9_]{1,128}$/.test(pgError.constraint)
+        ? pgError.constraint
+        : null;
+      this.state.errors.push({ sqlstate, constraint, query_tag: sanitizedQueryTag(sql) });
       throw error;
     }
   }
@@ -249,6 +268,53 @@ class ObservedDb implements Db {
     return this.delegate.transaction((tx) => fn(new ObservedDb(tx, this.state)));
   }
   close() { return Promise.resolve(); }
+}
+
+function responseDiagnostic(response: { statusCode: number; json(): unknown }) {
+  const body = response.json() as { error?: unknown };
+  const oauthCode = typeof body.error === "string" && /^[a-z_]{1,64}$/.test(body.error)
+    ? body.error
+    : null;
+  return { http_status: response.statusCode, oauth_code: oauthCode };
+}
+
+async function refreshLineageDiagnostic(db: PostgresDb, sessionId: string) {
+  const result = await db.query<Record<string, unknown>>(`SELECT
+      family.status AS family_status,
+      family.current_generation,
+      family.replay_detected_at IS NOT NULL AS replay_detected,
+      session.status AS session_status,
+      array_agg(token.status ORDER BY token.generation) AS token_statuses,
+      array_agg(token.generation ORDER BY token.generation) AS generations,
+      bool_and(
+        (token.generation = 0 AND token.parent_refresh_token_id IS NULL)
+        OR (token.generation > 0 AND EXISTS (
+          SELECT 1
+          FROM oauth_refresh_tokens parent
+          WHERE parent.id = token.parent_refresh_token_id
+            AND parent.oauth_refresh_token_family_id = token.oauth_refresh_token_family_id
+            AND parent.generation = token.generation - 1
+        ))
+      ) AS parent_coherent,
+      bool_or(token.revoked_at IS NOT NULL AND token.revoked_at < token.issued_at) AS revoked_before_issued
+    FROM oauth_refresh_token_families family
+    JOIN oauth_sessions session ON session.id = family.oauth_session_id
+    JOIN oauth_refresh_tokens token ON token.oauth_refresh_token_family_id = family.id
+    WHERE family.oauth_session_id = $1
+    GROUP BY family.id, session.id`, [sessionId]);
+  if (result.rows.length !== 1) return { row_count: result.rows.length };
+  const row = result.rows[0];
+  return {
+    row_count: 1,
+    family_status: row.family_status,
+    current_generation: row.current_generation,
+    replay_detected: row.replay_detected,
+    session_status: row.session_status,
+    token_statuses: row.token_statuses,
+    generations: row.generations,
+    parent_coherent: row.parent_coherent,
+    revoked_before_issued: row.revoked_before_issued
+  };
 }
 
 function config(databaseUrl: string, signingRoot: string): Config {
@@ -560,7 +626,7 @@ async function main() {
     const source = await buildRealApp(observedSourceDb, sourceConfig);
     apps.push(source.app);
 
-    const first = await loginAndExchange(source.app, source.google, "step4b-normal-state", () => observedSourceDb.state.lastError);
+    const first = await loginAndExchange(source.app, source.google, "step4b-normal-state", () => stable(observedSourceDb.state.errors));
     assert(first.token_type === "Bearer" && first.expires_in === 900 && first.scope === SCOPE, "token response must be exact");
     const keys = await new OAuthTokenRepository(sourceDb).listVerificationKeys();
     const claims = await verifyOAuthAccessToken({ token: first.access_token, issuer: sourceConfig.authIssuer, audience: RESOURCE_ID, keys, now: new Date() });
@@ -583,32 +649,32 @@ async function main() {
     assert((await refresh(source.app, normalRefresh.json().refresh_token)).statusCode === 400, "revoked refresh token must be invalid_grant");
 
     const concurrent = await loginAndExchange(source.app, source.google, "step4b-concurrency-state");
+    const concurrentInitialClaims = await verifyOAuthAccessToken({
+      token: concurrent.access_token, issuer: sourceConfig.authIssuer, audience: RESOURCE_ID, keys, now: new Date()
+    });
+    const databaseErrorOffset = observedSourceDb.state.errors.length;
     const concurrentResponses = await withTimeout(Promise.all([
       refresh(source.app, concurrent.refresh_token),
       refresh(source.app, concurrent.refresh_token)
     ]), "real refresh concurrency", 20_000);
-    assert(concurrentResponses.filter((response) => response.statusCode === 200).length === 1, "concurrency must have exactly one rotation success");
-    assert(concurrentResponses.filter((response) => response.statusCode === 400 && response.json().error === "invalid_grant").length === 1, "concurrency must have exactly one invalid_grant replay outcome");
+    const concurrencyDiagnostic = {
+      responses: concurrentResponses.map(responseDiagnostic),
+      database_errors: observedSourceDb.state.errors.slice(databaseErrorOffset),
+      lineage: await refreshLineageDiagnostic(sourceDb, concurrentInitialClaims.sid)
+    };
+    assert(concurrentResponses.filter((response) => response.statusCode === 200).length === 1,
+      `concurrency must have exactly one rotation success; diagnostic=${stable(concurrencyDiagnostic)}`);
+    assert(concurrentResponses.filter((response) => response.statusCode === 400 && response.json().error === "invalid_grant").length === 1,
+      `concurrency must have exactly one invalid_grant replay outcome; diagnostic=${stable(concurrencyDiagnostic)}`);
     const concurrencyClaims = await verifyOAuthAccessToken({
       token: concurrentResponses.find((response) => response.statusCode === 200)!.json().access_token,
       issuer: sourceConfig.authIssuer, audience: RESOURCE_ID, keys, now: new Date()
     });
-    const lineage = await sourceDb.query<Record<string, unknown>>(`SELECT family.status AS family_status, family.current_generation,
-        family.replay_detected_at, session.status AS session_status,
-        array_agg(token.status ORDER BY token.generation) AS token_statuses,
-        array_agg(token.generation ORDER BY token.generation) AS generations,
-        array_agg(token.parent_refresh_token_id::text ORDER BY token.generation) AS parents,
-        array_agg(token.id::text ORDER BY token.generation) AS ids
-      FROM oauth_refresh_token_families family
-      JOIN oauth_sessions session ON session.id = family.oauth_session_id
-      JOIN oauth_refresh_tokens token ON token.oauth_refresh_token_family_id = family.id
-      WHERE family.oauth_session_id = $1
-      GROUP BY family.id, session.id`, [concurrencyClaims.sid]);
-    assert(lineage.rows.length === 1, "concurrency lineage must resolve to one family");
-    const line = lineage.rows[0];
-    assert(line.family_status === "revoked" && line.session_status === "revoked" && line.replay_detected_at !== null, "replay must revoke family and session");
+    const line = concurrencyDiagnostic.lineage as Record<string, unknown>;
+    assert(line.row_count === 1, "concurrency lineage must resolve to one family");
+    assert(line.family_status === "revoked" && line.session_status === "revoked" && line.replay_detected === true, "replay must revoke family and session");
     assert(stable(line.generations) === stable([0, 1]) && stable(line.token_statuses) === stable(["consumed", "revoked"]), "concurrency lineage must be generation 0 consumed then generation 1 revoked");
-    assert((line.parents as unknown[])[0] === null && (line.parents as unknown[])[1] === (line.ids as unknown[])[0], "refresh parent lineage must be coherent");
+    assert(line.parent_coherent === true && line.revoked_before_issued === false, "refresh parent and revocation-time lineage must be coherent");
     assert((await introspect(source.app, concurrentResponses.find((response) => response.statusCode === 200)!.json().access_token)).json().active === false, "replay winner access token must be inactive online");
 
     const retained = await loginAndExchange(source.app, source.google, "step4b-backup-state");

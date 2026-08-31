@@ -1,5 +1,30 @@
 # DEVLOG.md
 
+## 2026-08-31 - Step 4B intermittent refresh race hardened and locally qualified
+
+Changed by: Codex
+Related task: Diagnose the independent audit flakiness, preserve atomic PostgreSQL replay semantics and rerun complete local qualification without production access.
+
+### Diagnosis and implementation
+
+- Added a secret-safe qualification observer that records only response status/OAuth code and sanitized SQLSTATE/constraint/query-tag. It explicitly classifies timeout, deadlock, rate-limit, constraint, other database and HTTP 5xx outcomes, then attempts sanitized family/session/generation/parent/revocation-order evidence before a failing assertion.
+- Before changing runtime behavior, exact diagnostic commit `59cc07957dee6f1f9d576ef1823cd9e59b28bee0` reproduced one 200 plus one 503 `temporarily_unavailable`; PostgreSQL returned SQLSTATE `23514` for `oauth_refresh_tokens_revoked_order` at query-tag `revoke_current_refresh_token`. The rollback left family/session active, gen0 consumed and gen1 current, confirming that a request timestamp acquired before lock wait was older than the winner's gen1 `issued_at`.
+- `OAuthTokenLifecycleService.refresh()` now obtains a fresh replay observation only after the consumed row is returned under the existing PostgreSQL locks. `OAuthTokenRepository` computes revocation time as `GREATEST(replay observation, MAX(family issued_at))` and uses that single value for family/session/current-token and durable revocations. Existing transaction scope commits those writes and the sanitized replay audit before the post-transaction `invalid_grant`; database failures are still not reclassified.
+- Replaced `Promise.all` export reads with 24 sequential awaits on the same transaction client. Isolation remains `REPEATABLE READ, READ ONLY`, columns/order/backup shape are unchanged and the coordinated anti-torn-snapshot test remains active.
+- Added a deterministic out-of-order clock/lock regression, sequential-client export assertion and an eight-iteration real PostgreSQL concurrency stress section with exact response, state, lineage and online-introspection checks.
+
+### Qualification and boundaries
+
+- Exact clean commit `d8998e1fbc1789d71a19cef78714c74c3dbfed37` passed three complete consecutive qualifications on PostgreSQL 16.15. Every run created distinct source/restore containers, applied exactly migrations 001–005, completed eight replay races, OAuth E2E, snapshot/export, encrypted replace restore, post-restore access/refresh continuity and legacy `/health`, JWKS and `/v1/auth/start` smoke.
+- All 24 races returned exactly one HTTP 200 and one HTTP 400 `invalid_grant`; family/session/replay marker, gen0 consumed, gen1 revoked, immediate parent and inactive winner access-token assertions passed. No timeout, deadlock, 429, 5xx, database error or `pg` deprecation warning occurred.
+- Cleanup was checked before each subsequent run and after the third: zero Step 4B containers remained. OAuth is still default-off. No production, Coolify, real Google, external database, pilot, consumer, key/secret provisioning, deploy, Step 5 or completion-branch action occurred.
+- The independent audit's five-run result on `2ff5d226b186afd75a79aa4010d7e656f82213e7` remains preserved as four FAIL and one PASS. The prior SQLSTATE `42601` and local concurrency failures also remain below. A new independent positive audit is still required.
+
+### Validation
+
+- TypeScript lint/build passed; full Vitest passed 317 tests across 18 files. Python discovery passed 61 tests with two expected skips (63 collected); OAuth validation passed all 24 groups; continuity remained expected `VALID_BUT_NOT_READY` with both gates false and exit 2; non-strict platform validation passed 27 checks with seven known warnings.
+- Frozen migration hashes, absence of migration 006, approved `src/app.ts` blob, legacy baseline, scoped diff and `git diff --check` passed.
+
 ## 2026-08-31 - Step 4B SQL fix passed; real refresh-concurrency qualification still blocked
 
 Changed by: Codex

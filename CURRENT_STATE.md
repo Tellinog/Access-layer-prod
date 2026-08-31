@@ -2,7 +2,17 @@
 
 ## Phase
 
-V1 legacy implementation complete. Step 4B qualification remains **FAIL — BLOCKED_IMPLEMENTATION**. Exact clean hardened commit `ac3a4c54f4f865d0193f254b9a525f5b06e6b28d` closed the PostgreSQL reserved-alias failure and passed real OAuth exchange plus the non-concurrent lifecycle checks, but the real same-refresh race did not produce the required loser `invalid_grant`. OAuth remains default-off; no pilot, production registration, key/secret provisioning, real restore or production enablement exists.
+V1 legacy implementation complete. Step 4B hardened candidate `d8998e1fbc1789d71a19cef78714c74c3dbfed37` has three complete consecutive local PostgreSQL 16.15 qualification PASS results, but Step 4B is not approved until a new independent audit passes. OAuth remains default-off; no pilot, production registration, production key/secret provisioning, production restore or production enablement exists.
+
+## Step 4B refresh-race hardening locally qualified, independent audit pending, 2026-08-31
+
+- Sanitized pre-fix evidence on exact diagnostic commit `59cc07957dee6f1f9d576ef1823cd9e59b28bee0` reproduced the intermittent loser as HTTP 503 `temporarily_unavailable`, SQLSTATE `23514`, constraint `oauth_refresh_tokens_revoked_order`, query-tag `revoke_current_refresh_token`; the winner committed generation 1 while replay revocation rolled back.
+- `refresh()` now re-observes time after the refresh row/family/session lock exposes a consumed token. Repository revocation additionally uses the maximum of that observation and every family token `issued_at`, so family, session, current token, durable revocations and replay audit commit atomically with a monotonic timestamp before the service returns `invalid_grant`. Database failures remain 503 rather than being masked.
+- The export keeps all 24 deterministic reads in one `REPEATABLE READ, READ ONLY` transaction but executes them sequentially on its single client, removing the `pg` concurrent-query deprecation warning without weakening the coordinated anti-torn-snapshot proof.
+- The harness records only HTTP status/OAuth code plus sanitized SQLSTATE/constraint/query-tag, explicitly classifies timeout/deadlock/rate-limit/constraint/other failures and attempts the sanitized family/session/lineage read before failing. No tokens, hashes, credentials, keys, arbitrary bodies or private paths are evidence.
+- Exact clean commit `d8998e1fbc1789d71a19cef78714c74c3dbfed37` passed three full qualifications from empty databases. Each used two distinct loopback-only PostgreSQL 16.15 containers, applied exactly migrations 001–005, ran eight same-refresh races, and completed OAuth E2E, claims/TTL/JWKS/introspection, revocation, coordinated snapshot, encrypted replace restore, post-restore access/refresh continuity and legacy health/JWKS/auth-start smoke. Cleanup left zero Step 4B containers after every run; no `pg` deprecation warning appeared.
+- Across the final three runs, all 24 races produced exactly one HTTP 200 plus one HTTP 400 `invalid_grant`, zero timeout/deadlock/rate-limit/5xx/database errors, revoked family/session with replay marker, gen0 consumed, gen1 revoked, coherent parent lineage and inactive winning access token online.
+- The independent audit history on `2ff5d226b186afd75a79aa4010d7e656f82213e7` remains four FAIL and one PASS; the earlier local SQL and concurrency failures remain recorded below and in the qualification report. No `step-4b-completed`, Step 5, deploy or rollout action is authorised.
 
 ## Step 4B hardened rerun stopped on refresh-concurrency outcome, 2026-08-31
 

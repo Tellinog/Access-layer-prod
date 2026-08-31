@@ -1,5 +1,29 @@
 # DEVLOG.md
 
+## 2026-08-31 - Step 4B SQL fix passed; real refresh-concurrency qualification still blocked
+
+Changed by: Codex
+Related task: Apply the minimum approved PostgreSQL alias hardening and rerun the complete Step 4B qualification without production access.
+
+### Runtime and qualification hardening
+
+- Renamed the unquoted reserved `authorization` SQL alias to `oauth_authorization` in `lockAuthorizationCodeByHash()`, `lockRefreshByHash()` and `isAccessTokenActiveOnline()`, including every projection, join predicate, filter and `FOR SHARE OF` reference.
+- Updated the existing lock-shape assertions and added a static regression that forbids the old alias form.
+- Extended `legacyBaselineSmoke()` with the frozen legacy JWKS endpoint and public RSA/RS256/signing/non-empty-kid/private-member assertions. The rerun stopped earlier, so those new legacy assertions are implemented but not yet executed as Step 4B evidence.
+- Hardened the runner/harness boundary to require a clean worktree, record the exact 40-character runtime commit, require Step 4A ancestry and reject attribution to the old failed baseline. The attempted commit was `ac3a4c54f4f865d0193f254b9a525f5b06e6b28d`.
+
+### Qualification result
+
+- Two distinct real loopback-only PostgreSQL 16 targets applied migrations 001–005. The reserved-alias blocker is closed in real PostgreSQL: authorization/callback, code exchange, access-token claims and TTL, dedicated OAuth JWKS, resource introspection, normal refresh and revocation passed.
+- The same-refresh concurrency test completed both requests and produced exactly one success, but the loser did not match HTTP 400 `invalid_grant`. The harness stopped immediately; family/session replay-state, snapshot/export/restore, post-restore continuity and legacy-baseline smoke were not run or claimed.
+- Both Step 4B containers were removed. No production, Coolify, Google, consumer, pilot, deployment or Step 5 action occurred.
+
+### Local checks before the rerun
+
+- TypeScript lint and build passed. Full Vitest passed 316 tests across 18 files, including the new alias regression.
+- PowerShell parsing, migration hashes, no-migration-006, approved `src/app.ts` blob and `git diff --check` passed before the exact hardened commit was created.
+- Final checks after recording the failed rerun also passed: lint/build; 316 Vitest tests across 18 files; 61 Python tests with two expected pristine-template skips; all 24 OAuth validator groups; expected continuity `VALID_BUT_NOT_READY` with both gates false; and non-strict platform validation with 27 passes/seven known warnings. The ignored `.platform-deps` cache was temporarily moved beneath excluded `.venv` for the Python/platform scan and restored in `finally`.
+
 ## 2026-08-30 - Step 4B real-PG qualification stopped on frozen runtime SQL failure
 
 Changed by: Codex

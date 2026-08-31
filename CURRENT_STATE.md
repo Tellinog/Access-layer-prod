@@ -2,7 +2,16 @@
 
 ## Phase
 
-V1 legacy implementation complete. Step 4B qualification is **FAIL — BLOCKED_IMPLEMENTATION**: real PostgreSQL 16.15 applied migrations 001–005 on two disposable targets, but the real OAuth authorization-code exchange exposed a PostgreSQL syntax error in the frozen token repository before downstream concurrency/restore assertions could run. OAuth remains default-off; no pilot, production registration, key/secret provisioning, real restore or production enablement exists.
+V1 legacy implementation complete. Step 4B qualification remains **FAIL — BLOCKED_IMPLEMENTATION**. Exact clean hardened commit `ac3a4c54f4f865d0193f254b9a525f5b06e6b28d` closed the PostgreSQL reserved-alias failure and passed real OAuth exchange plus the non-concurrent lifecycle checks, but the real same-refresh race did not produce the required loser `invalid_grant`. OAuth remains default-off; no pilot, production registration, key/secret provisioning, real restore or production enablement exists.
+
+## Step 4B hardened rerun stopped on refresh-concurrency outcome, 2026-08-31
+
+- All three token-repository queries now use `oauth_authorization` consistently in projections, joins, predicates and SHARE lock lists. A static regression rejects the forbidden unquoted `authorization` alias.
+- The qualification runner requires a completely clean worktree, records the exact 40-character commit and passes it to the harness for equality and Step 4A ancestry checks. The attempted runtime was exactly `ac3a4c54f4f865d0193f254b9a525f5b06e6b28d`.
+- Two distinct loopback-only PostgreSQL 16 containers again applied exactly migrations 001–005. Real authorize/callback, authorization-code exchange, access-token claims/TTL/dedicated JWKS, resource introspection, normal refresh and refresh revocation passed.
+- For two simultaneous requests using one refresh credential, exactly one response succeeded. The other response was not the required HTTP 400 `invalid_grant`; both requests completed before the timeout, but replay family/session state was not inspected because the harness stopped on that assertion.
+- Snapshot coordination, encrypted export, replacement restore, post-restore access/refresh continuity and legacy-baseline runtime/JWKS smoke were not run. Automatic cleanup removed both containers. Step 4B, Step 5 and rollout remain unapproved.
+- The 2026-08-30 SQLSTATE `42601` failure remains preserved below and in `operations/STEP_4B_QUALIFICATION_REPORT.md`; it is not rewritten as a pass.
 
 ## Step 4B disposable PostgreSQL qualification failure, 2026-08-30
 

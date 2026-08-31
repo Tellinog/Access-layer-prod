@@ -46,6 +46,8 @@ class RecordingDb implements Db {
   readonly committedMutations: string[] = [];
   transactionCalls = 0;
   rollbackCalls = 0;
+  activeQueries = 0;
+  maxConcurrentQueries = 0;
   failOn: RegExp | null = null;
   private pendingMutations: string[] = [];
 
@@ -58,15 +60,22 @@ class RecordingDb implements Db {
     params: unknown[],
     transactional: boolean
   ): Promise<QueryResult<T>> {
-    this.queries.push({ sql, params, transactional });
-    if (this.failOn?.test(sql)) {
-      throw new Error("synthetic database failure");
+    this.activeQueries += 1;
+    this.maxConcurrentQueries = Math.max(this.maxConcurrentQueries, this.activeQueries);
+    try {
+      await Promise.resolve();
+      this.queries.push({ sql, params, transactional });
+      if (this.failOn?.test(sql)) {
+        throw new Error("synthetic database failure");
+      }
+      if (/^\s*(?:INSERT|UPDATE|DELETE)\b/i.test(sql)) {
+        (transactional ? this.pendingMutations : this.committedMutations).push(sql);
+      }
+      const table = sql.match(/\bFROM\s+([a-z_]+)/i)?.[1];
+      return result(table ? ([{ section: table }] as unknown as T[]) : []);
+    } finally {
+      this.activeQueries -= 1;
     }
-    if (/^\s*(?:INSERT|UPDATE|DELETE)\b/i.test(sql)) {
-      (transactional ? this.pendingMutations : this.committedMutations).push(sql);
-    }
-    const table = sql.match(/\bFROM\s+([a-z_]+)/i)?.[1];
-    return result(table ? ([{ section: table }] as unknown as T[]) : []);
   }
 
   async transaction<T>(fn: (db: Db) => Promise<T>): Promise<T> {
@@ -124,6 +133,7 @@ describe("OAuth backup repository coverage", () => {
     });
     const tableReads = db.queries.slice(1);
     expect(tableReads).toHaveLength(24);
+    expect(db.maxConcurrentQueries).toBe(1);
     expect(tableReads.every((query) => query.transactional)).toBe(true);
     expect(db.queries.some((query) => !query.transactional)).toBe(false);
     for (const query of tableReads) {

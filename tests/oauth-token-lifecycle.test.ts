@@ -51,6 +51,12 @@ const resourceSecret = "oauth-resource-secret-value";
 const verifier = "v".repeat(43);
 const challenge = createHash("sha256").update(verifier).digest("base64url");
 
+function deferred() {
+  let resolvePromise!: () => void;
+  const promise = new Promise<void>((resolvePromiseValue) => { resolvePromise = resolvePromiseValue; });
+  return { promise, resolve: resolvePromise };
+}
+
 let tempRoot: string;
 let privateKeyPath: string;
 let privateKeyPem: string;
@@ -297,6 +303,7 @@ class MemoryOAuthTokenRepository extends OAuthTokenRepository {
   lastInitial: Record<string, unknown> | null = null;
   lastRotation: Record<string, unknown> | null = null;
   replayRevoked = false;
+  replayRevokedAt: Date | null = null;
   familyRevoked = false;
   accessRevoked = false;
   accessRevocationExpiresAt: Date | null = null;
@@ -379,8 +386,9 @@ class MemoryOAuthTokenRepository extends OAuthTokenRepository {
       currentScopes: [...input.scopes], sessionIdleExpiresAt: input.idleExpiresAt
     });
   }
-  override async revokeRefreshReplay(context: OAuthRefreshContext): Promise<void> {
-    this.replayRevoked = true; context.familyStatus = "revoked"; context.sessionStatus = "revoked";
+  override async revokeRefreshReplay(context: OAuthRefreshContext, now: Date): Promise<void> {
+    this.replayRevoked = true; this.replayRevokedAt = now;
+    context.familyStatus = "revoked"; context.sessionStatus = "revoked";
   }
   override async revokeRefreshFamily(context: OAuthRefreshContext): Promise<void> {
     this.familyRevoked = true; context.familyStatus = "revoked"; context.sessionStatus = "revoked";
@@ -407,6 +415,32 @@ class MemoryOAuthTokenRepository extends OAuthTokenRepository {
   override async recordCodeExchangeDeniedAudit(input: Record<string, unknown>): Promise<void> {
     if (this.failCodeDenialAudit) throw new Error("audit unavailable");
     this.codeDenials.push(input);
+  }
+}
+
+class OutOfOrderRefreshRepository extends MemoryOAuthTokenRepository {
+  readonly olderRequestReachedLock = deferred();
+  private readonly releaseOlderRequest = deferred();
+  private refreshLockCalls = 0;
+
+  override async transaction<T>(fn: (repository: OAuthTokenRepository) => Promise<T>): Promise<T> {
+    return fn(this);
+  }
+
+  override async lockRefreshByHash(value: string): Promise<OAuthRefreshContext | null> {
+    this.refreshLockCalls += 1;
+    if (this.refreshLockCalls === 1) {
+      this.olderRequestReachedLock.resolve();
+      await this.releaseOlderRequest.promise;
+    }
+    return super.lockRefreshByHash(value);
+  }
+
+  override async persistRefreshRotation(
+    input: Parameters<OAuthTokenRepository["persistRefreshRotation"]>[0]
+  ): Promise<void> {
+    await super.persistRefreshRotation(input);
+    this.releaseOlderRequest.resolve();
   }
 }
 
@@ -596,6 +630,44 @@ describe("OAuth token-lifecycle service", () => {
     expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
     expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
     expect(repository.replayRevoked).toBe(true);
+  });
+
+  it("re-observes time after the older-timestamp request loses the refresh lock", async () => {
+    const repository = new OutOfOrderRefreshRepository();
+    repository.clientCredentialHash = await hashOAuthCredentialSecret(clientSecret, pepper);
+    repository.resourceCredentialHash = await hashOAuthCredentialSecret(resourceSecret, pepper);
+    const makeService = (now: () => Date) => new OAuthTokenLifecycleService({
+      config: {
+        authIssuer: issuer,
+        oauthCredentialSecretPepper: pepper,
+        oauthSigningKeyRoot: tempRoot,
+        toolClientSecretPepper: "legacy-tool-only-pepper"
+      },
+      repository,
+      now
+    });
+    const issued = await makeService(() => fixedNow).exchangeAuthorizationCode({
+      code: "raw-code", clientId, clientSecret, redirectUri: repository.code.redirectUri,
+      resource: resourceId, codeVerifier: verifier
+    });
+    const olderObservedAt = new Date(fixedNow.getTime() + 1_000);
+    const winnerIssuedAt = new Date(fixedNow.getTime() + 2_000);
+    const replayObservedAfterLock = new Date(fixedNow.getTime() + 3_000);
+    const olderClock = [olderObservedAt, replayObservedAfterLock];
+    const olderRequest = makeService(() => olderClock.shift() ?? replayObservedAfterLock).refresh({
+      refreshToken: issued.refreshToken, clientId, clientSecret, resource: resourceId
+    });
+    await repository.olderRequestReachedLock.promise;
+    const winnerRequest = makeService(() => winnerIssuedAt).refresh({
+      refreshToken: issued.refreshToken, clientId, clientSecret, resource: resourceId
+    });
+
+    const [olderResult, winnerResult] = await Promise.allSettled([olderRequest, winnerRequest]);
+    expect(olderResult).toMatchObject({ status: "rejected", reason: { code: "invalid_grant" } });
+    expect(winnerResult.status).toBe("fulfilled");
+    expect(repository.lastRotation).toMatchObject({ now: winnerIssuedAt });
+    expect(repository.replayRevokedAt).toEqual(replayObservedAfterLock);
+    expect(repository.replayRevokedAt!.getTime()).toBeGreaterThanOrEqual(winnerIssuedAt.getTime());
   });
 
   it("denies expired, revoked or no-longer-authorized refresh state", async () => {
@@ -812,6 +884,7 @@ describe("repository race and secrecy SQL", () => {
     expect(source).toContain("oauth.refresh.replay_detected");
     expect(source).toContain("last_signed_at = GREATEST(COALESCE(last_signed_at, $2), $2)");
     expect(source).toContain("GREATEST(oauth_revocations.expires_at, EXCLUDED.expires_at)");
+    expect(source).toContain("GREATEST($2::timestamptz, COALESCE(MAX(issued_at), $2::timestamptz)) AS revocation_time");
     expect(source).toContain("oauth_authorization.granted_scopes AS authorization_granted_scopes");
     expect(source).toContain("oauth.code.exchange_denied");
     expect(source).toContain("WHERE resource_id = $1 AND audience_policy = 'exact_single_resource'");

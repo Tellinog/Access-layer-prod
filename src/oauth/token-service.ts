@@ -224,7 +224,8 @@ export class OAuthTokenLifecycleService {
         const context = await repository.lockRefreshByHash(tokenHash);
         if (!context || context.oauthClientId !== client.id || context.clientId !== client.clientId) invalid("invalid_grant");
         if (context.tokenStatus === "consumed") {
-          await repository.revokeRefreshReplay(context, now);
+          const replayObservedAt = (this.input.now ?? (() => new Date()))();
+          await repository.revokeRefreshReplay(context, replayObservedAt);
           return { kind: "replay" };
         }
         if (

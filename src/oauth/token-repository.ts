@@ -553,28 +553,36 @@ export class OAuthTokenRepository {
     reason: string,
     replay: boolean
   ): Promise<void> {
+    const revocation = await this.db.query<{ revocation_time: Date }>(
+      `SELECT GREATEST($2::timestamptz, COALESCE(MAX(issued_at), $2::timestamptz)) AS revocation_time
+       FROM oauth_refresh_tokens
+       WHERE oauth_refresh_token_family_id = $1`,
+      [context.familyId, now]
+    );
+    const revocationTime = revocation.rows[0]?.revocation_time;
+    if (!(revocationTime instanceof Date)) throw new Error("oauth_refresh_revocation_time_unavailable");
     await this.db.query(
       `UPDATE oauth_refresh_token_families
        SET status = 'revoked', revoked_at = COALESCE(revoked_at, $2),
            revocation_reason = COALESCE(revocation_reason, $3),
            replay_detected_at = CASE WHEN $4::boolean THEN COALESCE(replay_detected_at, $2) ELSE replay_detected_at END
        WHERE id = $1`,
-      [context.familyId, now, reason, replay]
+      [context.familyId, revocationTime, reason, replay]
     );
     await this.db.query(
       `UPDATE oauth_sessions
        SET status = 'revoked', revoked_at = COALESCE(revoked_at, $2),
            revocation_reason = COALESCE(revocation_reason, $3)
        WHERE id = $1`,
-      [context.sessionId, now, reason]
+      [context.sessionId, revocationTime, reason]
     );
     await this.db.query(
       `UPDATE oauth_refresh_tokens SET status = 'revoked', revoked_at = COALESCE(revoked_at, $2)
        WHERE oauth_refresh_token_family_id = $1 AND status = 'current'`,
-      [context.familyId, now]
+      [context.familyId, revocationTime]
     );
-    await this.insertDurableRevocation("refresh_family", context.familyId, context, reason, now, null);
-    await this.insertDurableRevocation("oauth_session", context.sessionId, context, reason, now, null);
+    await this.insertDurableRevocation("refresh_family", context.familyId, context, reason, revocationTime, null);
+    await this.insertDurableRevocation("oauth_session", context.sessionId, context, reason, revocationTime, null);
   }
 
   async recordAccessTokenRevocation(input: {

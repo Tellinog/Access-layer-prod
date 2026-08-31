@@ -488,6 +488,65 @@ async function refresh(app: Awaited<ReturnType<typeof buildApplication>>, refres
   });
 }
 
+async function exerciseConcurrentRefreshReplay(input: {
+  iteration: number;
+  app: Awaited<ReturnType<typeof buildApplication>>;
+  google: FakeGoogle;
+  db: PostgresDb;
+  observedDb: ObservedDb;
+  appConfig: Config;
+  keys: Awaited<ReturnType<OAuthTokenRepository["listVerificationKeys"]>>;
+}) {
+  const initial = await loginAndExchange(input.app, input.google, `step4b-concurrency-state-${input.iteration}`);
+  const initialClaims = await verifyOAuthAccessToken({
+    token: initial.access_token,
+    issuer: input.appConfig.authIssuer,
+    audience: RESOURCE_ID,
+    keys: input.keys,
+    now: new Date()
+  });
+  const databaseErrorOffset = input.observedDb.state.errors.length;
+  const responses = await withTimeout(Promise.all([
+    refresh(input.app, initial.refresh_token),
+    refresh(input.app, initial.refresh_token)
+  ]), `real refresh concurrency iteration ${input.iteration}`, 20_000);
+  const diagnostic = {
+    iteration: input.iteration,
+    responses: responses.map(responseDiagnostic),
+    database_errors: input.observedDb.state.errors.slice(databaseErrorOffset),
+    lineage: await refreshLineageDiagnostic(input.db, initialClaims.sid)
+  };
+  assert(responses.filter((response) => response.statusCode === 200).length === 1,
+    `concurrency must have exactly one rotation success; diagnostic=${stable(diagnostic)}`);
+  assert(responses.filter((response) => response.statusCode === 400 && response.json().error === "invalid_grant").length === 1,
+    `concurrency must have exactly one invalid_grant replay outcome; diagnostic=${stable(diagnostic)}`);
+  assert(diagnostic.database_errors.length === 0,
+    `concurrency must not cause a database error; diagnostic=${stable(diagnostic)}`);
+  const winner = responses.find((response) => response.statusCode === 200);
+  assert(winner, `concurrency winner response must exist; diagnostic=${stable(diagnostic)}`);
+  const winnerClaims = await verifyOAuthAccessToken({
+    token: winner.json().access_token,
+    issuer: input.appConfig.authIssuer,
+    audience: RESOURCE_ID,
+    keys: input.keys,
+    now: new Date()
+  });
+  assert(winnerClaims.sid === initialClaims.sid,
+    `concurrency winner must preserve the OAuth session; diagnostic=${stable(diagnostic)}`);
+  const lineage = diagnostic.lineage as Record<string, unknown>;
+  assert(lineage.row_count === 1,
+    `concurrency lineage must resolve to one family; diagnostic=${stable(diagnostic)}`);
+  assert(lineage.family_status === "revoked" && lineage.session_status === "revoked" && lineage.replay_detected === true,
+    `replay must revoke family and session; diagnostic=${stable(diagnostic)}`);
+  assert(stable(lineage.generations) === stable([0, 1]) && stable(lineage.token_statuses) === stable(["consumed", "revoked"]),
+    `concurrency lineage must be generation 0 consumed then generation 1 revoked; diagnostic=${stable(diagnostic)}`);
+  assert(lineage.parent_coherent === true && lineage.revoked_before_issued === false,
+    `refresh parent and revocation-time lineage must be coherent; diagnostic=${stable(diagnostic)}`);
+  assert((await introspect(input.app, winner.json().access_token)).json().active === false,
+    `replay winner access token must be inactive online; diagnostic=${stable(diagnostic)}`);
+  return diagnostic;
+}
+
 async function seedRestoreAdmin(db: PostgresDb, appConfig: Config, tokenService: TokenService) {
   const userId = "20000000-0000-4000-8000-000000000001";
   const toolId = "20000000-0000-4000-8000-000000000002";
@@ -648,34 +707,13 @@ async function main() {
     assert((await introspect(source.app, normalRefresh.json().access_token)).json().active === false, "revoked family access token must introspect inactive");
     assert((await refresh(source.app, normalRefresh.json().refresh_token)).statusCode === 400, "revoked refresh token must be invalid_grant");
 
-    const concurrent = await loginAndExchange(source.app, source.google, "step4b-concurrency-state");
-    const concurrentInitialClaims = await verifyOAuthAccessToken({
-      token: concurrent.access_token, issuer: sourceConfig.authIssuer, audience: RESOURCE_ID, keys, now: new Date()
-    });
-    const databaseErrorOffset = observedSourceDb.state.errors.length;
-    const concurrentResponses = await withTimeout(Promise.all([
-      refresh(source.app, concurrent.refresh_token),
-      refresh(source.app, concurrent.refresh_token)
-    ]), "real refresh concurrency", 20_000);
-    const concurrencyDiagnostic = {
-      responses: concurrentResponses.map(responseDiagnostic),
-      database_errors: observedSourceDb.state.errors.slice(databaseErrorOffset),
-      lineage: await refreshLineageDiagnostic(sourceDb, concurrentInitialClaims.sid)
-    };
-    assert(concurrentResponses.filter((response) => response.statusCode === 200).length === 1,
-      `concurrency must have exactly one rotation success; diagnostic=${stable(concurrencyDiagnostic)}`);
-    assert(concurrentResponses.filter((response) => response.statusCode === 400 && response.json().error === "invalid_grant").length === 1,
-      `concurrency must have exactly one invalid_grant replay outcome; diagnostic=${stable(concurrencyDiagnostic)}`);
-    const concurrencyClaims = await verifyOAuthAccessToken({
-      token: concurrentResponses.find((response) => response.statusCode === 200)!.json().access_token,
-      issuer: sourceConfig.authIssuer, audience: RESOURCE_ID, keys, now: new Date()
-    });
-    const line = concurrencyDiagnostic.lineage as Record<string, unknown>;
-    assert(line.row_count === 1, "concurrency lineage must resolve to one family");
-    assert(line.family_status === "revoked" && line.session_status === "revoked" && line.replay_detected === true, "replay must revoke family and session");
-    assert(stable(line.generations) === stable([0, 1]) && stable(line.token_statuses) === stable(["consumed", "revoked"]), "concurrency lineage must be generation 0 consumed then generation 1 revoked");
-    assert(line.parent_coherent === true && line.revoked_before_issued === false, "refresh parent and revocation-time lineage must be coherent");
-    assert((await introspect(source.app, concurrentResponses.find((response) => response.statusCode === 200)!.json().access_token)).json().active === false, "replay winner access token must be inactive online");
+    const concurrencyEvidence = [];
+    for (let iteration = 1; iteration <= 8; iteration += 1) {
+      concurrencyEvidence.push(await exerciseConcurrentRefreshReplay({
+        iteration, app: source.app, google: source.google, db: sourceDb,
+        observedDb: observedSourceDb, appConfig: sourceConfig, keys
+      }));
+    }
 
     const retained = await loginAndExchange(source.app, source.google, "step4b-backup-state");
     const retainedClaims = await verifyOAuthAccessToken({ token: retained.access_token, issuer: sourceConfig.authIssuer, audience: RESOURCE_ID, keys, now: new Date() });
@@ -737,7 +775,7 @@ async function main() {
         real_oauth_http_e2e: "PASS",
         exact_issuer_pkce_rs256_ttl_jwks_claims: "PASS",
         resource_owned_introspection_and_revocation: "PASS",
-        real_refresh_concurrency_replay: "PASS",
+        real_refresh_concurrency_replay: { status: "PASS", iterations: concurrencyEvidence.length },
         repeatable_read_snapshot_coordination: "PASS",
         encrypted_replace_restore: "PASS",
         post_restore_access_and_refresh_continuity: "PASS",

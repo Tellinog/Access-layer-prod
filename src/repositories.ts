@@ -1143,99 +1143,72 @@ export class Repositories {
   async exportBackup(): Promise<Record<string, unknown>> {
     return this.db.transaction(async (tx) => {
       await tx.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY");
-      const [
-      users,
-      tools,
-      toolClients,
-      toolPermissions,
-      authorizationGrants,
-      adminToolAssignments,
-      accessRequests,
-      oauthClients,
-      oauthClientCredentials,
-      oauthClientRedirectUris,
-      oauthResources,
-      oauthResourceCredentials,
-      oauthResourceEntitlementBindings,
-      oauthScopes,
-      oauthResourceScopes,
-      oauthClientResourceScopes,
-      oauthSigningKeys,
-      oauthAuthorizationTransactions,
-      oauthAuthorizations,
-      oauthAuthorizationCodes,
-      oauthSessions,
-      oauthRefreshTokenFamilies,
-      oauthRefreshTokens,
-      oauthRevocations
-      ] = await Promise.all([
-      tx.query(`SELECT id, google_sub, email::text AS email, email_normalized::text AS email_normalized,
+      const users = await tx.query(`SELECT id, google_sub, email::text AS email, email_normalized::text AS email_normalized,
           email_verified, hd, display_name, picture_url, status, first_seen_at, last_seen_at, created_at, updated_at
-        FROM users ORDER BY created_at ASC, id ASC`),
-      tx.query(`SELECT id, slug, display_name, description, status, allowed_return_urls, owner_email::text AS owner_email,
+        FROM users ORDER BY created_at ASC, id ASC`);
+      const tools = await tx.query(`SELECT id, slug, display_name, description, status, allowed_return_urls, owner_email::text AS owner_email,
           created_at, updated_at
-        FROM tools ORDER BY created_at ASC, id ASC`),
-      tx.query(`SELECT id, tool_id, client_id, client_secret_hash, status, created_at, last_used_at
-        FROM tool_clients ORDER BY created_at ASC, id ASC`),
-      tx.query(`SELECT id, tool_id, permission_key, description, created_at
-        FROM tool_permissions ORDER BY created_at ASC, id ASC`),
-      tx.query(`SELECT id, tool_id, user_id, email_normalized::text AS email_normalized, role, permissions, status,
+        FROM tools ORDER BY created_at ASC, id ASC`);
+      const toolClients = await tx.query(`SELECT id, tool_id, client_id, client_secret_hash, status, created_at, last_used_at
+        FROM tool_clients ORDER BY created_at ASC, id ASC`);
+      const toolPermissions = await tx.query(`SELECT id, tool_id, permission_key, description, created_at
+        FROM tool_permissions ORDER BY created_at ASC, id ASC`);
+      const authorizationGrants = await tx.query(`SELECT id, tool_id, user_id, email_normalized::text AS email_normalized, role, permissions, status,
           valid_from, valid_until, created_by_user_id, revoked_by_user_id, revoked_at, created_at, updated_at
-        FROM authorization_grants ORDER BY created_at ASC, id ASC`),
-      tx.query(`SELECT id, user_id, tool_id, created_by_user_id, created_at
-        FROM admin_tool_assignments ORDER BY created_at ASC, id ASC`),
-      tx.query(`SELECT id, tool_id, tool_slug, user_id, google_sub, email::text AS email, email_normalized::text AS email_normalized,
+        FROM authorization_grants ORDER BY created_at ASC, id ASC`);
+      const adminToolAssignments = await tx.query(`SELECT id, user_id, tool_id, created_by_user_id, created_at
+        FROM admin_tool_assignments ORDER BY created_at ASC, id ASC`);
+      const accessRequests = await tx.query(`SELECT id, tool_id, tool_slug, user_id, google_sub, email::text AS email, email_normalized::text AS email_normalized,
           hd, display_name, status, reason_code, attempts_count, first_seen_at, last_seen_at, last_correlation_id,
           request_ip_hash, user_agent_hash, reviewed_by_user_id, reviewed_at, review_note, grant_id, created_at, updated_at
-        FROM access_requests ORDER BY created_at ASC, id ASC`),
-      tx.query(`SELECT id, client_id, client_name, client_type, token_endpoint_auth_method, grant_types, status,
+        FROM access_requests ORDER BY created_at ASC, id ASC`);
+      const oauthClients = await tx.query(`SELECT id, client_id, client_name, client_type, token_endpoint_auth_method, grant_types, status,
           owner_team, owner_contact, created_at, updated_at
-        FROM oauth_clients ORDER BY created_at ASC, id ASC`),
-      tx.query(`SELECT id, oauth_client_id, secret_hash, status, created_at, activated_at, expires_at, retired_at,
+        FROM oauth_clients ORDER BY created_at ASC, id ASC`);
+      const oauthClientCredentials = await tx.query(`SELECT id, oauth_client_id, secret_hash, status, created_at, activated_at, expires_at, retired_at,
           rotation_parent_id
-        FROM oauth_client_credentials ORDER BY created_at ASC, id ASC`),
-      tx.query(`SELECT id, oauth_client_id, redirect_uri, created_at
-        FROM oauth_client_redirect_uris ORDER BY created_at ASC, id ASC`),
-      tx.query(`SELECT id, resource_id, display_name, status, owner_team, owner_contact, audience_policy,
+        FROM oauth_client_credentials ORDER BY created_at ASC, id ASC`);
+      const oauthClientRedirectUris = await tx.query(`SELECT id, oauth_client_id, redirect_uri, created_at
+        FROM oauth_client_redirect_uris ORDER BY created_at ASC, id ASC`);
+      const oauthResources = await tx.query(`SELECT id, resource_id, display_name, status, owner_team, owner_contact, audience_policy,
           protected_resource_metadata_url, created_at, updated_at
-        FROM oauth_resources ORDER BY created_at ASC, id ASC`),
-      tx.query(`SELECT id, oauth_resource_id, credential_id, secret_hash, authentication_method, status, created_at,
+        FROM oauth_resources ORDER BY created_at ASC, id ASC`);
+      const oauthResourceCredentials = await tx.query(`SELECT id, oauth_resource_id, credential_id, secret_hash, authentication_method, status, created_at,
           activated_at, rotated_at, expires_at, retired_at, rotation_parent_id
-        FROM oauth_resource_credentials ORDER BY created_at ASC, id ASC`),
-      tx.query(`SELECT id, oauth_resource_id, binding_type, legacy_tool_id, status, created_at, disabled_at
-        FROM oauth_resource_entitlement_bindings ORDER BY created_at ASC, id ASC`),
-      tx.query(`SELECT id, scope, description, status, created_at, updated_at
-        FROM oauth_scopes ORDER BY created_at ASC, id ASC`),
-      tx.query(`SELECT id, oauth_resource_id, oauth_scope_id, legacy_permission_key, status, created_at, updated_at
-        FROM oauth_resource_scopes ORDER BY created_at ASC, id ASC`),
-      tx.query(`SELECT id, oauth_client_id, oauth_resource_id, oauth_scope_id, status, created_at
-        FROM oauth_client_resource_scopes ORDER BY created_at ASC, id ASC`),
-      tx.query(`SELECT id, key_namespace, kid, algorithm, public_jwk, public_key_fingerprint_sha256,
+        FROM oauth_resource_credentials ORDER BY created_at ASC, id ASC`);
+      const oauthResourceEntitlementBindings = await tx.query(`SELECT id, oauth_resource_id, binding_type, legacy_tool_id, status, created_at, disabled_at
+        FROM oauth_resource_entitlement_bindings ORDER BY created_at ASC, id ASC`);
+      const oauthScopes = await tx.query(`SELECT id, scope, description, status, created_at, updated_at
+        FROM oauth_scopes ORDER BY created_at ASC, id ASC`);
+      const oauthResourceScopes = await tx.query(`SELECT id, oauth_resource_id, oauth_scope_id, legacy_permission_key, status, created_at, updated_at
+        FROM oauth_resource_scopes ORDER BY created_at ASC, id ASC`);
+      const oauthClientResourceScopes = await tx.query(`SELECT id, oauth_client_id, oauth_resource_id, oauth_scope_id, status, created_at
+        FROM oauth_client_resource_scopes ORDER BY created_at ASC, id ASC`);
+      const oauthSigningKeys = await tx.query(`SELECT id, key_namespace, kid, algorithm, public_jwk, public_key_fingerprint_sha256,
           protected_private_key_ref, status, published_at, activates_at, last_signed_at, retire_after, retired_at, created_at
-        FROM oauth_signing_keys ORDER BY created_at ASC, id ASC`),
-      tx.query(`SELECT id, oauth_client_id, oauth_resource_id, redirect_uri, requested_scopes, code_challenge,
+        FROM oauth_signing_keys ORDER BY created_at ASC, id ASC`);
+      const oauthAuthorizationTransactions = await tx.query(`SELECT id, oauth_client_id, oauth_resource_id, redirect_uri, requested_scopes, code_challenge,
           code_challenge_method, protected_downstream_state, upstream_state_hash, upstream_nonce_hash, correlation_id,
           status, expires_at, claimed_at, completed_at, created_at
-        FROM oauth_authorization_transactions ORDER BY created_at ASC, id ASC`),
-      tx.query(`SELECT id, oauth_authorization_transaction_id, user_id, oauth_client_id, oauth_resource_id,
+        FROM oauth_authorization_transactions ORDER BY created_at ASC, id ASC`);
+      const oauthAuthorizations = await tx.query(`SELECT id, oauth_authorization_transaction_id, user_id, oauth_client_id, oauth_resource_id,
           granted_scopes, legacy_authorization_grant_id, correlation_id, status, created_at, updated_at
-        FROM oauth_authorizations ORDER BY created_at ASC, id ASC`),
-      tx.query(`SELECT id, code_hash, oauth_authorization_transaction_id, oauth_authorization_id, oauth_client_id,
+        FROM oauth_authorizations ORDER BY created_at ASC, id ASC`);
+      const oauthAuthorizationCodes = await tx.query(`SELECT id, code_hash, oauth_authorization_transaction_id, oauth_authorization_id, oauth_client_id,
           oauth_resource_id, user_id, redirect_uri, granted_scopes, code_challenge, code_challenge_method, correlation_id,
           issued_at, expires_at, consumed_at
-        FROM oauth_authorization_codes ORDER BY issued_at ASC, id ASC`),
-      tx.query(`SELECT id, oauth_authorization_id, user_id, oauth_client_id, oauth_resource_id, status,
+        FROM oauth_authorization_codes ORDER BY issued_at ASC, id ASC`);
+      const oauthSessions = await tx.query(`SELECT id, oauth_authorization_id, user_id, oauth_client_id, oauth_resource_id, status,
           correlation_id, issued_at, last_activity_at, idle_expires_at, revoked_at, revocation_reason
-        FROM oauth_sessions ORDER BY issued_at ASC, id ASC`),
-      tx.query(`SELECT id, oauth_authorization_id, oauth_session_id, user_id, oauth_client_id, oauth_resource_id,
+        FROM oauth_sessions ORDER BY issued_at ASC, id ASC`);
+      const oauthRefreshTokenFamilies = await tx.query(`SELECT id, oauth_authorization_id, oauth_session_id, user_id, oauth_client_id, oauth_resource_id,
           scope_ceiling, current_scopes, current_generation, status, replay_detected_at, revoked_at, revocation_reason, created_at
-        FROM oauth_refresh_token_families ORDER BY created_at ASC, id ASC`),
-      tx.query(`SELECT id, oauth_refresh_token_family_id, token_hash, generation, parent_refresh_token_id, scopes,
+        FROM oauth_refresh_token_families ORDER BY created_at ASC, id ASC`);
+      const oauthRefreshTokens = await tx.query(`SELECT id, oauth_refresh_token_family_id, token_hash, generation, parent_refresh_token_id, scopes,
           status, issued_at, expires_at, consumed_at, revoked_at
-        FROM oauth_refresh_tokens ORDER BY oauth_refresh_token_family_id ASC, generation ASC, id ASC`),
-      tx.query(`SELECT id, target_type, target_id, oauth_client_id, oauth_resource_id, reason_code, revoked_at, expires_at
-        FROM oauth_revocations ORDER BY revoked_at ASC, target_type ASC, target_id ASC, id ASC`)
-    ]);
+        FROM oauth_refresh_tokens ORDER BY oauth_refresh_token_family_id ASC, generation ASC, id ASC`);
+      const oauthRevocations = await tx.query(`SELECT id, target_type, target_id, oauth_client_id, oauth_resource_id, reason_code, revoked_at, expires_at
+        FROM oauth_revocations ORDER BY revoked_at ASC, target_type ASC, target_id ASC, id ASC`);
       return {
       users: users.rows,
       tools: tools.rows,

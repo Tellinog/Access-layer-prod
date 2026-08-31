@@ -2,6 +2,7 @@
 
 ## BLOCKER
 
+- 2026-08-30 Step 4B real-PG failure: on two disposable loopback-only PostgreSQL 16.15 targets, migrations 001–005 applied successfully and the real authorize/callback path reached code exchange, but `OAuthTokenRepository.lockAuthorizationCodeByHash()` failed with PostgreSQL SQLSTATE `42601` at parser position 661. The position maps to the unquoted `authorization.status` alias reference, so `/oauth/token` returned sanitized 503 `temporarily_unavailable`. The test/evidence-only boundary forbade a runtime patch or bypass. Approve and implement a focused runtime SQL fix, then rerun all Step 4B OAuth, concurrency, snapshot/restore and legacy-baseline assertions; do not enable OAuth or use production before the rerun passes.
 - Confirm who receives bootstrap platform admin access after first deploy.
 - 2026-08-26 Step 3C: before any OAuth enablement, provision `OAUTH_TRANSACTION_PROTECTION_KEY` as a dedicated canonical base64url 32-byte secret through the approved secret manager and add the separate OAuth callback URI in Google Cloud without removing the legacy callback. Neither action is authorised or performed by Step 3C.
 - 2026-08-27 Step 3D production gate: before any OAuth enablement, provision a dedicated OAuth credential pepper, dedicated signing-key root and OAuth-only RSA key through approved secret/storage controls; prove key/secret continuity without recording values or paths. No provisioning is authorised or performed here.

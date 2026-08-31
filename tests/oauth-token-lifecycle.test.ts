@@ -802,23 +802,30 @@ describe("OAuth token-lifecycle service", () => {
 describe("repository race and secrecy SQL", () => {
   it("uses row locks, compare-and-set consumption, atomic audit and OAuth-only tables", () => {
     const source = readFileSync(resolve("src/oauth/token-repository.ts"), "utf8");
-    expect(source).toContain("FOR UPDATE OF code\n       FOR SHARE OF authorization, client, resource, human, legacy_grant");
-    expect(source).toContain("FOR UPDATE OF token, family, session\n       FOR SHARE OF authorization, client, resource, human, legacy_grant");
-    expect(source).not.toContain("FOR UPDATE OF code, authorization");
-    expect(source).not.toContain("FOR UPDATE OF token, family, session, authorization");
+    expect(source).toContain("FOR UPDATE OF code\n       FOR SHARE OF oauth_authorization, client, resource, human, legacy_grant");
+    expect(source).toContain("FOR UPDATE OF token, family, session\n       FOR SHARE OF oauth_authorization, client, resource, human, legacy_grant");
+    expect(source).not.toContain("FOR UPDATE OF code, oauth_authorization");
+    expect(source).not.toContain("FOR UPDATE OF token, family, session, oauth_authorization");
     expect(source).toContain("consumed_at IS NULL AND expires_at > $2");
     expect(source).toContain("status = 'consumed', consumed_at = $2");
     expect(source).toContain("status = 'revoked'");
     expect(source).toContain("oauth.refresh.replay_detected");
     expect(source).toContain("last_signed_at = GREATEST(COALESCE(last_signed_at, $2), $2)");
     expect(source).toContain("GREATEST(oauth_revocations.expires_at, EXCLUDED.expires_at)");
-    expect(source).toContain("authorization.granted_scopes AS authorization_granted_scopes");
+    expect(source).toContain("oauth_authorization.granted_scopes AS authorization_granted_scopes");
     expect(source).toContain("oauth.code.exchange_denied");
     expect(source).toContain("WHERE resource_id = $1 AND audience_policy = 'exact_single_resource'");
     expect(source).not.toContain("WHERE resource_id = $1 AND status = 'active'");
     expect(source).not.toMatch(/INSERT INTO (sessions|refresh_tokens|one_time_codes|authorization_grants)/);
     expect(source).not.toMatch(/UPDATE (sessions|refresh_tokens|one_time_codes|authorization_grants)/);
     expect(source).not.toContain("TOOL_CLIENT_SECRET_PEPPER");
+  });
+
+  it("never uses the PostgreSQL keyword authorization as an unquoted table alias", () => {
+    const source = readFileSync(resolve("src/oauth/token-repository.ts"), "utf8");
+    expect(source).not.toMatch(/\bJOIN\s+oauth_authorizations\s+authorization\b/i);
+    expect(source).not.toMatch(/\bauthorization\./i);
+    expect(source).not.toMatch(/\bFOR\s+SHARE\s+OF[^`]*\bauthorization\b/i);
   });
 
   it("keeps last_signed_at monotonic when an observed signing clock moves backwards", async () => {

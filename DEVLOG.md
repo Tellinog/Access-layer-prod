@@ -1,5 +1,31 @@
 # DEVLOG.md
 
+## 2026-08-30 - Step 4B real-PG qualification stopped on frozen runtime SQL failure
+
+Changed by: Codex
+Related task: Qualify the approved Step 4A implementation on two disposable PostgreSQL 16 targets without changing runtime behavior.
+
+### Qualification work
+
+- Added a guarded PowerShell runner and TypeScript harness under `scripts/step4b/`. The runner enforces distinct synthetic database/container names, local Docker Desktop context, random loopback-only ports, migrations 001–005 and `finally` cleanup.
+- Exercised two real PostgreSQL 16.15 databases. Both applied exactly migrations 001–005 with frozen hashes; no migration 006 or migration edit exists.
+- Seeded only synthetic legacy/OAuth data, hashed client/resource credentials and a temporary dedicated RSA signing key. Dedicated OAuth signing preflight, real HTTP authorization and the fake-only Google callback passed.
+- Real HTTP code exchange failed as sanitized 503. The captured non-secret database classification is SQLSTATE `42601`, parser position 661, in `lockAuthorizationCodeByHash`; that position maps to the unquoted `authorization.status` alias reference.
+- Added `operations/STEP_4B_QUALIFICATION_REPORT.md` and recorded the implementation blocker in state/testing/backlog documentation.
+
+### Boundary and result
+
+- Result is `FAIL — BLOCKED_IMPLEMENTATION`, not PASS. Dependent claims/JWKS/introspection, refresh/revocation, concurrency, snapshot/restore and legacy-baseline assertions were not bypassed and are not claimed.
+- No production, Coolify, network-to-production, pilot, real user/client/resource, real secret/key, consumer/SDK, OpenAPI, dependency, production Docker/Compose or protocol-contract action occurred.
+- The frozen runtime, including `src/app.ts` and `src/oauth/`, remains unchanged. No Step 4B completion commit is created while the critical real-PG assertion fails.
+
+### Checks
+
+- TypeScript lint/build passed. Full Vitest passed 315 tests across 18 files.
+- Python unittest discovery passed 61 tests with two expected skips (63 collected). The OAuth validator passed all 24 groups.
+- Continuity remained expected `VALID_BUT_NOT_READY` with both gates false (exit 2). Non-strict platform validation passed 27 checks with seven known warnings.
+- `git diff --check` passed with line-ending normalization notices only. Frozen runtime, migration, schema, dependency and Docker/Compose paths have no diff.
+
 ## 2026-08-29 - Step 4A snapshot and lineage hardening
 
 Changed by: Codex

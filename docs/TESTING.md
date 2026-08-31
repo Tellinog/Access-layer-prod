@@ -1,5 +1,11 @@
 # TESTING.md
 
+## Step 4B disposable PostgreSQL 16 qualification
+
+`scripts/step4b/run-qualification.ps1` creates two distinct synthetic PostgreSQL 16 containers on random loopback-only ports, applies the existing migration runner to each, invokes the real-HTTP qualification harness and removes both containers in `finally`. The harness allows only a fake upstream Google dependency; database, repository, service, signing, HTTP backup and legacy-baseline boundaries remain real. Temporary credentials, refresh material and RSA files are never emitted as evidence.
+
+The 2026-08-30 run on PostgreSQL 16.15 is `FAIL — BLOCKED_IMPLEMENTATION`. Both targets applied exactly migrations 001–005 and the generated OAuth signing-key preflight plus real HTTP authorize/callback passed. Real authorization-code exchange then returned sanitized 503 because PostgreSQL reported SQLSTATE `42601`, parser position 661, in `OAuthTokenRepository.lockAuthorizationCodeByHash()`; the position maps to the unquoted `authorization.status` alias reference. The harness stopped rather than patching or bypassing the frozen runtime, so claims/JWKS/introspection, refresh/revocation, same-token concurrency, coordinated encrypted snapshot/restore and legacy-baseline schema smoke are not claimed. Full sanitized evidence is in `../operations/STEP_4B_QUALIFICATION_REPORT.md`.
+
 ## Step 4A snapshot and lineage hardening conformance
 
 The export regression uses distinct pool/root and transaction-bound query recorders. It requires exactly one transaction, `SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY` as the first callback statement, and all 24 explicit deterministic table `SELECT`s through only the transaction-bound `Db`.

@@ -207,26 +207,26 @@ export class OAuthTokenRepository {
               human.email_normalized AS user_email_normalized, human.status AS user_status,
               code.redirect_uri, code.granted_scopes, code.code_challenge, code.code_challenge_method,
               code.correlation_id, code.issued_at, code.expires_at, code.consumed_at,
-              authorization.status AS authorization_status,
-              authorization.granted_scopes AS authorization_granted_scopes,
-              authorization.legacy_authorization_grant_id,
+              oauth_authorization.status AS authorization_status,
+              oauth_authorization.granted_scopes AS authorization_granted_scopes,
+              oauth_authorization.legacy_authorization_grant_id,
               legacy_grant.tool_id AS grant_tool_id, legacy_grant.user_id AS grant_user_id,
               legacy_grant.email_normalized AS grant_email_normalized,
               legacy_grant.status AS grant_status, legacy_grant.valid_from AS grant_valid_from,
               legacy_grant.valid_until AS grant_valid_until, legacy_grant.permissions AS grant_permissions
        FROM oauth_authorization_codes code
-       JOIN oauth_authorizations authorization
-         ON authorization.id = code.oauth_authorization_id
-        AND authorization.oauth_client_id = code.oauth_client_id
-        AND authorization.oauth_resource_id = code.oauth_resource_id
-        AND authorization.user_id = code.user_id
+       JOIN oauth_authorizations oauth_authorization
+         ON oauth_authorization.id = code.oauth_authorization_id
+        AND oauth_authorization.oauth_client_id = code.oauth_client_id
+        AND oauth_authorization.oauth_resource_id = code.oauth_resource_id
+        AND oauth_authorization.user_id = code.user_id
        JOIN oauth_clients client ON client.id = code.oauth_client_id
        JOIN oauth_resources resource ON resource.id = code.oauth_resource_id
        JOIN users human ON human.id = code.user_id
-       JOIN authorization_grants legacy_grant ON legacy_grant.id = authorization.legacy_authorization_grant_id
+       JOIN authorization_grants legacy_grant ON legacy_grant.id = oauth_authorization.legacy_authorization_grant_id
        WHERE code.code_hash = $1
        FOR UPDATE OF code
-       FOR SHARE OF authorization, client, resource, human, legacy_grant`,
+       FOR SHARE OF oauth_authorization, client, resource, human, legacy_grant`,
       [codeHash]
     );
     const row = result.rows[0];
@@ -420,16 +420,16 @@ export class OAuthTokenRepository {
               family.scope_ceiling, family.current_scopes,
               session.id AS session_id, session.status AS session_status,
               session.idle_expires_at AS session_idle_expires_at,
-              authorization.id AS oauth_authorization_id,
-              authorization.status AS authorization_status,
-              authorization.granted_scopes AS authorization_granted_scopes,
+              oauth_authorization.id AS oauth_authorization_id,
+              oauth_authorization.status AS authorization_status,
+              oauth_authorization.granted_scopes AS authorization_granted_scopes,
               client.id AS oauth_client_id, client.client_id, client.status AS client_status,
               client.grant_types AS client_grant_types,
               resource.id AS oauth_resource_id, resource.resource_id,
               resource.status AS resource_status, resource.audience_policy,
               human.id AS user_id, human.google_sub, human.status AS user_status,
               human.email_normalized AS user_email_normalized,
-              authorization.legacy_authorization_grant_id,
+              oauth_authorization.legacy_authorization_grant_id,
               legacy_grant.tool_id AS grant_tool_id, legacy_grant.user_id AS grant_user_id,
               legacy_grant.email_normalized AS grant_email_normalized,
               legacy_grant.status AS grant_status, legacy_grant.valid_from AS grant_valid_from,
@@ -438,18 +438,18 @@ export class OAuthTokenRepository {
        FROM oauth_refresh_tokens token
        JOIN oauth_refresh_token_families family ON family.id = token.oauth_refresh_token_family_id
        JOIN oauth_sessions session ON session.id = family.oauth_session_id
-       JOIN oauth_authorizations authorization
-         ON authorization.id = family.oauth_authorization_id
-        AND authorization.oauth_client_id = family.oauth_client_id
-        AND authorization.oauth_resource_id = family.oauth_resource_id
-        AND authorization.user_id = family.user_id
+       JOIN oauth_authorizations oauth_authorization
+         ON oauth_authorization.id = family.oauth_authorization_id
+        AND oauth_authorization.oauth_client_id = family.oauth_client_id
+        AND oauth_authorization.oauth_resource_id = family.oauth_resource_id
+        AND oauth_authorization.user_id = family.user_id
        JOIN oauth_clients client ON client.id = family.oauth_client_id
        JOIN oauth_resources resource ON resource.id = family.oauth_resource_id
        JOIN users human ON human.id = family.user_id
-       JOIN authorization_grants legacy_grant ON legacy_grant.id = authorization.legacy_authorization_grant_id
+       JOIN authorization_grants legacy_grant ON legacy_grant.id = oauth_authorization.legacy_authorization_grant_id
        WHERE token.token_hash = $1
        FOR UPDATE OF token, family, session
-       FOR SHARE OF authorization, client, resource, human, legacy_grant`,
+       FOR SHARE OF oauth_authorization, client, resource, human, legacy_grant`,
       [tokenHash]
     );
     const row = result.rows[0];
@@ -613,20 +613,20 @@ export class OAuthTokenRepository {
   }): Promise<boolean> {
     const result = await this.db.query<Record<string, unknown>>(
       `SELECT session.oauth_authorization_id, session.oauth_client_id, session.oauth_resource_id,
-              authorization.legacy_authorization_grant_id,
+              oauth_authorization.legacy_authorization_grant_id,
               legacy_grant.tool_id AS grant_tool_id, legacy_grant.permissions AS grant_permissions
        FROM oauth_sessions session
-       JOIN oauth_authorizations authorization ON authorization.id = session.oauth_authorization_id
+       JOIN oauth_authorizations oauth_authorization ON oauth_authorization.id = session.oauth_authorization_id
        JOIN oauth_clients client ON client.id = session.oauth_client_id
        JOIN oauth_resources resource ON resource.id = session.oauth_resource_id
        JOIN users human ON human.id = session.user_id
-       JOIN authorization_grants legacy_grant ON legacy_grant.id = authorization.legacy_authorization_grant_id
+       JOIN authorization_grants legacy_grant ON legacy_grant.id = oauth_authorization.legacy_authorization_grant_id
        WHERE session.id = $1 AND session.status = 'active' AND session.idle_expires_at > $6
-         AND authorization.oauth_client_id = session.oauth_client_id
-         AND authorization.oauth_resource_id = session.oauth_resource_id
-         AND authorization.user_id = session.user_id
-         AND $7::text[] <@ authorization.granted_scopes
-         AND authorization.status = 'active' AND client.status = 'active' AND client.client_id = $2
+         AND oauth_authorization.oauth_client_id = session.oauth_client_id
+         AND oauth_authorization.oauth_resource_id = session.oauth_resource_id
+         AND oauth_authorization.user_id = session.user_id
+         AND $7::text[] <@ oauth_authorization.granted_scopes
+         AND oauth_authorization.status = 'active' AND client.status = 'active' AND client.client_id = $2
          AND resource.status = 'active' AND resource.resource_id = $3
          AND human.status = 'active' AND human.google_sub = $4
          AND legacy_grant.status = 'active' AND legacy_grant.valid_from <= $6

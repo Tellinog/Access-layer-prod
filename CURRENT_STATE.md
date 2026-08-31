@@ -2,7 +2,15 @@
 
 ## Phase
 
-V1 legacy implementation complete. Step 4A extends and hardens the existing encrypted version-1 backup repository contract for every current OAuth table while preserving legacy-only backups and the frozen runtime boundary. OAuth remains default-off; no pilot, production registration, key/secret provisioning, real restore or production enablement exists.
+V1 legacy implementation complete. Step 4B qualification is **FAIL — BLOCKED_IMPLEMENTATION**: real PostgreSQL 16.15 applied migrations 001–005 on two disposable targets, but the real OAuth authorization-code exchange exposed a PostgreSQL syntax error in the frozen token repository before downstream concurrency/restore assertions could run. OAuth remains default-off; no pilot, production registration, key/secret provisioning, real restore or production enablement exists.
+
+## Step 4B disposable PostgreSQL qualification failure, 2026-08-30
+
+- The guarded local runner created distinct source/restore PostgreSQL 16.15 containers with synthetic Step4B database names and random loopback-only host ports. Both applied exactly migrations 001–005 with the frozen hashes, including migration 005 `aaffcb469000f62e680b5d391360fdacc4414e4280ba230e90e7fd4eee4dafbe`. Automatic cleanup removed both targets.
+- The real `PostgresDb`, repositories/services and HTTP application used synthetic registrations, entitlement data, hashed credentials and a temporary dedicated RSA key. Only the upstream Google boundary was fake. Dedicated signing-key loading/issuance, HTTP authorize and HTTP callback succeeded.
+- Real HTTP code exchange failed closed as 503 `temporarily_unavailable`. Sanitized database diagnostics identify SQLSTATE `42601`, parser position 661, in `OAuthTokenRepository.lockAuthorizationCodeByHash()`; that parser position maps to the unquoted `authorization.status` alias reference.
+- The frozen test/evidence boundary was preserved: runtime OAuth code, `src/app.ts`, migrations, OpenAPI, dependencies, production Docker/Compose, consumers and contracts were not changed or bypassed. No production or Coolify action occurred.
+- Claims/JWKS/introspection, normal refresh/revocation, real refresh concurrency, coordinated encrypted snapshot/restore and legacy-baseline schema smoke remain unqualified because the fail-fast critical exchange assertion did not pass. Step 4B, Step 5 and rollout are not approved. See `operations/STEP_4B_QUALIFICATION_REPORT.md` and the new `BACKLOG.md` blocker.
 
 ## Step 4A snapshot and lineage hardening, 2026-08-29
 

@@ -1,5 +1,17 @@
 # API.md
 
+## Temporary legacy Microsoft bridge
+
+This additive exception applies only when `LEGACY_MICROSOFT_ENABLED=true`:
+
+- `/v1/auth/start` without `provider` renders a provider chooser only for active tools listed in `LEGACY_MICROSOFT_TOOL_SLUGS`. `provider=google` starts the existing Google path and `provider=microsoft` starts Entra. Non-allowlisted tools without `provider` continue directly to Google.
+- `GET /v1/auth/microsoft/callback` is registered only while the flag is true. It accepts the provider-bound one-time `mst_` state and Microsoft authorization code, validates the Entra identity and then calls the same legacy completion path as Google.
+- Google states use `gst_`; each callback rejects the other provider's prefix before consuming the request. Missing, unknown, expired, consumed or wrong-provider state fails closed.
+- Successful callback output, tool redirect query, `POST /v1/auth/exchange`, refresh, introspection, logout, JWT claims, status codes and consumer payloads remain the legacy contract. The mapped subject is `msft:<tenant-id>:<oid>` and `hd` is the validated allowed domain.
+- New safe errors are `AUTH_INVALID_PROVIDER`, `AUTH_MICROSOFT_NOT_AVAILABLE`, `AUTH_MICROSOFT_CALLBACK_FAILED` and `AUTH_INVALID_MICROSOFT_TOKEN`. Provider error descriptions and token endpoint details are never returned.
+
+The historical OpenAPI and OAuth vNext surfaces are intentionally unchanged. The machine-readable exception is `../specs/legacy-microsoft-bridge.v1.yml`.
+
 ## API principles
 
 - Versioned under `/v1`.
@@ -16,6 +28,7 @@
 | `/health` | None |
 | `/v1/auth/start` | None, but tool and return URL must be valid |
 | `/v1/auth/google/callback` | Google OAuth callback plus server-side state validation |
+| `/v1/auth/microsoft/callback` | Conditional Microsoft Entra callback plus server-side provider-bound state validation |
 | `/v1/auth/exchange` | Tool client credentials |
 | `/v1/auth/refresh` | Tool client credentials |
 | `/v1/auth/introspect` | Tool client credentials |
@@ -80,6 +93,7 @@ Confidential token/revocation callers use registered OAuth client Basic credenti
 | GET | `/health` | Health check | No | Includes DB status in non-public detail mode |
 | GET | `/v1/auth/start` | Start login for a tool | No | Requires `tool_slug`, `return_url`, `state` |
 | GET | `/v1/auth/google/callback` | Receive Google callback | Google state | Internal endpoint for OAuth redirect |
+| GET | `/v1/auth/microsoft/callback` | Receive Microsoft callback when the legacy bridge is enabled | Microsoft state | Internal endpoint; absent while disabled |
 | POST | `/v1/auth/exchange` | Exchange one-time code for identity/token | Tool client | Consumes code once |
 | POST | `/v1/auth/refresh` | Rotate refresh token and renew access/session | Tool client | Sliding renewal on authenticated activity |
 | POST | `/v1/auth/introspect` | Validate token online | Tool client | Returns active/inactive and identity |

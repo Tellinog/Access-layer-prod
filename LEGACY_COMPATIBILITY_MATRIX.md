@@ -1,5 +1,18 @@
 # Legacy Compatibility Matrix
 
+## D-045 temporary bridge addendum
+
+| Surface | Temporary Microsoft behavior | Google/non-pilot guarantee |
+|---|---|---|
+| `/v1/auth/start` | Chooser only for slugs in `LEGACY_MICROSOFT_TOOL_SLUGS`; explicit `provider=microsoft` otherwise denied | Flag false or non-allowlisted/no-provider remains direct Google |
+| Upstream state | Microsoft uses `mst_`; Google uses `gst_`; callback prefixes are mutually exclusive | Existing hash-only, single-use, expiring storage remains shared |
+| Microsoft callback | Conditional `/v1/auth/microsoft/callback`; strict single-tenant validation | Google callback behavior and payload remain unchanged |
+| Legacy identity | `google_sub=msft:<tid>:<oid>`, `hd=<validated-domain>` | Existing Google `sub` and `hd` remain untouched |
+| Completion/token lifecycle | Same user, pending grant, grant, session, OTC, exchange, JWT, refresh, introspection, logout | No consumer, SDK, table, migration, TTL, cookie or payload change |
+| Rollback | Set `LEGACY_MICROSOFT_ENABLED=false` and restart | Microsoft route/choice disappear; Google remains operational |
+
+The frozen baseline file is not edited; `specs/legacy-microsoft-bridge.v1.yml` is the machine-readable exception.
+
 This matrix freezes the repository-observed contract at commit `6e8221ade74591c23c3f9606f7d696ea2810d873`. The machine-readable source is `specs/legacy-contract-baseline.v1.json`.
 
 | Surface | Frozen behavior | Step 1 evidence | Change |

@@ -1,5 +1,51 @@
 # DEVLOG.md
 
+## 2026-09-14 - Temporary legacy Microsoft Entra bridge for Testbirds
+
+Changed by: Codex
+Related task: Implement the approved Testbirds bridge exclusively in the legacy Access Layer without changing consumers or OAuth vNext.
+
+### Implementation
+
+- Added a tenant-specific Microsoft Entra OIDC adapter and a default-off, per-tool provider chooser on the existing `/v1/auth/start` endpoint.
+- Added the conditional `/v1/auth/microsoft/callback`, provider-bound `mst_`/`gst_` state, strict issuer/audience/tenant/nonce/expiry/email-domain validation and the approved synthetic legacy subject `msft:<tid>:<oid>`.
+- Extracted the post-identity legacy completion path so Google and Microsoft reuse the same user, pending-grant, grant, session, one-time-code, exchange, JWT, refresh, introspection and logout implementation.
+- Added no migration or table, changed no consumer/SDK, and made no change under `src/oauth/**`.
+- Added default-off environment forwarding, configuration/schema validation, redacted continuity inventory and the machine-readable `specs/legacy-microsoft-bridge.v1.yml` addendum. No real provider credential is versioned.
+
+### Verification
+
+- Added unit and HTTP regressions for Microsoft claims/URLs/errors, provider selection, state isolation/replay/expiry, callback errors, nonce mismatch, synthetic identity mapping, pending grants, denials and unchanged legacy token/exchange shape.
+- Final checks passed: TypeScript lint and build; 350 Vitest tests across 19 files; 64 Python `unittest` tests with two expected skips; platform check with 27 passed checks and seven known warnings; all 24 OAuth P0 validator groups; Docker Compose config rendering; and `git diff --check`.
+- Production-continuity evidence remains schema-valid `VALID_BUT_NOT_READY` with both readiness gates false, as expected from the existing missing live/operator evidence. The source-derived environment inventory now contains 53 names; Microsoft secret material is represented only by state and conditional continuity records.
+
+### Boundary
+
+- Microsoft remains absent unless `LEGACY_MICROSOFT_ENABLED=true` and the tool slug is explicitly allowlisted. OAuth vNext remains independently default-off and unchanged.
+- No deploy, Coolify mutation, Entra registration mutation, live credential use or real-provider call was performed.
+
+## 2026-09-11 - Testbirds Microsoft Entra multi-provider discovery plan
+
+Changed by: Codex
+Related task: Plan Microsoft Entra onboarding, Access Layer multi-provider evolution and per-tool alignment without starting implementation.
+
+### Documentation and discovery
+
+- Added `docs/MICROSOFT_ENTRA_SETUP.md` with the proposed single-tenant Entra operator procedure, callback placeholders, OIDC scopes/claims, assignment and Conditional Access controls, credential options, secret-safe handoff fields and pilot validation matrix.
+- Added `docs/MULTI_IDP_AUTH_DISCOVERY_PLAN.md` with the current Google-specific compatibility constraints, recommended provider-neutral architecture, staged identity-data migration, work packages, test matrix and decisions required before code.
+- Added `prompts/TOOL_MULTI_IDP_ALIGNMENT_PROMPT.md` so each tool can be assessed and migrated without embedding Microsoft/Google logic or weakening Access Layer grants, sessions, refresh, introspection, logout and logging controls.
+- Added the unresolved tenant, guest, email-claim, identity-subject, route-versioning, credential, pilot-tool, Admin UI and OAuth-vNext questions to `BACKLOG.md`.
+
+### Boundary
+
+- Documentation only. No source, migration, API/schema/spec, dependency, environment template, provider registration, credential, tool, production, Coolify or deployment state changed.
+- Microsoft support is not implemented or enabled. Frozen `/v1/*`, existing Google login and all current deployment/continuity blockers remain unchanged.
+
+### Validation
+
+- Documentation links and repository paths were checked locally.
+- `git diff --check` is the proportional verification for this planning-only change; runtime tests are not required because runtime and contracts were not changed.
+
 ## 2026-08-31 - Step 4B intermittent refresh race hardened and locally qualified
 
 Changed by: Codex

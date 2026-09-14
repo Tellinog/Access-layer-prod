@@ -27,7 +27,9 @@ SOURCE_ENVIRONMENT_NAMES = (
     "BACKUP_API_TOKEN", "BACKUP_ENCRYPTION_KEY", "CORS_ALLOWED_ORIGINS", "DATABASE_URL",
     "ENABLE_REFRESH_TOKENS", "GOOGLE_ALLOWED_HD", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET",
     "GOOGLE_OIDC_SCOPE", "GOOGLE_REDIRECT_URI", "JWT_PRIVATE_KEY_PEM", "JWT_PRIVATE_KEY_PEM_PATH",
-    "JWT_PUBLIC_KEY_ID", "LOG_IP_SALT", "LOG_LEVEL", "OAUTH_CREDENTIAL_SECRET_PEPPER", "OAUTH_P0_ENABLED",
+    "JWT_PUBLIC_KEY_ID", "LEGACY_MICROSOFT_ENABLED", "LEGACY_MICROSOFT_TOOL_SLUGS", "LOG_IP_SALT", "LOG_LEVEL",
+    "MICROSOFT_ALLOWED_EMAIL_DOMAINS", "MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET", "MICROSOFT_OIDC_SCOPE",
+    "MICROSOFT_REDIRECT_URI", "MICROSOFT_TENANT_ID", "OAUTH_CREDENTIAL_SECRET_PEPPER", "OAUTH_P0_ENABLED",
     "OAUTH_SIGNING_KEY_ROOT", "OAUTH_TRANSACTION_PROTECTION_KEY", "ONE_TIME_CODE_TTL_SECONDS", "PORT",
     "POSTGRES_DB", "POSTGRES_PASSWORD", "POSTGRES_USER", "PUBLIC_BASE_PATH",
     "REFRESH_TOKEN_TTL_SECONDS", "RETURN_URL_ALLOWED_SCHEMES", "RUN_MIGRATIONS_ON_START",
@@ -37,7 +39,7 @@ SOURCE_ENVIRONMENT_NAMES = (
 )
 SECRET_CONTINUITY_NAMES = (
     "SESSION_SECRET", "TOOL_CLIENT_SECRET_PEPPER", "OAUTH_CREDENTIAL_SECRET_PEPPER", "BACKUP_ENCRYPTION_KEY",
-    "GOOGLE_CLIENT_SECRET", "LOG_IP_SALT",
+    "GOOGLE_CLIENT_SECRET", "LOG_IP_SALT", "MICROSOFT_CLIENT_SECRET",
 )
 REQUIRED_NON_EMPTY_ENVIRONMENT = {
     "APP_ENV", "APP_BASE_URL", "AUTH_ISSUER", "POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB",
@@ -210,6 +212,8 @@ def _jwt_gaps(data: dict[str, Any]) -> list[str]:
 def _secret_continuity_gaps(data: dict[str, Any]) -> list[str]:
     missing: list[str] = []
     for name, record in data["secret_continuity"]["records"].items():
+        if name == "MICROSOFT_CLIENT_SECRET" and data["configuration"]["effective_non_secret_config"].get("legacy_microsoft_enabled") is not True:
+            continue
         prefix = f"secret_continuity.records.{name}"
         _require(missing, record.get("verified_same_value") is True, f"{prefix}.verified_same_value=true")
         for key in ("verification_method", "verified_by", "verified_at", "evidence_reference"):
@@ -239,11 +243,21 @@ def _configuration_gaps(data: dict[str, Any]) -> list[str]:
         "enable_refresh_tokens", "oauth_p0_enabled", "session_cookie_name", "trust_proxy_hops", "audit_log_retention_days",
         "audit_log_raw_ip", "access_request_reopen_after_days", "run_migrations_on_start", "run_seed_on_start",
         "seed_example_tools", "siem_export_enabled", "admin_bootstrap_email_count",
+        "legacy_microsoft_enabled",
     )
     for key in required_values:
         _require(missing, effective.get(key) is not None, f"configuration.effective_non_secret_config.{key}")
     for key in ("google_allowed_hd", "google_oidc_scope", "cors_allowed_origins", "return_url_allowed_schemes"):
         _require(missing, bool(effective.get(key)), f"configuration.effective_non_secret_config.{key}")
+
+    if effective.get("legacy_microsoft_enabled") is True:
+        for key in ("microsoft_tenant_id", "microsoft_client_id", "microsoft_redirect_uri"):
+            _require(missing, bool(effective.get(key)), f"configuration.effective_non_secret_config.{key}")
+        for key in ("microsoft_allowed_email_domains", "microsoft_oidc_scope", "legacy_microsoft_tool_slugs"):
+            _require(missing, bool(effective.get(key)), f"configuration.effective_non_secret_config.{key}")
+        for name in ("MICROSOFT_TENANT_ID", "MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET", "MICROSOFT_REDIRECT_URI", "MICROSOFT_ALLOWED_EMAIL_DOMAINS", "LEGACY_MICROSOFT_TOOL_SLUGS"):
+            _require(missing, states[name] == "PRESENT_NON_EMPTY", f"configuration.environment_state.{name}=PRESENT_NON_EMPTY")
+        _require(missing, {"openid", "email", "profile"}.issubset(set(effective.get("microsoft_oidc_scope", []))), "configuration.effective_non_secret_config.microsoft_oidc_scope includes openid,email,profile")
 
     _require(missing, effective.get("app_env") == "production", "configuration.effective_non_secret_config.app_env=production")
     _require(missing, effective.get("port") == 8080, "configuration.effective_non_secret_config.port=8080")

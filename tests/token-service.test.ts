@@ -106,6 +106,34 @@ describe("TokenService", () => {
     await expect(service.verifyAccessToken(issued.token, "reporting")).rejects.toThrow();
   });
 
+  it("keeps the legacy JWT contract unchanged for a synthetic Microsoft subject", async () => {
+    const service = new TokenService(config);
+    await service.init();
+    const input = makeTokenInput();
+    input.user = {
+      ...input.user,
+      google_sub: "msft:11111111-1111-4111-8111-111111111111:22222222-2222-4222-8222-222222222222",
+      email: "tester@testbirds.com",
+      email_normalized: "tester@testbirds.com",
+      hd: "testbirds.com",
+      display_name: "Testbirds Tester"
+    };
+    const issued = await service.issueAccessToken(input);
+    const claims = await service.verifyAccessToken(issued.token, "crm");
+    expect(claims).toMatchObject({
+      iss: config.authIssuer,
+      aud: "crm",
+      sub: input.user.google_sub,
+      sid: input.session.id,
+      tool_slug: "crm",
+      email: "tester@testbirds.com",
+      hd: "testbirds.com",
+      permissions: ["crm:read"],
+      role: "tool_user"
+    });
+    expect(Number(claims.exp) - Number(claims.iat)).toBe(config.accessTokenTtlSeconds);
+  });
+
   it("rejects expired JWTs", async () => {
     const service = new TokenService({ ...config, accessTokenTtlSeconds: -1 });
     await service.init();

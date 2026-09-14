@@ -1,5 +1,7 @@
 # Access Layer Google SSO
 
+> Temporary legacy Microsoft bridge (2026-09-14): selected tools can optionally offer Testbirds Microsoft Entra sign-in behind default-false `LEGACY_MICROSOFT_ENABLED` and a slug allowlist. The verified Entra identity is mapped into the unchanged legacy contract, so consumers need no change. Google remains the default/direct behavior outside that narrow scope; OAuth vNext is untouched. No production enablement is implied.
+
 > Platform status (2026-08-25): Template v2.1 is adopted in `legacy-migration` mode. Live evidence resolved the source Compose PostgreSQL logical-volume mismatch without renaming the live volume. Deployment remains blocked by the backup/restore, ownership, registry and remaining continuity gates in `BACKLOG.md`.
 
 > OAuth vNext status: Step 3E mounts the complete frozen P0 HTTP surface over the audited Step 3C/3D core, still behind default-false `OAUTH_P0_ENABLED`. Absent/false leaves every OAuth route at 404 and requires no OAuth-only secret. True additionally requires the dedicated transaction key, credential pepper and signing-key root. No pilot, production key/secret, registration or enablement exists, and `specs/oauth-p0.v1.yml` remains protocol-frozen.
@@ -19,11 +21,11 @@ Il servizio centralizza autenticazione, autorizzazione e audit trail per tutti i
 ## Flusso sintetico
 
 1. Il tool reindirizza l'utente a `GET /v1/auth/start` in produzione, o a `GET /access-control/v1/auth/start` in locale, passando `tool_slug`, `return_url` e uno `state` generato dal tool.
-2. Access Layer registra la richiesta, avvia il login Google OpenID Connect e mantiene una correlazione sicura.
-3. Dopo il callback Google, Access Layer valida ID token, `aud`, `iss`, `exp`, `email_verified` e `hd`.
+2. Access Layer registra la richiesta e avvia Google OpenID Connect; solo per i tool esplicitamente abilitati puo prima mostrare la scelta Google/Microsoft.
+3. Dopo il callback, Access Layer valida rigorosamente l'identita Google oppure, per il bridge temporaneo, il token Entra single-tenant e lo normalizza nel modello legacy.
 4. Se l'utente e autorizzato al tool, Access Layer genera un one-time code e reindirizza al callback del tool.
 5. Il backend del tool scambia il one-time code con `POST /v1/auth/exchange` in produzione, o `POST /access-control/v1/auth/exchange` in locale, autenticandosi come tool client.
-6. Il tool riceve identita, permessi e token firmato da Access Layer, crea la propria sessione locale e logga il `sub` Google e `session_id`.
+6. Il tool riceve lo stesso contratto legacy di identita, permessi e token firmato, crea la propria sessione locale e non deve conoscere il provider upstream.
 7. Durante una richiesta autenticata, quando il JWT sta per scadere, il backend del tool ruota il refresh token tramite `POST /v1/auth/refresh`; ogni refresh valido estende la scadenza inattiva della sessione.
 
 ## Stack di riferimento
@@ -35,7 +37,7 @@ La specifica API e indipendente dallo stack dei tool. Per implementare il serviz
 - PostgreSQL
 - migrazioni SQL esplicite con driver `pg`
 - `google-auth-library` per validare ID token Google
-- `jose` per firmare/verificare JWT interni
+- `jose` per verificare ID token Microsoft Entra e firmare/verificare JWT interni
 - OpenAPI 3.1 come contratto API
 
 Lo stack puo essere cambiato, ma la modifica va registrata in `DECISIONS.md` e deve preservare API, sicurezza, audit e integrazione.
@@ -114,6 +116,7 @@ Per aggiornare un tool gia integrato alla rotazione refresh e alle sessioni slid
 
 - Mai fidarsi del dominio della mail da solo: validare sempre il claim `hd` dell'ID token Google.
 - Mai usare `email` come primary key utente: usare `sub` Google come identificativo stabile.
+- Nel solo bridge D-045, usare esclusivamente `msft:<tid>:<oid>` come synthetic legacy subject; non collegare account per email.
 - Mai mettere token, client secret, authorization code o cookie nei log.
 - Ogni tool deve essere registrato con `tool_slug`, credenziali server-to-server e `return_url` allow-listato.
 - Ogni tentativo di accesso deve generare un audit event correlabile.

@@ -13,6 +13,7 @@
 ## In scope
 
 - Google OpenID Connect login.
+- Temporary, default-off Microsoft Entra login for explicitly allowlisted legacy tools, normalized into the unchanged legacy contract under D-045.
 - Company domain enforcement through `hd` claim.
 - Tool registry with `tool_slug`, display name, status, client credentials and return URL allow-list.
 - User registry with Google `sub`, email, hosted domain, profile metadata and status.
@@ -35,6 +36,7 @@
 - Device posture and endpoint management.
 - Password login.
 - Public user registration.
+- Provider-neutral identity migration, Microsoft support in OAuth vNext/Admin UI, direct tool/SDK Microsoft integration and automatic cross-provider account linking.
 
 ## Step 2 target-contract boundary
 

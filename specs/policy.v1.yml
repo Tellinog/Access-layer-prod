@@ -14,6 +14,16 @@ identity:
     - hd
   primary_user_key: google_sub
   email_primary_key_allowed: false
+temporary_legacy_microsoft_bridge:
+  decision: D-045
+  contract: specs/legacy-microsoft-bridge.v1.yml
+  default_enabled: false
+  enabled_env: LEGACY_MICROSOFT_ENABLED
+  tool_allowlist_env: LEGACY_MICROSOFT_TOOL_SLUGS
+  single_tenant_required: true
+  graph_allowed: false
+  synthetic_legacy_subject: "msft:<tid>:<oid>"
+  email_primary_key_allowed: false
 domain_policy:
   allowed_hd_env: GOOGLE_ALLOWED_HD
   deny_missing_hd: true

@@ -1,5 +1,15 @@
 # SECURITY.md
 
+## Temporary legacy Microsoft Entra security boundary
+
+The legacy bridge is disabled by default and available only to explicitly allowlisted tool slugs. It uses the tenant-specific Entra v2 authorization, token and JWKS endpoints; `common`, `organizations`, personal-account and Graph endpoints are not used. Validation requires an RS256 signature from that tenant's JWKS, exact tenant issuer, configured client audience, unexpired token, exact `tid`, non-empty `oid`, exact nonce, a syntactically valid email (or `preferred_username` fallback) and an allowlisted normalized email domain. Domain matching alone never replaces issuer/tenant/signature checks.
+
+Google and Microsoft authorization requests use independent opaque prefixes (`gst_` and `mst_`) and the existing hash-only, single-consume state/nonce storage. Provider callbacks reject cross-provider state before exchange. The Microsoft authorization code and ID token exist only at the adapter boundary; neither is persisted or logged. Upstream response bodies, provider descriptions, client secrets, codes and tokens are reduced to generic safe errors plus correlation ID.
+
+After validation, the immutable Entra `(tid, oid)` pair is mapped to the collision-resistant legacy subject `msft:<tid>:<oid>` and the validated domain is placed in `hd`. This is the explicit D-045 compatibility exception, not email-based account linking. Authorization still requires the current active user, active tool and active legacy grant. No Microsoft identity gains Admin UI or OAuth vNext access by implication.
+
+`MICROSOFT_CLIENT_SECRET` must be injected through approved secret storage and rotation controls; it must never be committed, logged or exposed in continuity evidence. Setting `LEGACY_MICROSOFT_ENABLED=false` removes the callback and provider choice after restart.
+
 ## Production continuity evidence safety
 
 Continuity evidence may contain operational identifiers, safe effective configuration, environment state enums, and public JWT key metadata, but never tokens, cookies, authorization codes, client secrets, private keys, passwords, database connection strings, session secrets, peppers, backup encryption keys, reusable secret verifiers, or personal rows. Operator artifacts stay outside the repository or in ignored local evidence paths; committed evidence must be redacted and reviewed.

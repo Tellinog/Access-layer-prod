@@ -10,6 +10,7 @@ const baseEnv: Record<string, string> = {
   GOOGLE_CLIENT_SECRET: "test-client-secret",
   GOOGLE_REDIRECT_URI: "http://localhost:8080/v1/auth/google/callback",
   GOOGLE_ALLOWED_HD: "unguess.io",
+  LEGACY_MICROSOFT_ENABLED: "false",
   JWT_PRIVATE_KEY_PEM_PATH: "",
   JWT_PRIVATE_KEY_PEM: "",
   JWT_PUBLIC_KEY_ID: "test-key",
@@ -30,6 +31,83 @@ afterEach(() => {
 });
 
 describe("loadConfig", () => {
+  it("defaults the legacy Microsoft bridge off and requires no Microsoft configuration", () => {
+    vi.stubEnv("LEGACY_MICROSOFT_ENABLED", undefined);
+    for (const name of ["MICROSOFT_TENANT_ID", "MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET", "MICROSOFT_REDIRECT_URI", "MICROSOFT_ALLOWED_EMAIL_DOMAINS", "LEGACY_MICROSOFT_TOOL_SLUGS"]) {
+      vi.stubEnv(name, undefined);
+    }
+    expect(loadConfig()).toMatchObject({
+      legacyMicrosoftEnabled: false,
+      microsoftTenantId: undefined,
+      microsoftAllowedEmailDomains: [],
+      legacyMicrosoftToolSlugs: []
+    });
+  });
+
+  it("loads the complete temporary Microsoft bridge configuration only when enabled", () => {
+    vi.stubEnv("LEGACY_MICROSOFT_ENABLED", "true");
+    vi.stubEnv("MICROSOFT_TENANT_ID", "11111111-1111-4111-8111-111111111111");
+    vi.stubEnv("MICROSOFT_CLIENT_ID", "33333333-3333-4333-8333-333333333333");
+    vi.stubEnv("MICROSOFT_CLIENT_SECRET", "synthetic-secret");
+    vi.stubEnv("MICROSOFT_REDIRECT_URI", "http://localhost:8080/v1/auth/microsoft/callback");
+    vi.stubEnv("MICROSOFT_ALLOWED_EMAIL_DOMAINS", "Testbirds.com");
+    vi.stubEnv("LEGACY_MICROSOFT_TOOL_SLUGS", "test-generator,sales-deck-agent");
+
+    expect(loadConfig()).toMatchObject({
+      legacyMicrosoftEnabled: true,
+      microsoftTenantId: "11111111-1111-4111-8111-111111111111",
+      microsoftClientId: "33333333-3333-4333-8333-333333333333",
+      microsoftOidcScope: "openid profile email",
+      microsoftAllowedEmailDomains: ["testbirds.com"],
+      legacyMicrosoftToolSlugs: ["test-generator", "sales-deck-agent"]
+    });
+  });
+
+  it.each([
+    "MICROSOFT_TENANT_ID",
+    "MICROSOFT_CLIENT_ID",
+    "MICROSOFT_CLIENT_SECRET",
+    "MICROSOFT_REDIRECT_URI",
+    "MICROSOFT_ALLOWED_EMAIL_DOMAINS",
+    "LEGACY_MICROSOFT_TOOL_SLUGS"
+  ])("requires %s when the legacy Microsoft bridge is enabled", (name) => {
+    vi.stubEnv("LEGACY_MICROSOFT_ENABLED", "true");
+    vi.stubEnv("MICROSOFT_TENANT_ID", "11111111-1111-4111-8111-111111111111");
+    vi.stubEnv("MICROSOFT_CLIENT_ID", "33333333-3333-4333-8333-333333333333");
+    vi.stubEnv("MICROSOFT_CLIENT_SECRET", "synthetic-secret");
+    vi.stubEnv("MICROSOFT_REDIRECT_URI", "http://localhost:8080/v1/auth/microsoft/callback");
+    vi.stubEnv("MICROSOFT_ALLOWED_EMAIL_DOMAINS", "testbirds.com");
+    vi.stubEnv("LEGACY_MICROSOFT_TOOL_SLUGS", "test-generator");
+    vi.stubEnv(name, undefined);
+    expect(() => loadConfig()).toThrow(name);
+  });
+
+  it("rejects unsafe Microsoft domains, slugs, scopes and callback topology", () => {
+    vi.stubEnv("LEGACY_MICROSOFT_ENABLED", "true");
+    vi.stubEnv("MICROSOFT_TENANT_ID", "11111111-1111-4111-8111-111111111111");
+    vi.stubEnv("MICROSOFT_CLIENT_ID", "33333333-3333-4333-8333-333333333333");
+    vi.stubEnv("MICROSOFT_CLIENT_SECRET", "synthetic-secret");
+    vi.stubEnv("MICROSOFT_REDIRECT_URI", "http://localhost:8080/v1/auth/microsoft/callback");
+    vi.stubEnv("MICROSOFT_ALLOWED_EMAIL_DOMAINS", "localhost");
+    vi.stubEnv("LEGACY_MICROSOFT_TOOL_SLUGS", "test-generator");
+    expect(() => loadConfig()).toThrow("MICROSOFT_ALLOWED_EMAIL_DOMAINS");
+
+    vi.stubEnv("MICROSOFT_ALLOWED_EMAIL_DOMAINS", "testbirds.com");
+    vi.stubEnv("LEGACY_MICROSOFT_TOOL_SLUGS", "access-admin");
+    expect(() => loadConfig()).toThrow("must not include access-admin");
+
+    vi.stubEnv("LEGACY_MICROSOFT_TOOL_SLUGS", "INVALID_SLUG");
+    expect(() => loadConfig()).toThrow("valid Access Layer tool slugs");
+
+    vi.stubEnv("LEGACY_MICROSOFT_TOOL_SLUGS", "test-generator");
+    vi.stubEnv("MICROSOFT_OIDC_SCOPE", "openid email");
+    expect(() => loadConfig()).toThrow("MICROSOFT_OIDC_SCOPE must include profile");
+
+    vi.stubEnv("MICROSOFT_OIDC_SCOPE", "openid profile email");
+    vi.stubEnv("MICROSOFT_REDIRECT_URI", "http://other.example/v1/auth/microsoft/callback");
+    expect(() => loadConfig()).toThrow("public Microsoft callback exactly");
+  });
+
   it("defaults the dark OAuth P0 foundation flag to false when the old environment omits it", () => {
     vi.stubEnv("OAUTH_P0_ENABLED", undefined);
 

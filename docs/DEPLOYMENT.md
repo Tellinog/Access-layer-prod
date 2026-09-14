@@ -46,6 +46,9 @@ Minimum production variables:
 - `OAUTH_TRANSACTION_PROTECTION_KEY` is required only when OAuth is true. It must be a dedicated canonical unpadded base64url encoding of exactly 32 random bytes. Never store a real value in Git or derive it from legacy secrets.
 - `OAUTH_CREDENTIAL_SECRET_PEPPER` is required only when OAuth is true. It must contain at least 16 characters and must never equal or derive from `TOOL_CLIENT_SECRET_PEPPER`.
 - `OAUTH_SIGNING_KEY_ROOT` is required only when OAuth is true and names an absolute dedicated local filesystem root. Key references, including paths, must not be logged. Missing or invalid persisted signing material remains a sanitized runtime 503 rather than permission to use the legacy key.
+- `LEGACY_MICROSOFT_ENABLED` is optional and defaults to `false`. Absent/false registers no Microsoft callback and requires no Microsoft value.
+- When `LEGACY_MICROSOFT_ENABLED=true`, all of `MICROSOFT_TENANT_ID`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_REDIRECT_URI`, `MICROSOFT_ALLOWED_EMAIL_DOMAINS` and `LEGACY_MICROSOFT_TOOL_SLUGS` are required. `MICROSOFT_OIDC_SCOPE` defaults to `openid profile email` and must retain all three scopes.
+- The production Microsoft redirect is `/v1/auth/microsoft/callback` under the configured origin/base path. Microsoft IDs and the secret are runtime/operator inputs; do not commit live values. `MICROSOFT_CLIENT_SECRET` belongs in the approved secret manager and its continuity must be proven only when the bridge is enabled.
 
 ## Infrastructure
 
@@ -54,6 +57,7 @@ Minimum production variables:
 - Secret manager.
 - Centralized application logs.
 - Monitoring for auth error rate, Google callback errors, DB write errors and audit log failures.
+- When enabled, monitoring for sanitized Microsoft callback errors without logging provider response bodies, codes or tokens.
 - Coolify/reverse-proxy deployments should set `TRUST_PROXY_HOPS=1`; direct local development should use `TRUST_PROXY_HOPS=0`.
 
 ## Local Docker Compose
@@ -96,6 +100,8 @@ When `RUN_SEED_ON_START=true`, the seed reconciles the reserved `access-admin` r
 8. Create admin grant and remove bootstrap env after verification.
 9. Register pilot tool.
 10. Run end-to-end tests.
+
+The optional Microsoft bridge adds no migration step. After separate authorization, configure the Entra Web redirect and runtime values, leave the flag false for configuration validation, then enable only for the approved pilot slugs and run the controlled smoke matrix. Roll back by disabling the flag and restarting.
 
 Steps 3A–3E implement the complete OAuth P0 surface only for local/default-off dark operation. They do not authorise a production flag/key/pepper/root, Google callback registration, pilot, key provisioning, controlled registration or deploy. Production remains blocked by the continuity/release gates below.
 

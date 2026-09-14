@@ -1,5 +1,11 @@
 # LOGGING.md
 
+## Temporary legacy Microsoft bridge events
+
+The conditional Microsoft callback emits `microsoft.callback.received` and then the same existing `auth.allowed`/`auth.denied.*`, session and exchange events as Google. Provider selection denials use the existing safe audit envelope with the new reason codes. `actor_google_sub` remains the frozen field name and may contain the approved synthetic `msft:<tid>:<oid>` value for this bridge.
+
+Automatic request logging is silent on `/v1/auth/microsoft/callback`. Never log Microsoft authorization codes, ID/access tokens, raw token responses, nonce/state, `error_description`, client secret, UPN beyond the already allowed normalized actor email, or arbitrary claim payloads. Safe Microsoft metadata is limited to correlation ID, tool identity, outcome/reason and the already approved actor fields after validation.
+
 ## Obiettivo
 
 Access Layer deve sapere da chi arriva ogni richiesta di accesso, per quale tool, e con quale risultato.
@@ -13,6 +19,7 @@ Access Layer deve sapere da chi arriva ogni richiesta di accesso, per quale tool
 | `auth.denied.invalid_return_url` | `return_url` non allow-listato | `denied` |
 | `auth.denied.invalid_state` | `state` mancante, malformato, scaduto o gia consumato | `denied` |
 | `google.callback.received` | Google ritorna al callback | `info` |
+| `microsoft.callback.received` | Microsoft Entra ritorna al callback legacy condizionale | `info` |
 | `auth.denied.invalid_google_token` | ID token non valido | `denied` |
 | `auth.denied.external_domain` | `hd` mancante o non ammesso | `denied` |
 | `auth.denied.email_not_verified` | `email_verified=false` | `denied` |

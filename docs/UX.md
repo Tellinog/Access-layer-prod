@@ -6,6 +6,8 @@
 - Access Layer should show as little intermediate UI as possible.
 - On denial, show a safe message and `correlation_id`.
 - Never expose raw Google error details to the user.
+- For a D-045 allowlisted tool only, `/v1/auth/start` shows one accessible intermediate choice with the target tool name and equal Google/Microsoft actions. It is not cacheable and creates no upstream auth transaction until a provider is selected.
+- Non-allowlisted tools and every tool while the bridge is disabled retain the direct Google flow. Microsoft failures use generic copy plus `correlation_id` and never expose provider details.
 
 ## Admin UX
 

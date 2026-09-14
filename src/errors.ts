@@ -7,6 +7,10 @@ export type ErrorCode =
   | "AUTH_INVALID_STATE"
   | "AUTH_GOOGLE_CALLBACK_FAILED"
   | "AUTH_INVALID_GOOGLE_TOKEN"
+  | "AUTH_MICROSOFT_CALLBACK_FAILED"
+  | "AUTH_INVALID_MICROSOFT_TOKEN"
+  | "AUTH_INVALID_PROVIDER"
+  | "AUTH_MICROSOFT_NOT_AVAILABLE"
   | "AUTH_EMAIL_NOT_VERIFIED"
   | "AUTH_EXTERNAL_DOMAIN"
   | "AUTH_USER_DISABLED"
@@ -31,6 +35,10 @@ export const httpStatusByCode: Record<ErrorCode, number> = {
   AUTH_INVALID_STATE: 400,
   AUTH_GOOGLE_CALLBACK_FAILED: 401,
   AUTH_INVALID_GOOGLE_TOKEN: 401,
+  AUTH_MICROSOFT_CALLBACK_FAILED: 401,
+  AUTH_INVALID_MICROSOFT_TOKEN: 401,
+  AUTH_INVALID_PROVIDER: 400,
+  AUTH_MICROSOFT_NOT_AVAILABLE: 403,
   AUTH_EMAIL_NOT_VERIFIED: 403,
   AUTH_EXTERNAL_DOMAIN: 403,
   AUTH_USER_DISABLED: 403,
@@ -56,6 +64,10 @@ export const safeMessageByCode: Record<ErrorCode, string> = {
   AUTH_INVALID_STATE: "Sessione di accesso non valida o scaduta. Riprova.",
   AUTH_GOOGLE_CALLBACK_FAILED: "Accesso Google non completato. Riprova.",
   AUTH_INVALID_GOOGLE_TOKEN: "Non e stato possibile verificare l'identita Google.",
+  AUTH_MICROSOFT_CALLBACK_FAILED: "Accesso Microsoft non completato. Riprova.",
+  AUTH_INVALID_MICROSOFT_TOKEN: "Non e stato possibile verificare l'identita Microsoft.",
+  AUTH_INVALID_PROVIDER: "Provider di accesso non valido.",
+  AUTH_MICROSOFT_NOT_AVAILABLE: "Accesso Microsoft non disponibile per questo tool.",
   AUTH_EMAIL_NOT_VERIFIED: "L'email Google non risulta verificata.",
   AUTH_EXTERNAL_DOMAIN: "Questo servizio e riservato agli account aziendali.",
   AUTH_USER_DISABLED: "Account non abilitato all'accesso.",

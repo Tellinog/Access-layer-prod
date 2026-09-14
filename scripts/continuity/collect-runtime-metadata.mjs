@@ -11,7 +11,9 @@ export const CONFIG_ENVIRONMENT_NAMES = Object.freeze([
   "BACKUP_API_TOKEN", "BACKUP_ENCRYPTION_KEY", "CORS_ALLOWED_ORIGINS", "DATABASE_URL",
   "ENABLE_REFRESH_TOKENS", "GOOGLE_ALLOWED_HD", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET",
   "GOOGLE_OIDC_SCOPE", "GOOGLE_REDIRECT_URI", "JWT_PRIVATE_KEY_PEM", "JWT_PRIVATE_KEY_PEM_PATH",
-  "JWT_PUBLIC_KEY_ID", "LOG_IP_SALT", "LOG_LEVEL", "OAUTH_CREDENTIAL_SECRET_PEPPER", "OAUTH_P0_ENABLED",
+  "JWT_PUBLIC_KEY_ID", "LEGACY_MICROSOFT_ENABLED", "LEGACY_MICROSOFT_TOOL_SLUGS", "LOG_IP_SALT", "LOG_LEVEL",
+  "MICROSOFT_ALLOWED_EMAIL_DOMAINS", "MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET", "MICROSOFT_OIDC_SCOPE",
+  "MICROSOFT_REDIRECT_URI", "MICROSOFT_TENANT_ID", "OAUTH_CREDENTIAL_SECRET_PEPPER", "OAUTH_P0_ENABLED",
   "OAUTH_SIGNING_KEY_ROOT", "OAUTH_TRANSACTION_PROTECTION_KEY", "ONE_TIME_CODE_TTL_SECONDS", "PORT",
   "POSTGRES_DB", "POSTGRES_PASSWORD", "POSTGRES_USER", "PUBLIC_BASE_PATH",
   "REFRESH_TOKEN_TTL_SECONDS", "RETURN_URL_ALLOWED_SCHEMES", "RUN_MIGRATIONS_ON_START",
@@ -162,6 +164,22 @@ export function collectRuntimeMetadata(environment = process.env) {
     missing.push("environment_state.OAUTH_TRANSACTION_PROTECTION_KEY=PRESENT_NON_EMPTY");
   }
 
+  const legacyMicrosoftEnabled = boolean(environment, "LEGACY_MICROSOFT_ENABLED", false, missing);
+  const microsoftRedirectUri = safeUrl(environment, "MICROSOFT_REDIRECT_URI", missing);
+  const microsoftAllowedEmailDomains = csv(environment, "MICROSOFT_ALLOWED_EMAIL_DOMAINS").map((value) => value.toLowerCase());
+  const microsoftOidcScope = String(optional(environment, "MICROSOFT_OIDC_SCOPE", "openid profile email")).split(/\s+/).filter(Boolean);
+  const legacyMicrosoftToolSlugs = csv(environment, "LEGACY_MICROSOFT_TOOL_SLUGS");
+  if (legacyMicrosoftEnabled === true) {
+    for (const name of ["MICROSOFT_TENANT_ID", "MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET", "MICROSOFT_REDIRECT_URI", "MICROSOFT_ALLOWED_EMAIL_DOMAINS", "LEGACY_MICROSOFT_TOOL_SLUGS"]) {
+      if (states[name] !== "PRESENT_NON_EMPTY") missing.push(`environment_state.${name}=PRESENT_NON_EMPTY`);
+    }
+    if (!microsoftAllowedEmailDomains.length) missing.push("effective_non_secret_config.MICROSOFT_ALLOWED_EMAIL_DOMAINS");
+    if (!legacyMicrosoftToolSlugs.length) missing.push("effective_non_secret_config.LEGACY_MICROSOFT_TOOL_SLUGS");
+    if (!["openid", "email", "profile"].every((scope) => microsoftOidcScope.includes(scope))) {
+      missing.push("effective_non_secret_config.MICROSOFT_OIDC_SCOPE_required_scopes");
+    }
+  }
+
   const effectiveConfig = {
     app_env: appEnv,
     public_base_path: publicBasePath(environment, missing),
@@ -175,6 +193,13 @@ export function collectRuntimeMetadata(environment = process.env) {
     google_redirect_uri: googleRedirectUri,
     google_allowed_hd: csv(environment, "GOOGLE_ALLOWED_HD").map((value) => value.toLowerCase()),
     google_oidc_scope: String(optional(environment, "GOOGLE_OIDC_SCOPE", "openid email profile")).split(/\s+/).filter(Boolean),
+    legacy_microsoft_enabled: legacyMicrosoftEnabled,
+    microsoft_tenant_id: optional(environment, "MICROSOFT_TENANT_ID", null),
+    microsoft_client_id: optional(environment, "MICROSOFT_CLIENT_ID", null),
+    microsoft_redirect_uri: microsoftRedirectUri,
+    microsoft_allowed_email_domains: microsoftAllowedEmailDomains,
+    microsoft_oidc_scope: microsoftOidcScope,
+    legacy_microsoft_tool_slugs: legacyMicrosoftToolSlugs,
     jwt_public_key_id: optional(environment, "JWT_PUBLIC_KEY_ID", null),
     access_token_ttl_seconds: integer(environment, "ACCESS_TOKEN_TTL_SECONDS", 900, 60, 3600, missing),
     refresh_token_ttl_seconds: integer(environment, "REFRESH_TOKEN_TTL_SECONDS", 28800, 300, 86400, missing),

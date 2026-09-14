@@ -17,6 +17,8 @@ Required pages:
 
 The same-service v1 Admin UI implements tool and user detail as lightweight in-page views opened from the list tables.
 
+The D-045 provider chooser is a separate, minimal legacy authentication page, not an Admin UI redesign. It contains a heading naming the escaped target tool and two keyboard-focusable links in one labelled navigation region. Existing Admin UI/Garden freeze rules remain unchanged.
+
 ## Layout
 
 - Left navigation for admin areas.

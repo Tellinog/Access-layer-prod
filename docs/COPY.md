@@ -4,6 +4,15 @@
 
 - `Accedi con Google aziendale`
 
+## Temporary provider chooser
+
+- Title: `Choose how to continue`
+- Heading: `Sign in to {escaped_tool_display_name}`
+- Supporting copy: `Choose your company account provider.`
+- Actions: `Continue with Google`; `Continue with Microsoft`
+
+This English copy is the explicit D-045 legacy exception for allowlisted tools. Do not show it when the bridge is disabled or the tool is not allowlisted.
+
 ## Logout button
 
 - `Logout`

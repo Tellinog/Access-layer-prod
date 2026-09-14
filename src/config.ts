@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { config as loadDotenv } from "dotenv";
 import type { Config } from "./types.js";
 import { parseOAuthTransactionProtectionKey } from "./oauth/state-protection.js";
-import { normalizeEmail } from "./validation.js";
+import { normalizeEmail, validateToolSlug } from "./validation.js";
 
 loadDotenv();
 
@@ -119,6 +119,19 @@ export function loadConfig(): Config {
     throw new Error("OAUTH_CREDENTIAL_SECRET_PEPPER must be at least 16 characters when set");
   }
 
+  const legacyMicrosoftEnabled = readBoolean("LEGACY_MICROSOFT_ENABLED", false);
+  const microsoftTenantId = legacyMicrosoftEnabled ? readRequired("MICROSOFT_TENANT_ID").toLowerCase() : undefined;
+  const microsoftClientId = legacyMicrosoftEnabled ? readRequired("MICROSOFT_CLIENT_ID").toLowerCase() : undefined;
+  const microsoftClientSecret = legacyMicrosoftEnabled ? readRequired("MICROSOFT_CLIENT_SECRET") : undefined;
+  const microsoftRedirectUri = legacyMicrosoftEnabled ? readRequired("MICROSOFT_REDIRECT_URI") : undefined;
+  const microsoftOidcScope = readOptional("MICROSOFT_OIDC_SCOPE", "openid profile email") ?? "openid profile email";
+  const microsoftAllowedEmailDomains = legacyMicrosoftEnabled
+    ? readCsv("MICROSOFT_ALLOWED_EMAIL_DOMAINS").map((domain) => domain.toLowerCase())
+    : [];
+  const legacyMicrosoftToolSlugs = legacyMicrosoftEnabled
+    ? readCsv("LEGACY_MICROSOFT_TOOL_SLUGS").map((slug) => slug.toLowerCase())
+    : [];
+
   const config: Config = {
     appEnv,
     appBaseUrl: readRequired("APP_BASE_URL"),
@@ -132,6 +145,14 @@ export function loadConfig(): Config {
     googleRedirectUri: readRequired("GOOGLE_REDIRECT_URI"),
     googleAllowedHd: readCsv("GOOGLE_ALLOWED_HD").map((hd) => hd.toLowerCase()),
     googleOidcScope: readOptional("GOOGLE_OIDC_SCOPE", "openid email profile") ?? "openid email profile",
+    legacyMicrosoftEnabled,
+    microsoftTenantId,
+    microsoftClientId,
+    microsoftClientSecret,
+    microsoftRedirectUri,
+    microsoftOidcScope,
+    microsoftAllowedEmailDomains,
+    legacyMicrosoftToolSlugs,
     jwtPrivateKeyPem: jwtPrivateKeyPem ?? (jwtPrivateKeyPemPath ? readFileSync(jwtPrivateKeyPemPath, "utf8") : undefined),
     jwtPrivateKeyPemPath,
     jwtPublicKeyId: readRequired("JWT_PUBLIC_KEY_ID"),
@@ -173,6 +194,37 @@ export function loadConfig(): Config {
     throw new Error("GOOGLE_ALLOWED_HD may only include Workspace hosted domains, not URLs, IP addresses or localhost");
   }
 
+  if (config.legacyMicrosoftEnabled) {
+    const guidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+    if (!config.microsoftTenantId || !guidPattern.test(config.microsoftTenantId)) {
+      throw new Error("MICROSOFT_TENANT_ID must be a GUID");
+    }
+    if (!config.microsoftClientId || !guidPattern.test(config.microsoftClientId)) {
+      throw new Error("MICROSOFT_CLIENT_ID must be a GUID");
+    }
+    if (!config.microsoftAllowedEmailDomains?.length) {
+      throw new Error("MICROSOFT_ALLOWED_EMAIL_DOMAINS must include at least one hosted domain");
+    }
+    if (config.microsoftAllowedEmailDomains.some((domain) => !isHostedDomain(domain))) {
+      throw new Error("MICROSOFT_ALLOWED_EMAIL_DOMAINS may only include hosted domains, not URLs, IP addresses or localhost");
+    }
+    if (!config.legacyMicrosoftToolSlugs?.length) {
+      throw new Error("LEGACY_MICROSOFT_TOOL_SLUGS must include at least one tool slug");
+    }
+    if (config.legacyMicrosoftToolSlugs.some((slug) => !validateToolSlug(slug))) {
+      throw new Error("LEGACY_MICROSOFT_TOOL_SLUGS may only include valid Access Layer tool slugs");
+    }
+    if (config.legacyMicrosoftToolSlugs.includes("access-admin")) {
+      throw new Error("LEGACY_MICROSOFT_TOOL_SLUGS must not include access-admin");
+    }
+    const configuredMicrosoftScopes = new Set((config.microsoftOidcScope ?? "").split(/\s+/).filter(Boolean));
+    for (const requiredScope of ["openid", "profile", "email"]) {
+      if (!configuredMicrosoftScopes.has(requiredScope)) {
+        throw new Error(`MICROSOFT_OIDC_SCOPE must include ${requiredScope}`);
+      }
+    }
+  }
+
   for (const [name, value] of [
     ["APP_BASE_URL", config.appBaseUrl],
     ["AUTH_ISSUER", config.authIssuer],
@@ -182,6 +234,21 @@ export function loadConfig(): Config {
       new URL(value);
     } catch {
       throw new Error(`${name} must be a valid URL`);
+    }
+  }
+
+  if (config.legacyMicrosoftEnabled) {
+    let microsoftRedirect: URL;
+    try {
+      microsoftRedirect = new URL(config.microsoftRedirectUri!);
+    } catch {
+      throw new Error("MICROSOFT_REDIRECT_URI must be a valid URL");
+    }
+    const appBase = new URL(config.appBaseUrl);
+    const expectedPath = `${config.publicBasePath}/v1/auth/microsoft/callback`;
+    if (microsoftRedirect.origin !== appBase.origin || microsoftRedirect.pathname !== expectedPath ||
+        microsoftRedirect.search !== "" || microsoftRedirect.hash !== "" || microsoftRedirect.username || microsoftRedirect.password) {
+      throw new Error("MICROSOFT_REDIRECT_URI must match the Access Layer public Microsoft callback exactly");
     }
   }
 
@@ -227,6 +294,9 @@ export function loadConfig(): Config {
     }
     if (!config.backupEncryptionKey) {
       throw new Error("BACKUP_ENCRYPTION_KEY is required in production");
+    }
+    if (config.legacyMicrosoftEnabled && !config.microsoftRedirectUri?.startsWith("https://")) {
+      throw new Error("Production MICROSOFT_REDIRECT_URI must be HTTPS");
     }
   }
 

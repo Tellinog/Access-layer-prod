@@ -95,6 +95,7 @@ class ProductionContinuityEvidenceTests(unittest.TestCase):
             postgres_user="access_layer", postgres_database="access_layer", google_client_id="public-client-id",
             google_redirect_uri="https://access-layer.example.test/v1/auth/google/callback",
             google_allowed_hd=["example.test"], google_oidc_scope=["openid", "email", "profile"],
+            legacy_microsoft_enabled=False,
             jwt_public_key_id="synthetic-kid", access_token_ttl_seconds=900,
             refresh_token_ttl_seconds=28800, one_time_code_ttl_seconds=60,
             enable_refresh_tokens=True, oauth_p0_enabled=False, session_cookie_name="access_layer_admin_session",
@@ -203,6 +204,27 @@ class ProductionContinuityEvidenceTests(unittest.TestCase):
         self.assertFalse(report.ready_for_isolated_restore)
         self.assertIn(
             "configuration.effective_non_secret_config.oauth_p0_enabled=false",
+            report.missing_for_isolated_restore,
+        )
+
+    def test_enabled_legacy_microsoft_bridge_requires_complete_observed_configuration(self) -> None:
+        evidence = self.restore_ready_evidence()
+        effective = evidence["configuration"]["effective_non_secret_config"]
+        effective.update(
+            legacy_microsoft_enabled=True,
+            microsoft_tenant_id="11111111-1111-4111-8111-111111111111",
+            microsoft_client_id="22222222-2222-4222-8222-222222222222",
+            microsoft_redirect_uri="https://access-layer.example.test/v1/auth/microsoft/callback",
+            microsoft_allowed_email_domains=["testbirds.com"],
+            microsoft_oidc_scope=["openid", "profile", "email"],
+            legacy_microsoft_tool_slugs=["test-generator"],
+        )
+        states = evidence["configuration"]["environment_state"]
+        states["MICROSOFT_CLIENT_SECRET"] = "PRESENT_EMPTY"
+        report = self.write_and_validate(evidence)
+        self.assertFalse(report.ready_for_isolated_restore)
+        self.assertIn(
+            "configuration.environment_state.MICROSOFT_CLIENT_SECRET=PRESENT_NON_EMPTY",
             report.missing_for_isolated_restore,
         )
 

@@ -8,6 +8,7 @@ import type {
   AuthorizationGrant,
   Config,
   GoogleIdentity,
+  MicrosoftIdentity,
   OneTimeCode,
   RefreshToken,
   Session,
@@ -48,6 +49,18 @@ const config: Config = {
   enableRefreshTokens: true,
   siemExportEnabled: false,
   trustProxyHops: 0
+};
+
+const microsoftConfig: Config = {
+  ...config,
+  legacyMicrosoftEnabled: true,
+  microsoftTenantId: "11111111-1111-4111-8111-111111111111",
+  microsoftClientId: "33333333-3333-4333-8333-333333333333",
+  microsoftClientSecret: "synthetic-microsoft-secret",
+  microsoftRedirectUri: "http://localhost:8080/v1/auth/microsoft/callback",
+  microsoftOidcScope: "openid profile email",
+  microsoftAllowedEmailDomains: ["testbirds.com"],
+  legacyMicrosoftToolSlugs: ["crm"]
 };
 
 const tool: Tool = {
@@ -95,6 +108,37 @@ class FakeGoogle {
   }
 }
 
+class FakeMicrosoft {
+  state = "";
+  nonce = "";
+  exchangeCalls = 0;
+
+  constructor(private readonly errorCode?: ErrorCode) {}
+
+  createAuthorizationUrl(input: { state: string; nonce: string }) {
+    this.state = input.state;
+    this.nonce = input.nonce;
+    return `https://login.microsoftonline.test/auth?state=${input.state}`;
+  }
+
+  async exchangeCodeForIdentity(_code?: string, correlationId = "corr_test"): Promise<MicrosoftIdentity> {
+    this.exchangeCalls += 1;
+    if (this.errorCode) throw new AppError(this.errorCode, correlationId);
+    return {
+      googleSub: "msft:11111111-1111-4111-8111-111111111111:22222222-2222-4222-8222-222222222222",
+      email: "tester@testbirds.com",
+      emailVerified: true,
+      hd: "testbirds.com",
+      displayName: "Testbirds Tester",
+      pictureUrl: null,
+      nonce: this.nonce,
+      issuer: "https://login.microsoftonline.com/11111111-1111-4111-8111-111111111111/v2.0",
+      audience: "33333333-3333-4333-8333-333333333333",
+      expiresAt: Math.floor(Date.now() / 1000) + 600
+    };
+  }
+}
+
 class MemoryRepos {
   db = {
     query: async () => ({ rows: [], rowCount: 0 }),
@@ -113,6 +157,8 @@ class MemoryRepos {
   client: ToolClient & { tool_slug: string } | null = null;
   refreshTokens = new Map<string, RefreshToken>();
   recentReviewedAccessRequest: Record<string, unknown> | null = null;
+  toolStatus: Tool["status"] = "active";
+  userStatus: User["status"] = "active";
 
   constructor(private readonly hasGrant: boolean) {}
 
@@ -129,11 +175,11 @@ class MemoryRepos {
   }
 
   async findToolBySlug(slug: string) {
-    return slug === tool.slug ? tool : null;
+    return slug === tool.slug ? { ...tool, status: this.toolStatus } : null;
   }
 
   async findToolById(id: string) {
-    return id === tool.id ? tool : null;
+    return id === tool.id ? { ...tool, status: this.toolStatus } : null;
   }
 
   async createAuthRequest(input: {
@@ -179,7 +225,7 @@ class MemoryRepos {
       hd: input.hd,
       display_name: input.displayName ?? null,
       picture_url: null,
-      status: "active",
+      status: this.userStatus,
       first_seen_at: new Date(),
       last_seen_at: new Date()
     };
@@ -382,12 +428,17 @@ function fakeTokenService() {
   };
 }
 
-async function buildFlowApp(repos: MemoryRepos, google: FakeGoogle) {
+async function buildFlowApp(
+  repos: MemoryRepos,
+  google: FakeGoogle,
+  options: { config?: Config; microsoft?: FakeMicrosoft } = {}
+) {
   return buildApp({
-    config,
+    config: options.config ?? config,
     repositories: repos as never,
     audit: new AuditLogger(repos as never),
     google,
+    microsoft: options.microsoft,
     tokenService: fakeTokenService() as never
   });
 }
@@ -885,6 +936,226 @@ describe("auth flow routes", () => {
     });
     expect(revoked.statusCode).toBe(200);
     expect(revoked.json()).toEqual({ active: false, reason: "revoked" });
+    await app.close();
+  });
+
+  it("keeps flag-off tools on direct Google and leaves the Microsoft callback absent", async () => {
+    const repos = new MemoryRepos(true);
+    const google = new FakeGoogle();
+    const app = await buildFlowApp(repos, google);
+    const start = await app.inject({
+      method: "GET",
+      url: `/v1/auth/start?tool_slug=crm&return_url=${encodeURIComponent(tool.allowed_return_urls[0])}&state=flag-off-google-state`
+    });
+    expect(start.statusCode).toBe(302);
+    expect(google.state).toMatch(/^gst_/);
+    const explicitGoogle = await app.inject({
+      method: "GET",
+      url: `/v1/auth/start?tool_slug=crm&return_url=${encodeURIComponent(tool.allowed_return_urls[0])}&state=flag-off-explicit-google-state&provider=google`
+    });
+    expect(explicitGoogle.statusCode).toBe(302);
+    expect(google.state).toMatch(/^gst_/);
+    expect(await app.inject({ method: "GET", url: "/v1/auth/microsoft/callback" })).toHaveProperty("statusCode", 404);
+    await app.close();
+  });
+
+  it("shows the provider chooser without creating auth state, then starts each selected provider", async () => {
+    const repos = new MemoryRepos(true);
+    const google = new FakeGoogle();
+    const microsoft = new FakeMicrosoft();
+    const app = await buildFlowApp(repos, google, { config: microsoftConfig, microsoft });
+    const baseUrl = `/v1/auth/start?tool_slug=crm&return_url=${encodeURIComponent(tool.allowed_return_urls[0])}&state=provider-choice-state`;
+
+    const chooser = await app.inject({ method: "GET", url: baseUrl });
+    expect(chooser.statusCode).toBe(200);
+    expect(chooser.body).toContain("Continue with Google");
+    expect(chooser.body).toContain("Continue with Microsoft");
+    expect(repos.authRequests.size).toBe(0);
+
+    const googleStart = await app.inject({ method: "GET", url: `${baseUrl}&provider=google` });
+    expect(googleStart.statusCode).toBe(302);
+    expect(google.state).toMatch(/^gst_/);
+
+    const microsoftStart = await app.inject({ method: "GET", url: `${baseUrl}&provider=microsoft` });
+    expect(microsoftStart.statusCode).toBe(302);
+    expect(microsoft.state).toMatch(/^mst_/);
+    expect(repos.authRequests.size).toBe(2);
+    await app.close();
+  });
+
+  it("fails closed for unknown providers and Microsoft on a non-allowlisted tool", async () => {
+    const repos = new MemoryRepos(true);
+    const google = new FakeGoogle();
+    const microsoft = new FakeMicrosoft();
+    const baseUrl = `/v1/auth/start?tool_slug=crm&return_url=${encodeURIComponent(tool.allowed_return_urls[0])}&state=provider-denial-state`;
+    const app = await buildFlowApp(repos, google, { config: microsoftConfig, microsoft });
+    expect((await app.inject({ method: "GET", url: `${baseUrl}&provider=other` })).statusCode).toBe(400);
+    await app.close();
+
+    const nonAllowlistedGoogle = new FakeGoogle();
+    const nonAllowlisted = await buildFlowApp(new MemoryRepos(true), nonAllowlistedGoogle, {
+      config: { ...microsoftConfig, legacyMicrosoftToolSlugs: ["test-generator"] },
+      microsoft: new FakeMicrosoft()
+    });
+    const directGoogle = await nonAllowlisted.inject({ method: "GET", url: baseUrl });
+    expect(directGoogle.statusCode).toBe(302);
+    expect(nonAllowlistedGoogle.state).toMatch(/^gst_/);
+    const denied = await nonAllowlisted.inject({ method: "GET", url: `${baseUrl}&provider=microsoft` });
+    expect(denied.statusCode).toBe(403);
+    expect(denied.body).toContain("Accesso Microsoft non disponibile");
+    await nonAllowlisted.close();
+  });
+
+  it("binds Microsoft state to its callback and reuses the full legacy exchange shape", async () => {
+    const repos = new MemoryRepos(true);
+    await repos.createToolClient("client-secret");
+    const google = new FakeGoogle();
+    const microsoft = new FakeMicrosoft();
+    const app = await buildFlowApp(repos, google, { config: microsoftConfig, microsoft });
+    await app.inject({
+      method: "GET",
+      url: `/v1/auth/start?tool_slug=crm&return_url=${encodeURIComponent(tool.allowed_return_urls[0])}&state=microsoft-exchange-state&provider=microsoft`
+    });
+
+    const confused = await app.inject({
+      method: "GET",
+      url: `/v1/auth/google/callback?state=${encodeURIComponent(microsoft.state)}&code=must-not-be-used`
+    });
+    expect(confused.statusCode).toBe(400);
+    expect(google.exchangeCalls).toBe(0);
+
+    const callback = await app.inject({
+      method: "GET",
+      url: `/v1/auth/microsoft/callback?state=${encodeURIComponent(microsoft.state)}&code=synthetic-code`
+    });
+    expect(callback.statusCode).toBe(302);
+    const code = new URL(callback.headers.location as string).searchParams.get("code");
+    const exchange = await app.inject({
+      method: "POST",
+      url: "/v1/auth/exchange",
+      headers: { authorization: `Basic ${Buffer.from("client-id:client-secret").toString("base64")}` },
+      payload: { code, redirect_uri: tool.allowed_return_urls[0] }
+    });
+    expect(exchange.statusCode).toBe(200);
+    expect(Object.keys(exchange.json()).sort()).toEqual([
+      "access_token", "correlation_id", "expires_in", "grant", "refresh_token", "session", "token_type", "tool", "user"
+    ].sort());
+    expect(exchange.json().user).toMatchObject({
+      google_sub: "msft:11111111-1111-4111-8111-111111111111:22222222-2222-4222-8222-222222222222",
+      email: "tester@testbirds.com",
+      hd: "testbirds.com"
+    });
+    expect(repos.audits).toContainEqual(expect.objectContaining({ event_type: "microsoft.callback.received" }));
+    expect(repos.audits).toContainEqual(expect.objectContaining({ event_type: "auth.allowed" }));
+    await app.close();
+  });
+
+  it("fails closed for missing, unknown, expired, replayed, errored, and nonce-mismatched Microsoft callbacks", async () => {
+    const missingMicrosoft = new FakeMicrosoft();
+    const missingApp = await buildFlowApp(new MemoryRepos(true), new FakeGoogle(), { config: microsoftConfig, microsoft: missingMicrosoft });
+    expect((await missingApp.inject({ method: "GET", url: "/v1/auth/microsoft/callback?code=synthetic-code" })).statusCode).toBe(400);
+    expect((await missingApp.inject({ method: "GET", url: "/v1/auth/microsoft/callback?state=mst_unknown&code=synthetic-code" })).statusCode).toBe(400);
+    expect(missingMicrosoft.exchangeCalls).toBe(0);
+    await missingApp.close();
+
+    const expiredRepos = new MemoryRepos(true);
+    const expiredMicrosoft = new FakeMicrosoft();
+    const expiredApp = await buildFlowApp(expiredRepos, new FakeGoogle(), { config: microsoftConfig, microsoft: expiredMicrosoft });
+    await expiredApp.inject({ method: "GET", url: `/v1/auth/start?tool_slug=crm&return_url=${encodeURIComponent(tool.allowed_return_urls[0])}&state=expired-auth-state-entropy&provider=microsoft` });
+    const expiredRequest = expiredRepos.authRequests.get(sha256(expiredMicrosoft.state));
+    if (!expiredRequest) throw new Error("expected Microsoft auth request");
+    expiredRequest.expires_at = new Date(0);
+    expect((await expiredApp.inject({ method: "GET", url: `/v1/auth/microsoft/callback?state=${encodeURIComponent(expiredMicrosoft.state)}&code=synthetic-code` })).statusCode).toBe(400);
+    expect(expiredMicrosoft.exchangeCalls).toBe(0);
+    await expiredApp.close();
+
+    const replayRepos = new MemoryRepos(true);
+    const replayMicrosoft = new FakeMicrosoft();
+    const replayApp = await buildFlowApp(replayRepos, new FakeGoogle(), { config: microsoftConfig, microsoft: replayMicrosoft });
+    await replayApp.inject({ method: "GET", url: `/v1/auth/start?tool_slug=crm&return_url=${encodeURIComponent(tool.allowed_return_urls[0])}&state=replay-auth-state-entropy&provider=microsoft` });
+    const replayUrl = `/v1/auth/microsoft/callback?state=${encodeURIComponent(replayMicrosoft.state)}&code=synthetic-code`;
+    expect((await replayApp.inject({ method: "GET", url: replayUrl })).statusCode).toBe(302);
+    expect((await replayApp.inject({ method: "GET", url: replayUrl })).statusCode).toBe(400);
+    expect(replayMicrosoft.exchangeCalls).toBe(1);
+    await replayApp.close();
+
+    const errorMicrosoft = new FakeMicrosoft();
+    const errorApp = await buildFlowApp(new MemoryRepos(true), new FakeGoogle(), { config: microsoftConfig, microsoft: errorMicrosoft });
+    await errorApp.inject({ method: "GET", url: `/v1/auth/start?tool_slug=crm&return_url=${encodeURIComponent(tool.allowed_return_urls[0])}&state=provider-error-state&provider=microsoft` });
+    const providerError = await errorApp.inject({ method: "GET", url: `/v1/auth/microsoft/callback?state=${encodeURIComponent(errorMicrosoft.state)}&error=access_denied&error_description=must-not-leak` });
+    expect(providerError.statusCode).toBe(401);
+    expect(providerError.body).not.toContain("must-not-leak");
+    expect(errorMicrosoft.exchangeCalls).toBe(0);
+    await errorApp.close();
+
+    const nonceMicrosoft = new FakeMicrosoft();
+    const nonceApp = await buildFlowApp(new MemoryRepos(true), new FakeGoogle(), { config: microsoftConfig, microsoft: nonceMicrosoft });
+    await nonceApp.inject({ method: "GET", url: `/v1/auth/start?tool_slug=crm&return_url=${encodeURIComponent(tool.allowed_return_urls[0])}&state=nonce-mismatch-state&provider=microsoft` });
+    nonceMicrosoft.nonce = "different-nonce";
+    const nonceMismatch = await nonceApp.inject({ method: "GET", url: `/v1/auth/microsoft/callback?state=${encodeURIComponent(nonceMicrosoft.state)}&code=synthetic-code` });
+    expect(nonceMismatch.statusCode).toBe(401);
+    expect(nonceMicrosoft.exchangeCalls).toBe(1);
+    await nonceApp.close();
+  });
+
+  it("uses the shared pending-grant and no-grant paths for Microsoft identities", async () => {
+    const pendingRepos = new MemoryRepos(false);
+    pendingRepos.pendingEmailGrant = {
+      ...makeGrant(),
+      id: "pending-microsoft-grant",
+      user_id: null,
+      email_normalized: "tester@testbirds.com",
+      status: "pending_user_link"
+    };
+    const pendingMicrosoft = new FakeMicrosoft();
+    const pendingApp = await buildFlowApp(pendingRepos, new FakeGoogle(), { config: microsoftConfig, microsoft: pendingMicrosoft });
+    await pendingApp.inject({
+      method: "GET",
+      url: `/v1/auth/start?tool_slug=crm&return_url=${encodeURIComponent(tool.allowed_return_urls[0])}&state=pending-microsoft-state&provider=microsoft`
+    });
+    const pendingCallback = await pendingApp.inject({
+      method: "GET",
+      url: `/v1/auth/microsoft/callback?state=${encodeURIComponent(pendingMicrosoft.state)}&code=synthetic-code`
+    });
+    expect(pendingCallback.statusCode).toBe(302);
+    expect(pendingRepos.pendingEmailGrant).toMatchObject({ user_id: "user-id", status: "active" });
+    await pendingApp.close();
+
+    const noGrantRepos = new MemoryRepos(false);
+    const noGrantMicrosoft = new FakeMicrosoft();
+    const noGrantApp = await buildFlowApp(noGrantRepos, new FakeGoogle(), { config: microsoftConfig, microsoft: noGrantMicrosoft });
+    await noGrantApp.inject({
+      method: "GET",
+      url: `/v1/auth/start?tool_slug=crm&return_url=${encodeURIComponent(tool.allowed_return_urls[0])}&state=no-grant-microsoft-state&provider=microsoft`
+    });
+    const denied = await noGrantApp.inject({
+      method: "GET",
+      url: `/v1/auth/microsoft/callback?state=${encodeURIComponent(noGrantMicrosoft.state)}&code=synthetic-code`
+    });
+    expect(denied.statusCode).toBe(403);
+    expect(noGrantRepos.accessRequests).toHaveLength(1);
+    expect(noGrantRepos.accessRequests[0]).toMatchObject({ google_sub: expect.stringMatching(/^msft:/), hd: "testbirds.com" });
+    await noGrantApp.close();
+  });
+
+  it.each([
+    ["disabled user", "userStatus", "disabled", 403, "auth.denied.user_disabled"],
+    ["disabled tool during callback", "toolStatus", "disabled", 403, "auth.denied.invalid_tool"]
+  ] as const)("denies a Microsoft callback for a %s", async (_label, property, status, expectedStatus, eventType) => {
+    const repos = new MemoryRepos(true);
+    const microsoft = new FakeMicrosoft();
+    const app = await buildFlowApp(repos, new FakeGoogle(), { config: microsoftConfig, microsoft });
+    await app.inject({
+      method: "GET",
+      url: `/v1/auth/start?tool_slug=crm&return_url=${encodeURIComponent(tool.allowed_return_urls[0])}&state=disabled-microsoft-state&provider=microsoft`
+    });
+    (repos[property] as string) = status;
+    const callback = await app.inject({
+      method: "GET",
+      url: `/v1/auth/microsoft/callback?state=${encodeURIComponent(microsoft.state)}&code=synthetic-code`
+    });
+    expect(callback.statusCode).toBe(expectedStatus);
+    expect(repos.audits).toContainEqual(expect.objectContaining({ event_type: eventType }));
     await app.close();
   });
 });

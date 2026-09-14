@@ -19,6 +19,14 @@ export interface Config {
   googleRedirectUri: string;
   googleAllowedHd: string[];
   googleOidcScope: string;
+  legacyMicrosoftEnabled?: boolean;
+  microsoftTenantId?: string;
+  microsoftClientId?: string;
+  microsoftClientSecret?: string;
+  microsoftRedirectUri?: string;
+  microsoftOidcScope?: string;
+  microsoftAllowedEmailDomains?: string[];
+  legacyMicrosoftToolSlugs?: string[];
   jwtPrivateKeyPem?: string;
   jwtPrivateKeyPemPath?: string;
   jwtPublicKeyId: string;
@@ -198,6 +206,9 @@ export interface GoogleIdentity {
   audience: string;
   expiresAt: number;
 }
+
+export type LegacyIdentity = GoogleIdentity;
+export type MicrosoftIdentity = LegacyIdentity;
 
 export interface AdminActor {
   userId: string;

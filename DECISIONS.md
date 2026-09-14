@@ -495,3 +495,13 @@ Only persisted protected forms are portable: credential/code/refresh hashes, pro
 Rationale: keeping the additive data inside version 1 preserves existing backup consumers while making current OAuth state portable and replacement FK-safe. External cryptographic material cannot be reconstructed from database state, and repository tests are not a substitute for the separately authorised real PostgreSQL restore in Step 4B.
 
 Hardening note, 2026-08-29: one export now reads every legacy and OAuth section through one transaction-bound PostgreSQL connection after establishing `REPEATABLE READ, READ ONLY`, so D-044's one logical backup cannot be torn across MVCC snapshots. Import prevalidation interprets credential rotation lineage as owner-local acyclic chains terminating at `NULL` and refresh lineage as exactly one generation for every integer in `0..current_generation`, with immediate same-family parents. Deterministic structure/lineage rejection carries sanitized HTTP 400 semantics for the unchanged legacy global handler. This tightens consistency and fail-closed validation without changing the version-1 shape, successful responses or protocol decisions.
+
+## D-045 - Permit a temporary Microsoft Entra identity bridge only in legacy v1
+
+Status: accepted
+
+Decision: the approved Testbirds hand-off authorizes a narrow exception to D-002/D-004 for selected legacy tools. When `LEGACY_MICROSOFT_ENABLED=true`, Access Layer may authenticate a Testbirds single-tenant Entra identity, validate the tenant-specific token and allowed email domain, and persist/propagate the synthetic legacy `google_sub` value `msft:<tenant-id>:<oid>` with `hd` equal to the validated domain. The existing legacy user/grant/session/code/token pipeline and consumer contract remain unchanged. OAuth vNext, `src/oauth/**`, SDKs, consumers, Admin UI access and non-allowlisted tools are outside this exception.
+
+Rationale: Testbirds needs an immediately reversible bridge while the durable provider-neutral identity programme remains deferred. A distinct `msft:` namespace prevents collision with Google subjects and avoids a migration or consumer rollout. Default-off and per-tool allowlisting contain the compatibility exception.
+
+Rollback: set `LEGACY_MICROSOFT_ENABLED=false` and restart. Microsoft routes/choice disappear while existing Google behavior and legacy contracts remain available. Synthetic users and their audit history remain as inert records; no destructive cleanup is required.

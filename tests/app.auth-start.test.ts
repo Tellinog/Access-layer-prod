@@ -50,6 +50,52 @@ const config: Config = {
 };
 
 describe("auth start route", () => {
+  it("offers Google and Microsoft only for the allowlisted test-generator slug without persisting auth state", async () => {
+    const testGenerator = {
+      ...tool,
+      slug: "test-generator",
+      display_name: "Test Generator",
+      allowed_return_urls: ["https://test-generator.example.test/auth/access-layer/callback"]
+    };
+    let createAuthRequestCalls = 0;
+    const repositories = {
+      health: async () => true,
+      findToolBySlug: async (slug: string) => slug === testGenerator.slug ? testGenerator : null,
+      createAuthRequest: async () => { createAuthRequestCalls += 1; },
+      writeAudit: async () => undefined
+    };
+    const app = await buildApp({
+      config: {
+        ...config,
+        legacyMicrosoftEnabled: true,
+        legacyMicrosoftToolSlugs: ["test-generator"]
+      },
+      repositories: repositories as never,
+      audit: new AuditLogger(repositories as never),
+      google: {
+        createAuthorizationUrl: () => "https://accounts.google.com/o/oauth2/v2/auth",
+        exchangeCodeForIdentity: async () => { throw new Error("not used"); }
+      },
+      microsoft: {
+        createAuthorizationUrl: () => "https://login.microsoftonline.com/tenant/oauth2/v2.0/authorize",
+        exchangeCodeForIdentity: async () => { throw new Error("not used"); }
+      },
+      tokenService: { getJwks: () => ({ keys: [] }) } as never
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/auth/start?tool_slug=test-generator&return_url=${encodeURIComponent(testGenerator.allowed_return_urls[0])}&state=test-generator-provider-state`
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.headers.pragma).toBe("no-cache");
+    expect(response.body).toContain("Continue with Google");
+    expect(response.body).toContain("Continue with Microsoft");
+    expect(createAuthRequestCalls).toBe(0);
+    await app.close();
+  });
+
   it("answers configured CORS preflight requests without touching auth state", async () => {
     const corsConfig = {
       ...config,

@@ -65,6 +65,41 @@
     "GOOGLE_OIDC_SCOPE": {
       "type": "string"
     },
+    "LEGACY_MICROSOFT_ENABLED": {
+      "type": "boolean",
+      "default": false,
+      "description": "Temporary legacy-only Microsoft Entra bridge flag. OAuth vNext is unaffected."
+    },
+    "MICROSOFT_TENANT_ID": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "MICROSOFT_CLIENT_ID": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "MICROSOFT_CLIENT_SECRET": {
+      "type": "string",
+      "minLength": 1
+    },
+    "MICROSOFT_REDIRECT_URI": {
+      "type": "string",
+      "format": "uri"
+    },
+    "MICROSOFT_OIDC_SCOPE": {
+      "type": "string",
+      "default": "openid profile email"
+    },
+    "MICROSOFT_ALLOWED_EMAIL_DOMAINS": {
+      "type": "string",
+      "minLength": 3,
+      "description": "Comma-separated email domains accepted only after tenant-specific Entra ID-token validation."
+    },
+    "LEGACY_MICROSOFT_TOOL_SLUGS": {
+      "type": "string",
+      "minLength": 3,
+      "description": "Comma-separated legacy tool slugs allowed to display Microsoft sign-in. access-admin is forbidden."
+    },
     "JWT_PRIVATE_KEY_PEM_PATH": {
       "type": "string"
     },
@@ -183,6 +218,10 @@
     {
       "if": {"properties": {"OAUTH_P0_ENABLED": {"const": true}}, "required": ["OAUTH_P0_ENABLED"]},
       "then": {"required": ["OAUTH_TRANSACTION_PROTECTION_KEY", "OAUTH_CREDENTIAL_SECRET_PEPPER", "OAUTH_SIGNING_KEY_ROOT"]}
+    },
+    {
+      "if": {"properties": {"LEGACY_MICROSOFT_ENABLED": {"const": true}}, "required": ["LEGACY_MICROSOFT_ENABLED"]},
+      "then": {"required": ["MICROSOFT_TENANT_ID", "MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET", "MICROSOFT_REDIRECT_URI", "MICROSOFT_ALLOWED_EMAIL_DOMAINS", "LEGACY_MICROSOFT_TOOL_SLUGS"]}
     }
   ]
 }

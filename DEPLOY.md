@@ -48,6 +48,23 @@ The dashboard is at `/admin`; admin and tool-management APIs are under `/v1/admi
 
 Do not set or enable those OAuth values in production under this step. No callback registration, pilot/key provisioning, controlled registration, backup expansion or production action is authorised; Step 3E does not modify Compose/Coolify or production secrets.
 
+### Optional temporary legacy Microsoft bridge
+
+The bridge is absent by default. Enabling it requires all of the following runtime values:
+
+```env
+LEGACY_MICROSOFT_ENABLED=true
+MICROSOFT_TENANT_ID=<testbirds-directory-tenant-guid>
+MICROSOFT_CLIENT_ID=<entra-web-app-client-guid>
+MICROSOFT_CLIENT_SECRET=<secret-manager-reference-value>
+MICROSOFT_REDIRECT_URI=https://access-layer.unguess-internal.net/v1/auth/microsoft/callback
+MICROSOFT_OIDC_SCOPE=openid profile email
+MICROSOFT_ALLOWED_EMAIL_DOMAINS=testbirds.com
+LEGACY_MICROSOFT_TOOL_SLUGS=<comma-separated-pilot-slugs>
+```
+
+Do not commit real identifiers or secret values. The redirect must exactly match the configured public origin/base path and the Entra Web redirect. The client secret must use approved secret storage/rotation and continuity evidence. Roll back by setting `LEGACY_MICROSOFT_ENABLED=false` and restarting; no migration or consumer change is involved. This repository task does not authorize deployment, Coolify changes or tenant registration changes.
+
 ## Local Docker Compose
 
 For local development, Docker Compose can start both PostgreSQL and the Access Layer service.
@@ -67,6 +84,7 @@ This local compose profile is not a production secret-management pattern. Produc
 - `GET /health` returns service and DB health.
 - `GET /v1/.well-known/jwks.json` returns current public signing keys.
 - OAuth redirect URI matches Google Cloud configuration exactly.
+- If the legacy Microsoft bridge is enabled, its exact redirect, single tenant, allowed domains and tool-slug allowlist match the approved registration/configuration.
 - `GOOGLE_ALLOWED_HD` matches the Workspace domain.
 - `GOOGLE_ALLOWED_HD` contains only Google Workspace hosted domains from the ID token `hd` claim, never local runtime hosts such as `localhost`.
 - Audit log write path is available before accepting login traffic.
@@ -75,6 +93,7 @@ This local compose profile is not a production secret-management pattern. Produc
 ## Secret rotation
 
 - Google client secret: rotate using Google Auth Platform, deploy new secret, verify no old secret use, then disable old secret.
+- Microsoft client secret: create/rotate in Entra and the approved secret store, update runtime configuration without versioning the value, verify the pilot, then retire the old credential.
 - JWT signing key: add new key with new `kid`, publish JWKS, issue new tokens, wait for old TTL, then retire old key.
 - Tool client secrets: support per-tool rotation with overlapping old/new secret during migration.
 - Backup encryption key: rotate by exporting a fresh encrypted backup after deploying the new `BACKUP_ENCRYPTION_KEY`; preserve the previous key until older backup files expire.

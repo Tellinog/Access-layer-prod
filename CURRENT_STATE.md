@@ -4,6 +4,22 @@
 
 V1 legacy implementation complete. Step 4B hardened candidate `d8998e1fbc1789d71a19cef78714c74c3dbfed37` has three complete consecutive local PostgreSQL 16.15 qualification PASS results, but Step 4B is not approved until a new independent audit passes. OAuth remains default-off; no pilot, production registration, production key/secret provisioning, production restore or production enablement exists.
 
+## Temporary Testbirds Microsoft Entra legacy bridge implemented locally, 2026-09-14
+
+- The approved hand-off supersedes the 2026-09-11 planning prohibition on synthetic legacy identities for this narrow, reversible exception. No provider-neutral migration is introduced.
+- With `LEGACY_MICROSOFT_ENABLED=true`, only slugs in `LEGACY_MICROSOFT_TOOL_SLUGS` receive a Google/Microsoft chooser on `/v1/auth/start`; all other tools retain direct Google behavior. With the flag absent/false, the Microsoft callback is not registered and legacy Google behavior remains the default.
+- The Microsoft adapter is single-tenant and validates the tenant-specific issuer, signature, audience, expiry, tenant, object ID, nonce and allowed email domain. It maps the verified identity to `google_sub=msft:<tid>:<oid>` and `hd=<validated-domain>`, then uses the existing legacy completion and token lifecycle pipeline unchanged.
+- No database migration, new table, consumer/SDK change or `src/oauth/**` change was made. The historical legacy baseline remains immutable; `specs/legacy-microsoft-bridge.v1.yml` records the approved additive exception.
+- Local automated verification uses synthetic IDs and credentials only: lint/build, 350 Vitest tests, 64 Python tests (two expected skips), platform and OAuth contract validators, continuity schema validation and Compose rendering pass. The environment inventory is 53 names and redacts the conditional Microsoft secret. No deploy, Coolify change, production secret provisioning or real Entra login has occurred.
+
+## Superseded Testbirds Microsoft Entra multi-provider discovery, 2026-09-11
+
+- Added planning-only operator guidance for a proposed single-tenant Testbirds Microsoft Entra web application, exact tenant/issuer/audience/nonce/object/member/domain validation, assignment controls, optional claims, production credential choices and secret-safe handoff.
+- Added a staged multi-provider architecture and compatibility plan. The recommendation keeps frozen Google-only `/v1/*` behavior available, introduces a versioned Access Layer-owned provider chooser and normalizes Google/Entra identities before common grant/session handling.
+- The existing schema and wire contracts are not provider-neutral. This remains true for the long-term target and OAuth vNext, but D-045 and the approved hand-off now permit a temporary legacy-only synthetic subject without changing those contracts.
+- Added a reusable per-tool Codex prompt that keeps all upstream provider integration inside Access Layer and migrates tools only to the approved provider-neutral contract.
+- This section records the earlier planning state. The local legacy bridge described above now exists; production/Coolify and long-term provider-neutral work remain unperformed.
+
 ## Step 4B refresh-race hardening locally qualified, independent audit pending, 2026-08-31
 
 - Sanitized pre-fix evidence on exact diagnostic commit `59cc07957dee6f1f9d576ef1823cd9e59b28bee0` reproduced the intermittent loser as HTTP 503 `temporarily_unavailable`, SQLSTATE `23514`, constraint `oauth_refresh_tokens_revoked_order`, query-tag `revoke_current_refresh_token`; the winner committed generation 1 while replay revocation rolled back.

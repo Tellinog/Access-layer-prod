@@ -27,6 +27,7 @@ function completeEnvironment(): NodeJS.ProcessEnv {
     GOOGLE_CLIENT_SECRET: secretSentinel,
     GOOGLE_OIDC_SCOPE: "openid email profile",
     GOOGLE_REDIRECT_URI: "https://access-layer.example.test/v1/auth/google/callback",
+    LEGACY_MICROSOFT_ENABLED: "false",
     JWT_PRIVATE_KEY_PEM: secretSentinel,
     JWT_PRIVATE_KEY_PEM_PATH: "",
     JWT_PUBLIC_KEY_ID: "public-kid",
@@ -112,6 +113,24 @@ describe("production continuity helper safety", () => {
     expect(completed.stdout).not.toContain(secretSentinel);
   });
 
+  it("tracks enabled Microsoft configuration without emitting its client secret", () => {
+    const environment = completeEnvironment();
+    environment.LEGACY_MICROSOFT_ENABLED = "true";
+    environment.MICROSOFT_TENANT_ID = "11111111-1111-4111-8111-111111111111";
+    environment.MICROSOFT_CLIENT_ID = "22222222-2222-4222-8222-222222222222";
+    environment.MICROSOFT_CLIENT_SECRET = secretSentinel;
+    environment.MICROSOFT_REDIRECT_URI = "https://access-layer.example.test/v1/auth/microsoft/callback";
+    environment.MICROSOFT_OIDC_SCOPE = "openid profile email";
+    environment.MICROSOFT_ALLOWED_EMAIL_DOMAINS = "testbirds.com";
+    environment.LEGACY_MICROSOFT_TOOL_SLUGS = "test-generator";
+    const { output, report } = collect(environment);
+    const effective = report.effective_non_secret_config as Record<string, unknown>;
+    expect(report.status).toBe("OBSERVED");
+    expect(effective.legacy_microsoft_enabled).toBe(true);
+    expect(effective.legacy_microsoft_tool_slugs).toEqual(["test-generator"]);
+    expect(output).not.toContain(secretSentinel);
+  });
+
   it("fails closed without emitting credentials embedded in nominally safe URLs", () => {
     const environment = completeEnvironment();
     environment.APP_BASE_URL = "https://operator:do-not-print@example.test";
@@ -133,12 +152,12 @@ describe("production continuity helper safety", () => {
     const { report } = collect();
     const inventory = report.source_inventory as { variables: string[] };
     expect([...inventory.variables].sort()).toEqual(sourceEnvironmentNames());
-    expect(inventory.variables).toHaveLength(45);
+    expect(inventory.variables).toHaveLength(53);
   });
 
   it("keeps runtime and entrypoint invariant and pins the approved Compose continuity correction", () => {
-    expect(sha256Lf("src/config.ts")).toBe("0a63490a7f51cda34c63b0cce1f71ed021fc7b303ea15398e2d163df318b0c23");
-    expect(sha256Lf("docker-compose.yaml")).toBe("3c91dbaccd3dadae1ef8587fba307721e72fe281aed26b969b961cc9a84630aa");
+    expect(sha256Lf("src/config.ts")).toBe("9bcd9efe5abb181621fbc0acbe60d8374f4ce5b5d662f3c74f094cd42d75c82e");
+    expect(sha256Lf("docker-compose.yaml")).toBe("7315710b8581c7e8dc3d6423df5ac11f8767fb29a8e12bdd571174f41a4a6359");
     expect(sha256Lf("docker/entrypoint.sh")).toBe("07d57fbdbb6bc09268b154c7d97afbfc5f8d5699b0378c747057393769ec6d76");
   });
 

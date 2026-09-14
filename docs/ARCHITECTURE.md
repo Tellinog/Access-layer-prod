@@ -12,12 +12,15 @@ It sits between internal tools and Google Auth Platform:
 - Access Layer returns a short-lived, tool-scoped identity to the tool backend.
 - Tools create local sessions and call introspection/JWKS as needed.
 
+For the temporary D-045 exception, a tenant-specific Microsoft Entra adapter can be mounted only behind a default-off flag and per-tool allowlist. It terminates the Microsoft protocol inside Access Layer, maps the verified identity to the frozen legacy shape, and joins the same permission/token pipeline after identity verification. Tools, OAuth vNext and the database schema do not change.
+
 ## Components
 
 | Component | Responsibility | Technology | Notes |
 |---|---|---|---|
 | Public Auth API | Start login, handle Google callback, exchange one-time code | Node.js/TypeScript reference | Must be HTTPS in production |
 | Google OIDC Adapter | Build authorization URL, exchange code, validate ID token | Google auth library | Must validate `aud`, `iss`, `exp`, `hd` |
+| Temporary Microsoft OIDC Adapter | Build tenant-specific authorization URL, exchange code, validate ID token and normalize identity | JOSE/JWKS | Default-off; strict `iss`, `aud`, `exp`, `tid`, `oid`, nonce and domain checks; no Graph |
 | Permission Service | Resolve grants for user/tool | DB-backed service | Must handle pending email grants |
 | Token Service | Issue Access Layer JWT and refresh tokens | JOSE/JWT | Tool-scoped, short TTL |
 | JWKS Endpoint | Publish public signing keys | HTTP endpoint | Used by tools for offline validation |
@@ -40,6 +43,8 @@ It sits between internal tools and Google Auth Platform:
 8. Browser is redirected to tool callback with code and original state.
 9. Tool backend calls `/v1/auth/exchange` using tool client credentials.
 10. Access Layer returns identity, permissions, session ID and JWT.
+
+For an allowlisted Microsoft selection, steps 2–4 use provider-bound `mst_` state and `/v1/auth/microsoft/callback`; after verified identity mapping, steps 5–10 are the exact same legacy implementation. Google uses `gst_` state and remains direct when the bridge is unavailable.
 
 ### Activity-driven session renewal
 

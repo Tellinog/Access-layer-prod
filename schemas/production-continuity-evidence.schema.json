@@ -152,14 +152,15 @@
         "secret_values_or_reusable_verifiers_committed": {"const": false},
         "records": {
           "type": "object", "additionalProperties": false,
-          "required": ["SESSION_SECRET", "TOOL_CLIENT_SECRET_PEPPER", "OAUTH_CREDENTIAL_SECRET_PEPPER", "BACKUP_ENCRYPTION_KEY", "GOOGLE_CLIENT_SECRET", "LOG_IP_SALT"],
+          "required": ["SESSION_SECRET", "TOOL_CLIENT_SECRET_PEPPER", "OAUTH_CREDENTIAL_SECRET_PEPPER", "BACKUP_ENCRYPTION_KEY", "GOOGLE_CLIENT_SECRET", "LOG_IP_SALT", "MICROSOFT_CLIENT_SECRET"],
           "properties": {
             "SESSION_SECRET": {"$ref": "#/$defs/secretContinuityRecord"},
             "TOOL_CLIENT_SECRET_PEPPER": {"$ref": "#/$defs/secretContinuityRecord"},
             "OAUTH_CREDENTIAL_SECRET_PEPPER": {"$ref": "#/$defs/secretContinuityRecord"},
             "BACKUP_ENCRYPTION_KEY": {"$ref": "#/$defs/secretContinuityRecord"},
             "GOOGLE_CLIENT_SECRET": {"$ref": "#/$defs/secretContinuityRecord"},
-            "LOG_IP_SALT": {"$ref": "#/$defs/secretContinuityRecord"}
+            "LOG_IP_SALT": {"$ref": "#/$defs/secretContinuityRecord"},
+            "MICROSOFT_CLIENT_SECRET": {"$ref": "#/$defs/secretContinuityRecord"}
           }
         }
       }
@@ -172,7 +173,7 @@
           "type": "object", "additionalProperties": false, "required": ["derived_from", "variables"],
           "properties": {
             "derived_from": {"const": ["src/config.ts", "docker-compose.yaml", "docker/entrypoint.sh"]},
-            "variables": {"const": ["ACCESS_REQUEST_REOPEN_AFTER_DAYS", "ACCESS_TOKEN_TTL_SECONDS", "ADMIN_BOOTSTRAP_EMAILS", "APP_BASE_URL", "APP_ENV", "AUDIT_LOG_RAW_IP", "AUDIT_LOG_RETENTION_DAYS", "AUTH_ISSUER", "BACKUP_API_TOKEN", "BACKUP_ENCRYPTION_KEY", "CORS_ALLOWED_ORIGINS", "DATABASE_URL", "ENABLE_REFRESH_TOKENS", "GOOGLE_ALLOWED_HD", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_OIDC_SCOPE", "GOOGLE_REDIRECT_URI", "JWT_PRIVATE_KEY_PEM", "JWT_PRIVATE_KEY_PEM_PATH", "JWT_PUBLIC_KEY_ID", "LOG_IP_SALT", "LOG_LEVEL", "OAUTH_CREDENTIAL_SECRET_PEPPER", "OAUTH_P0_ENABLED", "OAUTH_SIGNING_KEY_ROOT", "OAUTH_TRANSACTION_PROTECTION_KEY", "ONE_TIME_CODE_TTL_SECONDS", "PORT", "POSTGRES_DB", "POSTGRES_PASSWORD", "POSTGRES_USER", "PUBLIC_BASE_PATH", "REFRESH_TOKEN_TTL_SECONDS", "RETURN_URL_ALLOWED_SCHEMES", "RUN_MIGRATIONS_ON_START", "RUN_SEED_ON_START", "SEED_EXAMPLE_TOOLS", "SESSION_COOKIE_NAME", "SESSION_SECRET", "SIEM_EXPORT_ENABLED", "SIEM_EXPORT_ENDPOINT", "SIEM_EXPORT_TOKEN", "TOOL_CLIENT_SECRET_PEPPER", "TRUST_PROXY_HOPS"]}
+            "variables": {"const": ["ACCESS_REQUEST_REOPEN_AFTER_DAYS", "ACCESS_TOKEN_TTL_SECONDS", "ADMIN_BOOTSTRAP_EMAILS", "APP_BASE_URL", "APP_ENV", "AUDIT_LOG_RAW_IP", "AUDIT_LOG_RETENTION_DAYS", "AUTH_ISSUER", "BACKUP_API_TOKEN", "BACKUP_ENCRYPTION_KEY", "CORS_ALLOWED_ORIGINS", "DATABASE_URL", "ENABLE_REFRESH_TOKENS", "GOOGLE_ALLOWED_HD", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_OIDC_SCOPE", "GOOGLE_REDIRECT_URI", "JWT_PRIVATE_KEY_PEM", "JWT_PRIVATE_KEY_PEM_PATH", "JWT_PUBLIC_KEY_ID", "LEGACY_MICROSOFT_ENABLED", "LEGACY_MICROSOFT_TOOL_SLUGS", "LOG_IP_SALT", "LOG_LEVEL", "MICROSOFT_ALLOWED_EMAIL_DOMAINS", "MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET", "MICROSOFT_OIDC_SCOPE", "MICROSOFT_REDIRECT_URI", "MICROSOFT_TENANT_ID", "OAUTH_CREDENTIAL_SECRET_PEPPER", "OAUTH_P0_ENABLED", "OAUTH_SIGNING_KEY_ROOT", "OAUTH_TRANSACTION_PROTECTION_KEY", "ONE_TIME_CODE_TTL_SECONDS", "PORT", "POSTGRES_DB", "POSTGRES_PASSWORD", "POSTGRES_USER", "PUBLIC_BASE_PATH", "REFRESH_TOKEN_TTL_SECONDS", "RETURN_URL_ALLOWED_SCHEMES", "RUN_MIGRATIONS_ON_START", "RUN_SEED_ON_START", "SEED_EXAMPLE_TOOLS", "SESSION_COOKIE_NAME", "SESSION_SECRET", "SIEM_EXPORT_ENABLED", "SIEM_EXPORT_ENDPOINT", "SIEM_EXPORT_TOKEN", "TOOL_CLIENT_SECRET_PEPPER", "TRUST_PROXY_HOPS"]}
           }
         },
         "observation": {
@@ -256,7 +257,7 @@
     },
     "environmentStateMap": {
       "type": "object", "additionalProperties": false,
-      "required": ["ACCESS_REQUEST_REOPEN_AFTER_DAYS", "ACCESS_TOKEN_TTL_SECONDS", "ADMIN_BOOTSTRAP_EMAILS", "APP_BASE_URL", "APP_ENV", "AUDIT_LOG_RAW_IP", "AUDIT_LOG_RETENTION_DAYS", "AUTH_ISSUER", "BACKUP_API_TOKEN", "BACKUP_ENCRYPTION_KEY", "CORS_ALLOWED_ORIGINS", "DATABASE_URL", "ENABLE_REFRESH_TOKENS", "GOOGLE_ALLOWED_HD", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_OIDC_SCOPE", "GOOGLE_REDIRECT_URI", "JWT_PRIVATE_KEY_PEM", "JWT_PRIVATE_KEY_PEM_PATH", "JWT_PUBLIC_KEY_ID", "LOG_IP_SALT", "LOG_LEVEL", "OAUTH_CREDENTIAL_SECRET_PEPPER", "OAUTH_P0_ENABLED", "OAUTH_SIGNING_KEY_ROOT", "OAUTH_TRANSACTION_PROTECTION_KEY", "ONE_TIME_CODE_TTL_SECONDS", "PORT", "POSTGRES_DB", "POSTGRES_PASSWORD", "POSTGRES_USER", "PUBLIC_BASE_PATH", "REFRESH_TOKEN_TTL_SECONDS", "RETURN_URL_ALLOWED_SCHEMES", "RUN_MIGRATIONS_ON_START", "RUN_SEED_ON_START", "SEED_EXAMPLE_TOOLS", "SESSION_COOKIE_NAME", "SESSION_SECRET", "SIEM_EXPORT_ENABLED", "SIEM_EXPORT_ENDPOINT", "SIEM_EXPORT_TOKEN", "TOOL_CLIENT_SECRET_PEPPER", "TRUST_PROXY_HOPS"],
+      "required": ["ACCESS_REQUEST_REOPEN_AFTER_DAYS", "ACCESS_TOKEN_TTL_SECONDS", "ADMIN_BOOTSTRAP_EMAILS", "APP_BASE_URL", "APP_ENV", "AUDIT_LOG_RAW_IP", "AUDIT_LOG_RETENTION_DAYS", "AUTH_ISSUER", "BACKUP_API_TOKEN", "BACKUP_ENCRYPTION_KEY", "CORS_ALLOWED_ORIGINS", "DATABASE_URL", "ENABLE_REFRESH_TOKENS", "GOOGLE_ALLOWED_HD", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_OIDC_SCOPE", "GOOGLE_REDIRECT_URI", "JWT_PRIVATE_KEY_PEM", "JWT_PRIVATE_KEY_PEM_PATH", "JWT_PUBLIC_KEY_ID", "LEGACY_MICROSOFT_ENABLED", "LEGACY_MICROSOFT_TOOL_SLUGS", "LOG_IP_SALT", "LOG_LEVEL", "MICROSOFT_ALLOWED_EMAIL_DOMAINS", "MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET", "MICROSOFT_OIDC_SCOPE", "MICROSOFT_REDIRECT_URI", "MICROSOFT_TENANT_ID", "OAUTH_CREDENTIAL_SECRET_PEPPER", "OAUTH_P0_ENABLED", "OAUTH_SIGNING_KEY_ROOT", "OAUTH_TRANSACTION_PROTECTION_KEY", "ONE_TIME_CODE_TTL_SECONDS", "PORT", "POSTGRES_DB", "POSTGRES_PASSWORD", "POSTGRES_USER", "PUBLIC_BASE_PATH", "REFRESH_TOKEN_TTL_SECONDS", "RETURN_URL_ALLOWED_SCHEMES", "RUN_MIGRATIONS_ON_START", "RUN_SEED_ON_START", "SEED_EXAMPLE_TOOLS", "SESSION_COOKIE_NAME", "SESSION_SECRET", "SIEM_EXPORT_ENABLED", "SIEM_EXPORT_ENDPOINT", "SIEM_EXPORT_TOKEN", "TOOL_CLIENT_SECRET_PEPPER", "TRUST_PROXY_HOPS"],
       "properties": {
         "ACCESS_REQUEST_REOPEN_AFTER_DAYS": {"$ref": "#/$defs/environmentState"}, "ACCESS_TOKEN_TTL_SECONDS": {"$ref": "#/$defs/environmentState"},
         "ADMIN_BOOTSTRAP_EMAILS": {"$ref": "#/$defs/environmentState"}, "APP_BASE_URL": {"$ref": "#/$defs/environmentState"},
@@ -269,7 +270,15 @@
         "GOOGLE_OIDC_SCOPE": {"$ref": "#/$defs/environmentState"}, "GOOGLE_REDIRECT_URI": {"$ref": "#/$defs/environmentState"},
         "JWT_PRIVATE_KEY_PEM": {"$ref": "#/$defs/environmentState"}, "JWT_PRIVATE_KEY_PEM_PATH": {"$ref": "#/$defs/environmentState"},
         "JWT_PUBLIC_KEY_ID": {"$ref": "#/$defs/environmentState"}, "LOG_IP_SALT": {"$ref": "#/$defs/environmentState"},
+        "LEGACY_MICROSOFT_ENABLED": {"$ref": "#/$defs/environmentState"},
+        "LEGACY_MICROSOFT_TOOL_SLUGS": {"$ref": "#/$defs/environmentState"},
         "LOG_LEVEL": {"$ref": "#/$defs/environmentState"},
+        "MICROSOFT_ALLOWED_EMAIL_DOMAINS": {"$ref": "#/$defs/environmentState"},
+        "MICROSOFT_CLIENT_ID": {"$ref": "#/$defs/environmentState"},
+        "MICROSOFT_CLIENT_SECRET": {"$ref": "#/$defs/environmentState"},
+        "MICROSOFT_OIDC_SCOPE": {"$ref": "#/$defs/environmentState"},
+        "MICROSOFT_REDIRECT_URI": {"$ref": "#/$defs/environmentState"},
+        "MICROSOFT_TENANT_ID": {"$ref": "#/$defs/environmentState"},
         "OAUTH_CREDENTIAL_SECRET_PEPPER": {"$ref": "#/$defs/environmentState"},
         "OAUTH_P0_ENABLED": {"$ref": "#/$defs/environmentState"},
         "OAUTH_SIGNING_KEY_ROOT": {"$ref": "#/$defs/environmentState"},
@@ -288,7 +297,7 @@
     },
     "effectiveConfig": {
       "type": "object", "additionalProperties": false,
-      "required": ["app_env", "public_base_path", "app_base_url", "auth_issuer", "port", "log_level", "postgres_user", "postgres_database", "google_client_id", "google_redirect_uri", "google_allowed_hd", "google_oidc_scope", "jwt_public_key_id", "access_token_ttl_seconds", "refresh_token_ttl_seconds", "one_time_code_ttl_seconds", "enable_refresh_tokens", "oauth_p0_enabled", "session_cookie_name", "cors_allowed_origins", "return_url_allowed_schemes", "trust_proxy_hops", "audit_log_retention_days", "audit_log_raw_ip", "access_request_reopen_after_days", "run_migrations_on_start", "run_seed_on_start", "seed_example_tools", "siem_export_enabled", "siem_export_endpoint", "admin_bootstrap_email_count"],
+      "required": ["app_env", "public_base_path", "app_base_url", "auth_issuer", "port", "log_level", "postgres_user", "postgres_database", "google_client_id", "google_redirect_uri", "google_allowed_hd", "google_oidc_scope", "legacy_microsoft_enabled", "microsoft_tenant_id", "microsoft_client_id", "microsoft_redirect_uri", "microsoft_allowed_email_domains", "microsoft_oidc_scope", "legacy_microsoft_tool_slugs", "jwt_public_key_id", "access_token_ttl_seconds", "refresh_token_ttl_seconds", "one_time_code_ttl_seconds", "enable_refresh_tokens", "oauth_p0_enabled", "session_cookie_name", "cors_allowed_origins", "return_url_allowed_schemes", "trust_proxy_hops", "audit_log_retention_days", "audit_log_raw_ip", "access_request_reopen_after_days", "run_migrations_on_start", "run_seed_on_start", "seed_example_tools", "siem_export_enabled", "siem_export_endpoint", "admin_bootstrap_email_count"],
       "properties": {
         "app_env": {"type": ["string", "null"], "enum": ["development", "staging", "production", "test", null]},
         "public_base_path": {"type": ["string", "null"], "pattern": "^(|/[^?#\\\\]*)$"},
@@ -298,6 +307,13 @@
         "google_client_id": {"$ref": "#/$defs/nullableNonEmptyString"}, "google_redirect_uri": {"$ref": "#/$defs/nullableUri"},
         "google_allowed_hd": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z0-9.-]+$"}},
         "google_oidc_scope": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "legacy_microsoft_enabled": {"type": ["boolean", "null"]},
+        "microsoft_tenant_id": {"$ref": "#/$defs/nullableNonEmptyString"},
+        "microsoft_client_id": {"$ref": "#/$defs/nullableNonEmptyString"},
+        "microsoft_redirect_uri": {"$ref": "#/$defs/nullableUri"},
+        "microsoft_allowed_email_domains": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z0-9.-]+$"}},
+        "microsoft_oidc_scope": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "legacy_microsoft_tool_slugs": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
         "jwt_public_key_id": {"$ref": "#/$defs/nullableNonEmptyString"},
         "access_token_ttl_seconds": {"type": ["integer", "null"], "minimum": 60, "maximum": 3600},
         "refresh_token_ttl_seconds": {"type": ["integer", "null"], "minimum": 300, "maximum": 86400},

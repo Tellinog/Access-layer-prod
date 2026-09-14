@@ -1,0 +1,91 @@
+schema_version: 1
+profile_id: access-layer-legacy-microsoft-testbirds-temporary-v1
+status: implemented_default_off
+scope:
+  legacy_only: true
+  oauth_vnext_changed: false
+  consumer_changes_required: false
+feature_flag:
+  name: LEGACY_MICROSOFT_ENABLED
+  default: false
+tool_allowlist_env: LEGACY_MICROSOFT_TOOL_SLUGS
+initial_tool_slug: test-generator
+provider_selection:
+  endpoint: /v1/auth/start
+  enabled_tool_without_provider: html_google_or_microsoft
+  non_enabled_tool_without_provider: unchanged_direct_google_redirect
+  unknown_provider: deny
+  microsoft_for_non_enabled_tool: deny
+state_binding:
+  google_prefix: gst_
+  microsoft_prefix: mst_
+  storage: sha256_only
+  single_use: true
+microsoft_oidc:
+  authority: tenant_specific
+  common_or_organizations_forbidden: true
+  flow: authorization_code_server_side
+  implicit_or_hybrid_forbidden: true
+  graph_dependency: forbidden
+  scopes_default: openid profile email
+  validation:
+    - jwks_signature
+    - alg_rs256
+    - exact_tenant_issuer
+    - client_audience
+    - expiration
+    - nonce
+    - exact_tid
+    - non_empty_oid
+    - usable_email_or_preferred_username
+    - allowed_email_domain
+legacy_identity_mapping:
+  google_sub: "msft:<lowercase-tid>:<lowercase-oid>"
+  hd: validated_email_domain
+  email_verified: true_after_tenant_and_domain_validation
+  picture_url: null
+shared_legacy_pipeline:
+  - user_upsert
+  - pending_grant_link
+  - active_tool_and_user_recheck
+  - active_grant_or_access_request
+  - session
+  - one_time_code
+  - exchange
+  - legacy_jwt
+  - refresh
+  - introspection
+  - logout
+unchanged_contracts:
+  - legacy_exchange_response
+  - legacy_refresh_response
+  - legacy_jwt_claim_names_issuer_audience_ttl_and_key
+  - tool_basic_authentication
+  - exact_return_url_matching
+  - legacy_database_schema
+  - oauth_vnext
+new_route:
+  method: GET
+  path: /v1/auth/microsoft/callback
+  registered_only_when_enabled: true
+new_errors:
+  AUTH_MICROSOFT_CALLBACK_FAILED: 401
+  AUTH_INVALID_MICROSOFT_TOKEN: 401
+  AUTH_INVALID_PROVIDER: 400
+  AUTH_MICROSOFT_NOT_AVAILABLE: 403
+audit_events:
+  - microsoft.callback.received
+  - auth.denied.invalid_microsoft_token
+  - auth.denied.invalid_provider
+  - auth.denied.microsoft_not_available
+forbidden_persistence_or_logging:
+  - microsoft_client_secret
+  - upstream_authorization_code
+  - id_token
+  - access_token
+  - refresh_token
+  - raw_state
+  - raw_nonce
+rollback:
+  action: set_LEGACY_MICROSOFT_ENABLED_false
+  migration_required: false

@@ -1,5 +1,13 @@
 # TESTING.md
 
+## Temporary legacy Microsoft bridge coverage
+
+The bridge suite uses only synthetic provider data. `tests/microsoft-claims.test.ts` covers tenant-specific URLs and strict issuer/audience/tenant/expiry/object/nonce/email/domain checks, preferred-username fallback, synthetic subject mapping, no Graph dependency and sanitized upstream failures. `tests/config.test.ts` covers default-off behavior and conditional completeness/format/callback/scope/slug validation.
+
+Legacy HTTP tests cover provider selection, no state creation for the chooser, direct Google when disabled or non-allowlisted, `gst_`/`mst_` callback isolation, missing/unknown/expired/replayed/error state, nonce mismatch, full Microsoft callback/exchange shape, pending-email grant linking, no-grant access request and disabled user/tool denial. Token tests prove the synthetic subject still receives the frozen legacy claim set, TTL and audience. The legacy contract baseline test permits only the reviewed bridge-source differences and continues to validate all pre-existing frozen payload/error mappings.
+
+No test calls Microsoft, Google, production, Coolify or a real credential. A separately authorized real-tenant smoke test remains an operational assumption to validate.
+
 ## Step 4B disposable PostgreSQL 16 qualification
 
 `scripts/step4b/run-qualification.ps1` creates two distinct synthetic PostgreSQL 16 containers on random loopback-only ports, applies the existing migration runner to each, invokes the real-HTTP qualification harness and removes both containers in `finally`. The harness allows only a fake upstream Google dependency; database, repository, service, signing, HTTP backup and legacy-baseline boundaries remain real. Temporary credentials, refresh material and RSA files are never emitted as evidence.

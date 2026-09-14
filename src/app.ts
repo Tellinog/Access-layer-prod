@@ -17,11 +17,14 @@ import type {
   ToolClient,
   ToolStatus,
   User,
-  UserStatus
+  UserStatus,
+  LegacyIdentity,
+  AuthRequest
 } from "./types.js";
 import { AuditLogger } from "./audit.js";
 import { AppError, escapeHtml, safeErrorPage, sendJsonError, type ErrorCode } from "./errors.js";
 import type { GoogleOidcClient } from "./google.js";
+import type { MicrosoftOidcClient } from "./microsoft.js";
 import { hasPermission, rolePermissions } from "./permissions.js";
 import { Repositories } from "./repositories.js";
 import {
@@ -87,6 +90,7 @@ export interface AppDependencies {
   repositories: Repositories;
   audit: AuditLogger;
   google: GoogleOidcClient;
+  microsoft?: MicrosoftOidcClient;
   tokenService: TokenService;
 }
 
@@ -145,6 +149,9 @@ type AuthCallbackResult =
 type RateLimitCheck = ReturnType<FastifyInstance["createRateLimit"]>;
 
 export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> {
+  if (deps.config.legacyMicrosoftEnabled && !deps.microsoft) {
+    throw new Error("Legacy Microsoft is enabled but no Microsoft OIDC client is configured");
+  }
   const app = Fastify({
     logger: {
       level: deps.config.logLevel,
@@ -370,10 +377,51 @@ export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> 
       return reply.type("text/html").status(400).send(safeErrorPage("AUTH_INVALID_RETURN_URL", ctx.correlationId));
     }
 
-    const googleState = randomToken("gst_", 32);
+    const requestedProvider = query.provider;
+    const microsoftAvailable = deps.config.legacyMicrosoftEnabled === true &&
+      (deps.config.legacyMicrosoftToolSlugs ?? []).includes(tool.slug) && deps.microsoft !== undefined;
+    if (requestedProvider !== undefined && requestedProvider !== "google" && requestedProvider !== "microsoft") {
+      await deps.audit.write({
+        event_type: "auth.denied.invalid_provider",
+        outcome: "denied",
+        correlation_id: ctx.correlationId,
+        tool_id: tool.id,
+        tool_slug: tool.slug,
+        reason_code: "AUTH_INVALID_PROVIDER",
+        request_ip_hash: ctx.requestIpHash,
+        user_agent_hash: ctx.userAgentHash
+      });
+      return reply.type("text/html").status(400).send(safeErrorPage("AUTH_INVALID_PROVIDER", ctx.correlationId));
+    }
+    if (requestedProvider === undefined && microsoftAvailable) {
+      return reply.header("Cache-Control", "no-store").header("Pragma", "no-cache")
+        .type("text/html").status(200).send(providerChoicePage({
+        config: deps.config,
+        tool,
+        returnUrl,
+        toolState,
+        loginHint
+        }));
+    }
+    if (requestedProvider === "microsoft" && !microsoftAvailable) {
+      await deps.audit.write({
+        event_type: "auth.denied.microsoft_not_available",
+        outcome: "denied",
+        correlation_id: ctx.correlationId,
+        tool_id: tool.id,
+        tool_slug: tool.slug,
+        reason_code: "AUTH_MICROSOFT_NOT_AVAILABLE",
+        request_ip_hash: ctx.requestIpHash,
+        user_agent_hash: ctx.userAgentHash
+      });
+      return reply.type("text/html").status(403).send(safeErrorPage("AUTH_MICROSOFT_NOT_AVAILABLE", ctx.correlationId));
+    }
+
+    const useMicrosoft = requestedProvider === "microsoft";
+    const providerState = randomToken(useMicrosoft ? "mst_" : "gst_", 32);
     const nonce = randomToken("nce_", 32);
     await deps.repositories.createAuthRequest({
-      stateHash: sha256(googleState),
+      stateHash: sha256(providerState),
       nonceHash: sha256(nonce),
       toolId: tool.id,
       toolSlug: tool.slug,
@@ -387,14 +435,19 @@ export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> 
       expiresAt: new Date(Date.now() + 10 * 60 * 1000)
     });
 
-    return reply.redirect(deps.google.createAuthorizationUrl({ state: googleState, nonce, loginHint: loginHint ?? undefined }));
+    const identityProvider = useMicrosoft ? deps.microsoft! : deps.google;
+    return reply.redirect(identityProvider.createAuthorizationUrl({
+      state: providerState,
+      nonce,
+      loginHint: loginHint ?? undefined
+    }));
   });
 
   app.get(apiPath(deps.config, "/v1/auth/google/callback"), async (request, reply) => {
     const query = request.query as Record<string, string | undefined>;
     const state = query.state ?? "";
     const ctx = contextFor(request);
-    if (!state) {
+    if (!state.startsWith("gst_")) {
       await deps.audit.write({
         event_type: "auth.denied.invalid_state",
         outcome: "denied",
@@ -454,163 +507,7 @@ export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> 
         throw new AppError("AUTH_INVALID_GOOGLE_TOKEN", authRequest.correlation_id);
       }
 
-      const result: AuthCallbackResult = await deps.repositories.db.transaction(async (tx) => {
-        const txRepos = deps.repositories.withDb(tx);
-        const txAudit = new AuditLogger(txRepos);
-        const user = await txRepos.upsertUser({
-          googleSub: identity.googleSub,
-          email: identity.email,
-          emailNormalized: normalizeEmail(identity.email),
-          emailVerified: identity.emailVerified,
-          hd: identity.hd,
-          displayName: identity.displayName,
-          pictureUrl: identity.pictureUrl
-        });
-        await txRepos.linkPendingEmailGrants(user);
-        const tool = await txRepos.findToolById(authRequest.tool_id);
-        if (!tool || tool.status !== "active") {
-          await txAudit.write({
-            event_type: "auth.denied.invalid_tool",
-            outcome: "denied",
-            correlation_id: authRequest.correlation_id,
-            tool_id: authRequest.tool_id,
-            tool_slug: authRequest.tool_slug,
-            actor_user_id: user.id,
-            actor_google_sub: user.google_sub,
-            actor_email: user.email,
-            actor_hd: user.hd,
-            reason_code: "AUTH_TOOL_DISABLED",
-            request_ip_hash: flowCtx.requestIpHash,
-            user_agent_hash: flowCtx.userAgentHash
-          });
-          return { error: new AppError("AUTH_TOOL_DISABLED", authRequest.correlation_id) };
-        }
-        if (user.status !== "active") {
-          await txAudit.write({
-            event_type: "auth.denied.user_disabled",
-            outcome: "denied",
-            correlation_id: authRequest.correlation_id,
-            tool_id: tool.id,
-            tool_slug: tool.slug,
-            actor_user_id: user.id,
-            actor_google_sub: user.google_sub,
-            actor_email: user.email,
-            actor_hd: user.hd,
-            reason_code: "AUTH_USER_DISABLED",
-            request_ip_hash: flowCtx.requestIpHash,
-            user_agent_hash: flowCtx.userAgentHash
-          });
-          return { error: new AppError("AUTH_USER_DISABLED", authRequest.correlation_id) };
-        }
-
-        const bootstrapGrant = await ensureBootstrapAdminGrant({
-          config: deps.config,
-          repos: txRepos,
-          audit: txAudit,
-          user,
-          tool,
-          ctx: flowCtx
-        });
-        const grant =
-          bootstrapGrant ?? (await txRepos.findActiveGrant(tool.id, user.id, user.email_normalized));
-        if (!grant) {
-          await txAudit.write({
-            event_type: "auth.denied.no_grant",
-            outcome: "denied",
-            correlation_id: authRequest.correlation_id,
-            tool_id: tool.id,
-            tool_slug: tool.slug,
-            actor_user_id: user.id,
-            actor_google_sub: user.google_sub,
-            actor_email: user.email,
-            actor_hd: user.hd,
-            reason_code: "AUTH_NOT_AUTHORIZED_FOR_TOOL",
-            request_ip_hash: flowCtx.requestIpHash,
-            user_agent_hash: flowCtx.userAgentHash
-          });
-          const recentReviewed = await txRepos.findRecentReviewedAccessRequest(
-            tool.id,
-            user.email_normalized,
-            deps.config.accessRequestReopenAfterDays
-          );
-          if (recentReviewed) {
-            await txAudit.write({
-              event_type: "access_request.reopen_suppressed",
-              outcome: "info",
-              correlation_id: authRequest.correlation_id,
-              tool_id: tool.id,
-              tool_slug: tool.slug,
-              actor_user_id: user.id,
-              actor_google_sub: user.google_sub,
-              actor_email: user.email,
-              actor_hd: user.hd,
-              request_ip_hash: flowCtx.requestIpHash,
-              user_agent_hash: flowCtx.userAgentHash,
-              metadata: {
-                access_request_id: recentReviewed.id,
-                previous_status: recentReviewed.status,
-                reopen_after_days: deps.config.accessRequestReopenAfterDays
-              }
-            });
-          } else {
-            const accessRequest = await txRepos.upsertAccessRequest({
-              tool,
-              user,
-              correlationId: authRequest.correlation_id,
-              requestIpHash: flowCtx.requestIpHash,
-              userAgentHash: flowCtx.userAgentHash
-            });
-            await txAudit.write({
-              event_type: accessRequest.repeated ? "access_request.repeated" : "access_request.created",
-              outcome: "info",
-              correlation_id: authRequest.correlation_id,
-              tool_id: tool.id,
-              tool_slug: tool.slug,
-              actor_user_id: user.id,
-              actor_google_sub: user.google_sub,
-              actor_email: user.email,
-              actor_hd: user.hd,
-              request_ip_hash: flowCtx.requestIpHash,
-              user_agent_hash: flowCtx.userAgentHash,
-              metadata: { access_request_id: accessRequest.request.id, attempts_count: accessRequest.request.attempts_count }
-            });
-          }
-          return { error: new AppError("AUTH_NOT_AUTHORIZED_FOR_TOOL", authRequest.correlation_id) };
-        }
-
-        const session = await txRepos.createSession({
-          userId: user.id,
-          toolId: tool.id,
-          grantId: grant.id,
-          expiresAt: new Date(Date.now() + deps.config.refreshTokenTtlSeconds * 1000)
-        });
-        const codeValue = randomToken("otc_", 32);
-        await txRepos.createOneTimeCode({
-          codeHash: hashOpaque(codeValue, deps.config.toolClientSecretPepper),
-          userId: user.id,
-          toolId: tool.id,
-          grantId: grant.id,
-          sessionId: session.id,
-          returnUrl: authRequest.return_url,
-          correlationId: authRequest.correlation_id,
-          expiresAt: new Date(Date.now() + deps.config.oneTimeCodeTtlSeconds * 1000)
-        });
-        await txAudit.write({
-          event_type: "auth.allowed",
-          outcome: "success",
-          correlation_id: authRequest.correlation_id,
-          tool_id: tool.id,
-          tool_slug: tool.slug,
-          actor_user_id: user.id,
-          actor_google_sub: user.google_sub,
-          actor_email: user.email,
-          actor_hd: user.hd,
-          request_ip_hash: flowCtx.requestIpHash,
-          user_agent_hash: flowCtx.userAgentHash,
-          metadata: { session_id: session.id, grant_id: grant.id }
-        });
-        return { tool, codeValue, toolState: authRequest.tool_state };
-      });
+      const result = await completeLegacyIdentity(deps, authRequest, identity, flowCtx);
 
       if ("error" in result) {
         return reply
@@ -630,6 +527,90 @@ export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> 
       throw error;
     }
   });
+
+  if (deps.config.legacyMicrosoftEnabled) {
+    app.get(apiPath(deps.config, "/v1/auth/microsoft/callback"), { logLevel: "silent" }, async (request, reply) => {
+      const query = request.query as Record<string, string | undefined>;
+      const state = query.state ?? "";
+      const ctx = contextFor(request);
+      if (!state.startsWith("mst_")) {
+        await deps.audit.write({
+          event_type: "auth.denied.invalid_state",
+          outcome: "denied",
+          correlation_id: ctx.correlationId,
+          reason_code: "AUTH_INVALID_STATE",
+          request_ip_hash: ctx.requestIpHash,
+          user_agent_hash: ctx.userAgentHash
+        });
+        return reply.type("text/html").status(400).send(safeErrorPage("AUTH_INVALID_STATE", ctx.correlationId));
+      }
+
+      const authRequest = await deps.repositories.consumeAuthRequest(sha256(state));
+      if (!authRequest) {
+        await deps.audit.write({
+          event_type: "auth.denied.invalid_state",
+          outcome: "denied",
+          correlation_id: ctx.correlationId,
+          reason_code: "AUTH_INVALID_STATE",
+          request_ip_hash: ctx.requestIpHash,
+          user_agent_hash: ctx.userAgentHash
+        });
+        return reply.type("text/html").status(400).send(safeErrorPage("AUTH_INVALID_STATE", ctx.correlationId));
+      }
+      const flowCtx = contextFor(request, authRequest.correlation_id);
+      await deps.audit.write({
+        event_type: "microsoft.callback.received",
+        outcome: "info",
+        correlation_id: authRequest.correlation_id,
+        tool_id: authRequest.tool_id,
+        tool_slug: authRequest.tool_slug,
+        request_ip_hash: flowCtx.requestIpHash,
+        user_agent_hash: flowCtx.userAgentHash
+      });
+
+      if (query.error) {
+        await deps.audit.write({
+          event_type: "auth.denied.invalid_microsoft_token",
+          outcome: "denied",
+          correlation_id: authRequest.correlation_id,
+          tool_id: authRequest.tool_id,
+          tool_slug: authRequest.tool_slug,
+          request_ip_hash: flowCtx.requestIpHash,
+          user_agent_hash: flowCtx.userAgentHash,
+          reason_code: "AUTH_MICROSOFT_CALLBACK_FAILED"
+        });
+        return reply.type("text/html").status(401)
+          .send(safeErrorPage("AUTH_MICROSOFT_CALLBACK_FAILED", authRequest.correlation_id));
+      }
+
+      try {
+        const code = query.code;
+        if (!code) {
+          throw new AppError("AUTH_MICROSOFT_CALLBACK_FAILED", authRequest.correlation_id);
+        }
+        const identity = await deps.microsoft!.exchangeCodeForIdentity(code, authRequest.correlation_id);
+        if (!identity.nonce || sha256(identity.nonce) !== authRequest.nonce_hash) {
+          throw new AppError("AUTH_INVALID_MICROSOFT_TOKEN", authRequest.correlation_id);
+        }
+        const result = await completeLegacyIdentity(deps, authRequest, identity, flowCtx);
+        if ("error" in result) {
+          return reply.type("text/html").status(statusForHtml(result.error.code))
+            .send(safeErrorPage(result.error.code, result.error.correlationId));
+        }
+        const redirectUrl = new URL(authRequest.return_url);
+        redirectUrl.searchParams.set("code", result.codeValue);
+        redirectUrl.searchParams.set("state", result.toolState);
+        return reply.redirect(redirectUrl.toString());
+      } catch (error) {
+        if (error instanceof AppError) {
+          await auditCallbackErrorIfNeeded(deps.audit, authRequest, flowCtx, error);
+          return reply.type("text/html").status(statusForHtml(error.code))
+            .send(safeErrorPage(error.code, error.correlationId));
+        }
+        throw error;
+      }
+    });
+  }
 
   app.post(apiPath(deps.config, "/v1/auth/exchange"), { preHandler: async (request, reply) => {
     if (!(await enforceRateLimit(tokenExchangeRateLimit, request, reply))) return reply;
@@ -818,6 +799,217 @@ export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> 
   return app;
 }
 
+function providerChoicePage(input: {
+  config: Config;
+  tool: Tool;
+  returnUrl: string;
+  toolState: string;
+  loginHint: string | null;
+}): string {
+  const providerUrl = (provider: "google" | "microsoft") => {
+    const url = new URL(publicUrl(input.config, "/v1/auth/start"));
+    url.search = new URLSearchParams({
+      tool_slug: input.tool.slug,
+      return_url: input.returnUrl,
+      state: input.toolState,
+      provider
+    }).toString();
+    if (input.loginHint) url.searchParams.set("login_hint", input.loginHint);
+    return url.toString();
+  };
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Choose how to continue</title>
+  <style>
+    :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f5f7f9; color: #18202a; }
+    main { width: min(480px, calc(100vw - 32px)); border: 1px solid #d9e1e8; background: #fff; border-radius: 8px; padding: 28px; box-shadow: 0 8px 28px rgba(23, 36, 50, .08); }
+    h1 { font-size: 1.35rem; margin: 0 0 8px; } p { line-height: 1.5; margin: 0 0 22px; }
+    nav { display: grid; gap: 12px; }
+    a { display: block; padding: 12px 16px; border: 1px solid #156b6b; border-radius: 6px; color: #0b5454; text-align: center; text-decoration: none; font-weight: 650; }
+    a:hover, a:focus-visible { background: #e8f7f3; outline: 3px solid #9ee5d5; outline-offset: 2px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Sign in to ${escapeHtml(input.tool.display_name)}</h1>
+    <p>Choose your company account provider.</p>
+    <nav aria-label="Sign-in provider">
+      <a href="${escapeHtml(providerUrl("google"))}">Continue with Google</a>
+      <a href="${escapeHtml(providerUrl("microsoft"))}">Continue with Microsoft</a>
+    </nav>
+  </main>
+</body>
+</html>`;
+}
+
+async function completeLegacyIdentity(
+  deps: AppDependencies,
+  authRequest: AuthRequest,
+  identity: LegacyIdentity,
+  flowCtx: RequestContext
+): Promise<AuthCallbackResult> {
+  return deps.repositories.db.transaction(async (tx) => {
+    const txRepos = deps.repositories.withDb(tx);
+    const txAudit = new AuditLogger(txRepos);
+    const user = await txRepos.upsertUser({
+      googleSub: identity.googleSub,
+      email: identity.email,
+      emailNormalized: normalizeEmail(identity.email),
+      emailVerified: identity.emailVerified,
+      hd: identity.hd,
+      displayName: identity.displayName,
+      pictureUrl: identity.pictureUrl
+    });
+    await txRepos.linkPendingEmailGrants(user);
+    const tool = await txRepos.findToolById(authRequest.tool_id);
+    if (!tool || tool.status !== "active") {
+      await txAudit.write({
+        event_type: "auth.denied.invalid_tool",
+        outcome: "denied",
+        correlation_id: authRequest.correlation_id,
+        tool_id: authRequest.tool_id,
+        tool_slug: authRequest.tool_slug,
+        actor_user_id: user.id,
+        actor_google_sub: user.google_sub,
+        actor_email: user.email,
+        actor_hd: user.hd,
+        reason_code: "AUTH_TOOL_DISABLED",
+        request_ip_hash: flowCtx.requestIpHash,
+        user_agent_hash: flowCtx.userAgentHash
+      });
+      return { error: new AppError("AUTH_TOOL_DISABLED", authRequest.correlation_id) };
+    }
+    if (user.status !== "active") {
+      await txAudit.write({
+        event_type: "auth.denied.user_disabled",
+        outcome: "denied",
+        correlation_id: authRequest.correlation_id,
+        tool_id: tool.id,
+        tool_slug: tool.slug,
+        actor_user_id: user.id,
+        actor_google_sub: user.google_sub,
+        actor_email: user.email,
+        actor_hd: user.hd,
+        reason_code: "AUTH_USER_DISABLED",
+        request_ip_hash: flowCtx.requestIpHash,
+        user_agent_hash: flowCtx.userAgentHash
+      });
+      return { error: new AppError("AUTH_USER_DISABLED", authRequest.correlation_id) };
+    }
+
+    const bootstrapGrant = await ensureBootstrapAdminGrant({
+      config: deps.config,
+      repos: txRepos,
+      audit: txAudit,
+      user,
+      tool,
+      ctx: flowCtx
+    });
+    const grant = bootstrapGrant ?? (await txRepos.findActiveGrant(tool.id, user.id, user.email_normalized));
+    if (!grant) {
+      await txAudit.write({
+        event_type: "auth.denied.no_grant",
+        outcome: "denied",
+        correlation_id: authRequest.correlation_id,
+        tool_id: tool.id,
+        tool_slug: tool.slug,
+        actor_user_id: user.id,
+        actor_google_sub: user.google_sub,
+        actor_email: user.email,
+        actor_hd: user.hd,
+        reason_code: "AUTH_NOT_AUTHORIZED_FOR_TOOL",
+        request_ip_hash: flowCtx.requestIpHash,
+        user_agent_hash: flowCtx.userAgentHash
+      });
+      const recentReviewed = await txRepos.findRecentReviewedAccessRequest(
+        tool.id,
+        user.email_normalized,
+        deps.config.accessRequestReopenAfterDays
+      );
+      if (recentReviewed) {
+        await txAudit.write({
+          event_type: "access_request.reopen_suppressed",
+          outcome: "info",
+          correlation_id: authRequest.correlation_id,
+          tool_id: tool.id,
+          tool_slug: tool.slug,
+          actor_user_id: user.id,
+          actor_google_sub: user.google_sub,
+          actor_email: user.email,
+          actor_hd: user.hd,
+          request_ip_hash: flowCtx.requestIpHash,
+          user_agent_hash: flowCtx.userAgentHash,
+          metadata: {
+            access_request_id: recentReviewed.id,
+            previous_status: recentReviewed.status,
+            reopen_after_days: deps.config.accessRequestReopenAfterDays
+          }
+        });
+      } else {
+        const accessRequest = await txRepos.upsertAccessRequest({
+          tool,
+          user,
+          correlationId: authRequest.correlation_id,
+          requestIpHash: flowCtx.requestIpHash,
+          userAgentHash: flowCtx.userAgentHash
+        });
+        await txAudit.write({
+          event_type: accessRequest.repeated ? "access_request.repeated" : "access_request.created",
+          outcome: "info",
+          correlation_id: authRequest.correlation_id,
+          tool_id: tool.id,
+          tool_slug: tool.slug,
+          actor_user_id: user.id,
+          actor_google_sub: user.google_sub,
+          actor_email: user.email,
+          actor_hd: user.hd,
+          request_ip_hash: flowCtx.requestIpHash,
+          user_agent_hash: flowCtx.userAgentHash,
+          metadata: { access_request_id: accessRequest.request.id, attempts_count: accessRequest.request.attempts_count }
+        });
+      }
+      return { error: new AppError("AUTH_NOT_AUTHORIZED_FOR_TOOL", authRequest.correlation_id) };
+    }
+
+    const session = await txRepos.createSession({
+      userId: user.id,
+      toolId: tool.id,
+      grantId: grant.id,
+      expiresAt: new Date(Date.now() + deps.config.refreshTokenTtlSeconds * 1000)
+    });
+    const codeValue = randomToken("otc_", 32);
+    await txRepos.createOneTimeCode({
+      codeHash: hashOpaque(codeValue, deps.config.toolClientSecretPepper),
+      userId: user.id,
+      toolId: tool.id,
+      grantId: grant.id,
+      sessionId: session.id,
+      returnUrl: authRequest.return_url,
+      correlationId: authRequest.correlation_id,
+      expiresAt: new Date(Date.now() + deps.config.oneTimeCodeTtlSeconds * 1000)
+    });
+    await txAudit.write({
+      event_type: "auth.allowed",
+      outcome: "success",
+      correlation_id: authRequest.correlation_id,
+      tool_id: tool.id,
+      tool_slug: tool.slug,
+      actor_user_id: user.id,
+      actor_google_sub: user.google_sub,
+      actor_email: user.email,
+      actor_hd: user.hd,
+      request_ip_hash: flowCtx.requestIpHash,
+      user_agent_hash: flowCtx.userAgentHash,
+      metadata: { session_id: session.id, grant_id: grant.id }
+    });
+    return { tool, codeValue, toolState: authRequest.tool_state };
+  });
+}
+
 async function ensureBootstrapAdminGrant(input: {
   config: Config;
   repos: Repositories;
@@ -868,7 +1060,9 @@ async function auditCallbackErrorIfNeeded(
     AUTH_INVALID_GOOGLE_TOKEN: "auth.denied.invalid_google_token",
     AUTH_EMAIL_NOT_VERIFIED: "auth.denied.email_not_verified",
     AUTH_EXTERNAL_DOMAIN: "auth.denied.external_domain",
-    AUTH_GOOGLE_CALLBACK_FAILED: "auth.denied.invalid_google_token"
+    AUTH_GOOGLE_CALLBACK_FAILED: "auth.denied.invalid_google_token",
+    AUTH_INVALID_MICROSOFT_TOKEN: "auth.denied.invalid_microsoft_token",
+    AUTH_MICROSOFT_CALLBACK_FAILED: "auth.denied.invalid_microsoft_token"
   };
   const eventType = eventTypeByCode[error.code];
   if (!eventType) {
@@ -887,8 +1081,8 @@ async function auditCallbackErrorIfNeeded(
 }
 
 function statusForHtml(code: ErrorCode): number {
-  if (code === "AUTH_INVALID_GOOGLE_TOKEN" || code === "AUTH_GOOGLE_CALLBACK_FAILED") return 401;
-  if (code === "AUTH_INVALID_STATE") return 400;
+  if (["AUTH_INVALID_GOOGLE_TOKEN", "AUTH_GOOGLE_CALLBACK_FAILED", "AUTH_INVALID_MICROSOFT_TOKEN", "AUTH_MICROSOFT_CALLBACK_FAILED"].includes(code)) return 401;
+  if (code === "AUTH_INVALID_STATE" || code === "AUTH_INVALID_PROVIDER") return 400;
   if (code === "INTERNAL_ERROR") return 500;
   return 403;
 }

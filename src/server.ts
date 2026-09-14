@@ -3,6 +3,7 @@ import { buildApplication } from "./application.js";
 import { loadConfig } from "./config.js";
 import { PostgresDb } from "./db.js";
 import { GoogleAuthLibraryOidcClient } from "./google.js";
+import { MicrosoftEntraOidcClient } from "./microsoft.js";
 import { OAuthFoundationRepository } from "./oauth/repository.js";
 import { OAuthAuthorizationFlowRepository } from "./oauth/flow-repository.js";
 import { OAuthGoogleAuthLibraryOidcClient } from "./oauth/google.js";
@@ -31,6 +32,7 @@ const app = await buildApplication({
   }),
   audit,
   google: new GoogleAuthLibraryOidcClient(config),
+  microsoft: config.legacyMicrosoftEnabled ? new MicrosoftEntraOidcClient(config) : undefined,
   tokenService
 });
 

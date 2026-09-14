@@ -16,6 +16,8 @@
 
 ## RESOLVED
 
+- 2026-09-14 temporary legacy Microsoft bridge: the approved hand-off and D-045 resolve the implementation choices for the narrow legacy exception—single-tenant Entra, no Graph dependency, exact tenant/issuer/audience/nonce/object/email-domain checks, client secret supplied only at runtime, allowlisted tools, `/v1/auth/microsoft/callback`, and synthetic `msft:<tid>:<oid>` in the existing legacy identity contract. The provider-neutral vNext design remains deferred and this resolution does not authorize deployment or Admin UI/OAuth enablement.
+
 - 2026-08-31 Step 4B intermittent refresh blocker: pre-fix sanitized real-PG evidence proved SQLSTATE `23514` on `oauth_refresh_tokens_revoked_order` when an older observed request lost the lock and tried to revoke the winner's newer generation. Replay now re-observes time after the lock and clamps revocation to the family maximum `issued_at`; 24/24 races across three complete qualifications on `d8998e1fbc1789d71a19cef78714c74c3dbfed37` returned one 200 and one 400 `invalid_grant` with atomic replay revocation. Historical failures remain in the report; independent approval remains a blocker above.
 - 2026-08-31 Step 4B export warning: the 24 snapshot reads are sequential on the one transaction client while remaining `REPEATABLE READ, READ ONLY`; three full qualifications emitted no `pg` concurrent-query deprecation warning and retained the coordinated anti-torn snapshot proof.
 - 2026-08-31 Step 4B SQL blocker: the 2026-08-30 PostgreSQL `42601` failure is closed by replacing the unquoted reserved `authorization` alias in all three token-repository queries with `oauth_authorization`; the hardened real-PG rerun passed authorization-code exchange. The new concurrency blocker remains open above, and the original failure remains recorded in the qualification report and DEVLOG.
@@ -43,6 +45,9 @@
 
 ## QUESTION
 
+- 2026-09-14 post-bridge: define the durable provider-neutral identity model, versioned consumer contract, account-linking policy and migration only if Microsoft must expand beyond the approved temporary legacy exception. Do not infer that D-045 changes OAuth vNext or authorizes email-based account linking.
+- 2026-09-14 post-bridge operations: before deployment, assign the Entra client-secret storage/rotation and application backup owners and confirm Enterprise Application assignment/guest policy outside the repository.
+- 2026-09-14 post-bridge scope: decide separately whether Testbirds identities may access the same-service Admin UI or any future OAuth vNext surface; both remain excluded.
 - Should raw IP be stored for audit, or only salted hash plus country/ASN metadata?
 - Should logs be exported to an external SIEM in v1?
 - Should per-tool role labels remain free-form strings after v1, or become centrally managed values?
@@ -60,6 +65,8 @@
 - 2026-08-26 Step 2: define the operational owner and protected production storage mechanism for the dedicated OAuth signing key ring before OAuth enablement or production deployment; the legacy key ring cannot be reused. This does not block generic Step 3 local/dark implementation with synthetic local-only material.
 
 ## ASSUMPTION_TO_VALIDATE
+
+- 2026-09-14 temporary legacy Microsoft bridge: after an separately authorised configuration/deployment, perform a controlled Testbirds tenant smoke test for the exact registered callback, emitted ID-token claims and one allowlisted tool. Local tests use synthetic claims and do not prove tenant-side assignment, Conditional Access or production secret wiring.
 
 - 2026-08-27 Step 3D: apply migrations 001→005 to disposable PostgreSQL 16, run the old-binary/schema-consumer smoke test, and execute real same-refresh concurrency proving one rotation success plus one consumed-token replay revocation without deadlock. Static SQL-shape and serialized service tests are local evidence only; never use production for this check.
 - 2026-08-26 Step 3C: apply `001`→`004` to a disposable PostgreSQL 16 database and run the legacy binary/schema-consumer smoke test on a host with an available daemon. Deterministic migration-shape tests cover migration 004 locally; no production database may be used.

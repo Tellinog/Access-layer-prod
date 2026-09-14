@@ -168,6 +168,14 @@ secret_continuity:
       verified_at: null
       evidence_reference: null
       reusable_verifier_committed: false
+    MICROSOFT_CLIENT_SECRET:
+      comparison_scope: live_N_to_isolated_target
+      verified_same_value: false
+      verification_method: null
+      verified_by: null
+      verified_at: null
+      evidence_reference: null
+      reusable_verifier_committed: false
 configuration:
   source_inventory:
     derived_from: [src/config.ts, docker-compose.yaml, docker/entrypoint.sh]
@@ -193,8 +201,16 @@ configuration:
       - JWT_PRIVATE_KEY_PEM
       - JWT_PRIVATE_KEY_PEM_PATH
       - JWT_PUBLIC_KEY_ID
+      - LEGACY_MICROSOFT_ENABLED
+      - LEGACY_MICROSOFT_TOOL_SLUGS
       - LOG_IP_SALT
       - LOG_LEVEL
+      - MICROSOFT_ALLOWED_EMAIL_DOMAINS
+      - MICROSOFT_CLIENT_ID
+      - MICROSOFT_CLIENT_SECRET
+      - MICROSOFT_OIDC_SCOPE
+      - MICROSOFT_REDIRECT_URI
+      - MICROSOFT_TENANT_ID
       - OAUTH_CREDENTIAL_SECRET_PEPPER
       - OAUTH_P0_ENABLED
       - OAUTH_SIGNING_KEY_ROOT
@@ -244,8 +260,16 @@ configuration:
     JWT_PRIVATE_KEY_PEM: UNOBSERVED
     JWT_PRIVATE_KEY_PEM_PATH: UNOBSERVED
     JWT_PUBLIC_KEY_ID: UNOBSERVED
+    LEGACY_MICROSOFT_ENABLED: UNOBSERVED
+    LEGACY_MICROSOFT_TOOL_SLUGS: UNOBSERVED
     LOG_IP_SALT: UNOBSERVED
     LOG_LEVEL: UNOBSERVED
+    MICROSOFT_ALLOWED_EMAIL_DOMAINS: UNOBSERVED
+    MICROSOFT_CLIENT_ID: UNOBSERVED
+    MICROSOFT_CLIENT_SECRET: UNOBSERVED
+    MICROSOFT_OIDC_SCOPE: UNOBSERVED
+    MICROSOFT_REDIRECT_URI: UNOBSERVED
+    MICROSOFT_TENANT_ID: UNOBSERVED
     OAUTH_CREDENTIAL_SECRET_PEPPER: UNOBSERVED
     OAUTH_P0_ENABLED: UNOBSERVED
     OAUTH_SIGNING_KEY_ROOT: UNOBSERVED
@@ -281,6 +305,13 @@ configuration:
     google_redirect_uri: null
     google_allowed_hd: []
     google_oidc_scope: []
+    legacy_microsoft_enabled: null
+    microsoft_tenant_id: null
+    microsoft_client_id: null
+    microsoft_redirect_uri: null
+    microsoft_allowed_email_domains: []
+    microsoft_oidc_scope: []
+    legacy_microsoft_tool_slugs: []
     jwt_public_key_id: null
     access_token_ttl_seconds: null
     refresh_token_ttl_seconds: null

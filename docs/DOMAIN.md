@@ -10,6 +10,7 @@
 | Tool client | Server-side credential pair used by a tool backend to call Access Layer |
 | User | Google account recognized by Access Layer after ID token validation |
 | Google sub | Stable Google Account subject claim, used as primary identity key |
+| Temporary Microsoft legacy subject | D-045 synthetic `msft:<tenant-id>:<oid>` stored in the frozen `google_sub` field only for the allowlisted legacy bridge |
 | Hosted domain / hd | Google ID token claim indicating Workspace/Cloud organization domain |
 | Grant | Authorization that allows a user or pending email to access a tool with roles/permissions |
 | One-time code | Short-lived code sent to the tool callback and exchanged server-to-server |
@@ -31,12 +32,12 @@
 
 ### User
 
-Represents a verified Google account.
+Represents a verified Google account or, only under the temporary D-045 bridge, a verified Testbirds Entra identity normalized into the frozen legacy fields.
 
 Required fields:
 
 - `id`: internal UUID
-- `google_sub`: stable Google subject
+- `google_sub`: stable Google subject, or synthetic `msft:<tid>:<oid>` for the temporary legacy bridge
 - `email`: current email from Google
 - `email_normalized`: lowercase email
 - `email_verified`: boolean

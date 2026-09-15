@@ -257,11 +257,11 @@ Response:
 
 ### POST /v1/admin/grants/bulk/commit
 
-Uses the same request body as preview. If preview contains validation errors, the endpoint returns `committed=false` and does not write grants. If there are no errors, it creates, updates or revokes matching grants and writes per-row audit events plus `admin.grant.bulk_import_committed`.
+Uses the same request body as preview. If preview contains validation errors, the endpoint returns `committed=false` and does not write grants. If there are no errors, it creates new grants, skips already granted email/tool targets, or revokes matching grants, and writes applicable per-row audit events plus `admin.grant.bulk_import_committed`.
 
 Supported CSV actions:
 
-- `upsert`: create a new grant, or update an existing active/pending grant for the same email/tool/role;
+- `upsert`: create a new grant only when the normalized email has no `active` or `pending_user_link` grant for the tool. Otherwise return warning `EXISTING_GRANT_KEPT` and leave the earliest grant unchanged, regardless of incoming role, permissions or validity. Repeated email/tool rows in one payload keep the first valid row;
 - `revoke`: revoke non-revoked grants matching email/tool and optional role, and revoke their active sessions.
 
 Known users become `active` grants; unknown but allowed company emails become `pending_user_link` grants and are linked automatically at first verified Google login.

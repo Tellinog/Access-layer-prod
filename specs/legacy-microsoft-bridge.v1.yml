@@ -39,6 +39,16 @@ microsoft_oidc:
     - non_empty_oid
     - usable_email_or_preferred_username
     - allowed_email_domain
+pending_grants:
+  allowed_domains_env: MICROSOFT_ALLOWED_EMAIL_DOMAINS
+  configured_domains:
+    - testbirds.com
+    - testbirds.de
+  may_be_prepared_while_bridge_disabled: true
+  bridge_enabled_by_domain_configuration: false
+bulk_grants:
+  existing_active_or_pending_email_tool: keep_earliest_and_skip
+  repeated_email_tool_in_payload: first_valid_row_only
 legacy_identity_mapping:
   google_sub: "msft:<lowercase-tid>:<lowercase-oid>"
   hd: validated_email_domain

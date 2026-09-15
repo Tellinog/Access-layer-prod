@@ -48,6 +48,7 @@ Minimum production variables:
 - `OAUTH_SIGNING_KEY_ROOT` is required only when OAuth is true and names an absolute dedicated local filesystem root. Key references, including paths, must not be logged. Missing or invalid persisted signing material remains a sanitized runtime 503 rather than permission to use the legacy key.
 - `LEGACY_MICROSOFT_ENABLED` is optional and defaults to `false`. Absent/false registers no Microsoft callback and requires no Microsoft value.
 - When `LEGACY_MICROSOFT_ENABLED=true`, all of `MICROSOFT_TENANT_ID`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_REDIRECT_URI`, `MICROSOFT_ALLOWED_EMAIL_DOMAINS` and `LEGACY_MICROSOFT_TOOL_SLUGS` are required. `MICROSOFT_OIDC_SCOPE` defaults to `openid profile email` and must retain all three scopes.
+- `MICROSOFT_ALLOWED_EMAIL_DOMAINS` is parsed and domain-validated even while the bridge is disabled because it also allows administrators to prepare pending grants. The Testbirds production value is `testbirds.com,testbirds.de`; this setting alone does not register or enable Microsoft routes.
 - The production Microsoft redirect is `/v1/auth/microsoft/callback` under the configured origin/base path. Microsoft IDs and the secret are runtime/operator inputs; do not commit live values. `MICROSOFT_CLIENT_SECRET` belongs in the approved secret manager and its continuity must be proven only when the bridge is enabled.
 
 ## Infrastructure

@@ -24,7 +24,7 @@ The production URI must still be registered and configured by an authorized oper
 
 Register Access Layer as a **single-tenant Web application** in the Testbirds workforce tenant. Do not use `common`, `organizations`, personal Microsoft accounts or a generic multi-tenant registration for the first rollout.
 
-Access Layer must use a tenant-specific OpenID Connect authority and accept only the exact Testbirds tenant ID. The `testbirds.com` email suffix is an additional business check, not the primary trust boundary.
+Access Layer must use a tenant-specific OpenID Connect authority and accept only the exact Testbirds tenant ID. The `testbirds.com` and `testbirds.de` email suffixes are additional business checks, not the primary trust boundary.
 
 Recommended access policy:
 
@@ -52,7 +52,7 @@ Microsoft documents single-tenant registration, redirect URI requirements, token
 Before creating the application, confirm:
 
 - the authoritative Testbirds workforce Directory (tenant) ID;
-- that `testbirds.com` is a verified domain in that tenant;
+- that `testbirds.com` and `testbirds.de` are verified domains in that tenant;
 - whether Testbirds users are tenant members or B2B guests;
 - the Entra application owner and operational backup owner;
 - whether group assignment and Conditional Access are licensed and required.
@@ -133,7 +133,7 @@ This app registration authenticates users to Access Layer. It does not need an A
 
 - Directory (tenant) ID.
 - Confirmed tenant type: workforce tenant.
-- Confirmation that `testbirds.com` is a verified tenant domain.
+- Confirmation that `testbirds.com` and `testbirds.de` are verified tenant domains.
 - Application (client) ID.
 - Application Object ID.
 - Enterprise Application/service-principal Object ID.

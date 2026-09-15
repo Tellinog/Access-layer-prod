@@ -43,6 +43,7 @@ Main data categories:
 - A grant must refer to either `user_id` or `email_normalized`.
 - Non-empty grant permissions must reference registered permission keys for the target tool.
 - Active grants cannot duplicate same user/email + tool + role unless validity windows do not overlap.
+- Bulk `upsert` uses the earliest `active` or `pending_user_link` row for an email/tool as a no-op guard, independent of role; it does not mutate that grant.
 - One-time code is stored hashed and consumed at most once.
 - Audit log rows are never updated or deleted by normal app code.
 

@@ -75,5 +75,6 @@ The Admin UI root does not show unauthenticated dashboard copy. It redirects int
 - `Conferma rilascio`
 - `Seleziona i permessi`
 - `{count} permessi selezionati`
+- `Se email e tool hanno già un grant attivo o pendente, il primo grant resta invariato.`
 - `Client ID e client secret generati per il tool. Client secret mostrato una sola volta: copia entrambi ora e conservali in modo sicuro.`
 - `Compila slug, nome e almeno una Return URL.`

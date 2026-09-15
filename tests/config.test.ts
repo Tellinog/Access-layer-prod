@@ -50,7 +50,7 @@ describe("loadConfig", () => {
     vi.stubEnv("MICROSOFT_CLIENT_ID", "33333333-3333-4333-8333-333333333333");
     vi.stubEnv("MICROSOFT_CLIENT_SECRET", "synthetic-secret");
     vi.stubEnv("MICROSOFT_REDIRECT_URI", "http://localhost:8080/v1/auth/microsoft/callback");
-    vi.stubEnv("MICROSOFT_ALLOWED_EMAIL_DOMAINS", "Testbirds.com");
+    vi.stubEnv("MICROSOFT_ALLOWED_EMAIL_DOMAINS", "Testbirds.com,Testbirds.de");
     vi.stubEnv("LEGACY_MICROSOFT_TOOL_SLUGS", "test-generator,sales-deck-agent");
 
     expect(loadConfig()).toMatchObject({
@@ -58,9 +58,24 @@ describe("loadConfig", () => {
       microsoftTenantId: "11111111-1111-4111-8111-111111111111",
       microsoftClientId: "33333333-3333-4333-8333-333333333333",
       microsoftOidcScope: "openid profile email",
-      microsoftAllowedEmailDomains: ["testbirds.com"],
+      microsoftAllowedEmailDomains: ["testbirds.com", "testbirds.de"],
       legacyMicrosoftToolSlugs: ["test-generator", "sales-deck-agent"]
     });
+  });
+
+  it("loads configured Microsoft email domains while the bridge is disabled so pending grants can be prepared", () => {
+    vi.stubEnv("MICROSOFT_ALLOWED_EMAIL_DOMAINS", "Testbirds.com,Testbirds.de");
+
+    expect(loadConfig()).toMatchObject({
+      legacyMicrosoftEnabled: false,
+      microsoftAllowedEmailDomains: ["testbirds.com", "testbirds.de"]
+    });
+  });
+
+  it("rejects an unsafe configured Microsoft grant domain while the bridge is disabled", () => {
+    vi.stubEnv("MICROSOFT_ALLOWED_EMAIL_DOMAINS", "localhost");
+
+    expect(() => loadConfig()).toThrow("MICROSOFT_ALLOWED_EMAIL_DOMAINS");
   });
 
   it.each([

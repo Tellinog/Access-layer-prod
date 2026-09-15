@@ -9,12 +9,12 @@ export function validateEmail(email: string): boolean {
   return email.length <= 320 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-export function isAllowedPendingGrantEmail(email: string, allowedHd: string[]): boolean {
+export function isAllowedPendingGrantEmail(email: string, ...allowedDomainGroups: string[][]): boolean {
   if (!validateEmail(email)) {
     return false;
   }
   const domain = email.slice(email.lastIndexOf("@") + 1).toLowerCase();
-  return allowedHd.includes(domain);
+  return allowedDomainGroups.some((allowedDomains) => allowedDomains.includes(domain));
 }
 
 export function validateToolSlug(slug: string): boolean {

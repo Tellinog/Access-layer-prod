@@ -690,21 +690,19 @@ export class Repositories {
     toolId: string;
     userId?: string | null;
     emailNormalized: string;
-    role: string;
   }): Promise<AuthorizationGrant | null> {
     const result = await this.db.query(
       `SELECT *
        FROM authorization_grants
        WHERE tool_id = $1
-        AND role = $4
         AND status IN ('active', 'pending_user_link')
         AND (
           ($2::uuid IS NOT NULL AND (user_id = $2::uuid OR email_normalized = $3))
           OR ($2::uuid IS NULL AND user_id IS NULL AND email_normalized = $3)
         )
-       ORDER BY user_id NULLS LAST, updated_at DESC, created_at DESC
+       ORDER BY created_at ASC, id ASC
        LIMIT 1`,
-      [input.toolId, input.userId ?? null, input.emailNormalized, input.role]
+      [input.toolId, input.userId ?? null, input.emailNormalized]
     );
     return result.rowCount ? mapGrant(result.rows[0]) : null;
   }

@@ -61,10 +61,10 @@ Opzione B - utente non ancora entrato:
 
 1. Creare grant tramite email aziendale.
 2. Stato: `pending_user_link`.
-3. Al primo login, Access Layer collega il grant se email e `hd` sono validi.
+3. Al primo login con un provider approvato, Access Layer collega il grant se identita, email e dominio sono validi.
 4. Dopo il link, il grant diventa attivo per lo user ID.
 
-Le email per grant pendenti devono essere ben formate e usare un dominio presente in `GOOGLE_ALLOWED_HD`.
+Le email per grant pendenti devono essere ben formate e usare un dominio presente in `GOOGLE_ALLOWED_HD` oppure in `MICROSOFT_ALLOWED_EMAIL_DOMAINS`. La configurazione Testbirds prevista include `testbirds.com` e `testbirds.de`; questo consente di preparare grant pendenti ma non abilita da solo il login Microsoft.
 
 ## Viste per tool e utente
 
@@ -90,7 +90,8 @@ Flusso consigliato:
 
 Regole:
 
-- `upsert` crea un nuovo grant o aggiorna un grant attivo/pendente esistente per stessa email, tool e ruolo;
+- `upsert` crea un nuovo grant solo se la stessa email normalizzata non ha gia un grant `active` o `pending_user_link` per quel tool; il primo grant esistente resta invariato anche se ruolo, permessi o scadenza della nuova riga differiscono;
+- se la stessa email/tool compare piu volte nello stesso file, solo la prima riga valida puo creare il grant e le successive sono ignorate con warning;
 - `revoke` revoca grant non revocati per email/tool e ruolo opzionale;
 - utenti gia noti diventano grant `active`;
 - email aziendali non ancora note diventano `pending_user_link` e non richiedono approvazione ulteriore al primo login;

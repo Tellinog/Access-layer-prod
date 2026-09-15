@@ -4,6 +4,14 @@
 
 V1 legacy implementation complete. Step 4B hardened candidate `d8998e1fbc1789d71a19cef78714c74c3dbfed37` has three complete consecutive local PostgreSQL 16.15 qualification PASS results, but Step 4B is not approved until a new independent audit passes. OAuth remains default-off; no pilot, production registration, production key/secret provisioning, production restore or production enablement exists.
 
+## Testbirds grant-domain and bulk first-grant-wins update, 2026-09-15
+
+- Pending grant validation now accepts the union of Google Workspace hosted domains and configured Microsoft email domains. The checked-in Testbirds example configuration contains `testbirds.com,testbirds.de`; Google authentication still validates only `GOOGLE_ALLOWED_HD`.
+- Microsoft email domains are parsed and validated while the bridge is disabled, allowing pending grants to be prepared without enabling the Microsoft callback, provider chooser or any tool.
+- Bulk `upsert` no longer updates an existing active/pending grant or creates another grant for the same normalized email and tool. The earliest existing grant is kept unchanged; repeated email/tool rows in one payload create at most the first grant and later rows are warning skips.
+- Bulk revoke, direct grant editing, grant/session/authentication contracts, database schema, migrations, OAuth vNext and deployment state are unchanged. No deploy or production configuration mutation occurred.
+- Final local verification passed: TypeScript lint/build, 357 Vitest tests across 19 files, 64 Python tests with two expected skips, all 24 OAuth contract groups and the non-strict platform check with 27 passes/seven known warnings. Continuity remains expected `VALID_BUT_NOT_READY` with both gates false.
+
 ## Temporary Testbirds Microsoft Entra legacy bridge implemented locally, 2026-09-14
 
 - The approved hand-off supersedes the 2026-09-11 planning prohibition on synthetic legacy identities for this narrow, reversible exception. No provider-neutral migration is introduced.
@@ -441,7 +449,7 @@ For production, create a Coolify compose app from this package, fill variables f
 - Added Admin API and UI support for CSV bulk grant operations.
 - New CSV exports: grant template, current grants and tool permission catalog.
 - Bulk preview validates email domain, tool slug, delegated tool-admin scope, permission format, registered permission keys and UTC expiry values without writing data.
-- Bulk commit creates or updates grants idempotently, keeps unknown company emails as `pending_user_link`, links known users as `active`, and revokes matching grant sessions for `revoke` rows.
+- Historical behavior created or updated grants idempotently. D-046 supersedes the `upsert` portion: current bulk release creates only previously ungranted email/tool targets and keeps the earliest active/pending grant unchanged; `revoke` still revokes matching grant sessions.
 - Bulk commit refuses to write when any row has validation errors; warning rows such as no-op revokes are reported without failing the whole import.
 - Added per-row audit events and a summary `admin.grant.bulk_import_committed` event.
 - Verification: `npm ci`, `npm run lint`, `npm run build` and `npm test` passed locally; test suite result is 9 files and 95 tests.

@@ -235,6 +235,8 @@ Status: accepted
 
 Decision: bulk onboarding imports grant rows by company email and tool, not manually-created Google user records. Known emails are linked to existing users and committed as `active` grants. Unknown but allowed company emails are committed as `pending_user_link` grants and activate automatically at first verified Google login. Bulk `upsert` is idempotent for the same email/tool/role and updates existing active or pending grants instead of creating duplicates. Bulk `revoke` revokes matching non-revoked grants and active sessions.
 
+Partial supersession: D-046 replaces only the bulk `upsert` matching/update rule. Current behavior matches by normalized email/tool regardless of role and keeps the earliest active/pending grant unchanged.
+
 Rationale: Google `sub` remains the stable identity source. Pre-creating local users would weaken identity semantics, while pending email grants preserve the current OAuth-first model and let admins authorize access before the user's first login.
 
 ## D-026 - Admin UI UNGUESS visual alignment is presentation-only
@@ -505,3 +507,15 @@ Decision: the approved Testbirds hand-off authorizes a narrow exception to D-002
 Rationale: Testbirds needs an immediately reversible bridge while the durable provider-neutral identity programme remains deferred. A distinct `msft:` namespace prevents collision with Google subjects and avoids a migration or consumer rollout. Default-off and per-tool allowlisting contain the compatibility exception.
 
 Rollback: set `LEGACY_MICROSOFT_ENABLED=false` and restart. Microsoft routes/choice disappear while existing Google behavior and legacy contracts remain available. Synthetic users and their audit history remain as inert records; no destructive cleanup is required.
+
+## D-046 - Allow configured Testbirds pending grants and keep the first bulk grant
+
+Status: accepted
+
+Confirmed: 2026-09-15
+
+Decision: pending-email grant validation uses the union of `GOOGLE_ALLOWED_HD` and the configured `MICROSOFT_ALLOWED_EMAIL_DOMAINS`. The Testbirds configuration includes both `testbirds.com` and `testbirds.de`. Microsoft domains are parsed and validated even while the legacy bridge is disabled, so an administrator may prepare pending grants before a separately authorised enablement; this does not enable Microsoft login or broaden any tool allowlist.
+
+For bulk `upsert`, an existing `active` or `pending_user_link` grant for the same normalized email and tool is never updated or duplicated, regardless of the incoming role, permissions or validity. The earliest existing grant is retained. If the same email/tool occurs more than once in one bulk payload, only the first valid row may create a grant and later rows are skipped with a warning. Bulk `revoke` and direct grant editing remain unchanged. The legacy response fields `updated` and operation enum member `update` remain for compatibility but bulk upsert no longer produces them.
+
+Rationale: Testbirds users must be grantable through the approved Entra domains without weakening Google `hd` validation. Keeping the first bulk grant prevents a repeated list or changed form selection from silently replacing an already valid authorization.

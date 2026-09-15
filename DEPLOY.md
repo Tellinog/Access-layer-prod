@@ -59,7 +59,7 @@ MICROSOFT_CLIENT_ID=<entra-web-app-client-guid>
 MICROSOFT_CLIENT_SECRET=<secret-manager-reference-value>
 MICROSOFT_REDIRECT_URI=https://access-layer.unguess-internal.net/v1/auth/microsoft/callback
 MICROSOFT_OIDC_SCOPE=openid profile email
-MICROSOFT_ALLOWED_EMAIL_DOMAINS=testbirds.com
+MICROSOFT_ALLOWED_EMAIL_DOMAINS=testbirds.com,testbirds.de
 LEGACY_MICROSOFT_TOOL_SLUGS=<comma-separated-pilot-slugs>
 ```
 

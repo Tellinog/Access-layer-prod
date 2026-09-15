@@ -25,6 +25,10 @@ functional_requirements:
     text: The service must create an admin-visible access request when a valid internal user lacks a grant for a requested tool.
   - id: FR-012
     text: Admins must be able to approve or reject pending access requests, with approval creating a grant transactionally.
+  - id: FR-013
+    text: Pending grants must accept configured Google Workspace and Microsoft email domains, including testbirds.com and testbirds.de in the Testbirds configuration.
+  - id: FR-014
+    text: Bulk grant upsert must keep an existing active or pending grant for the same normalized email and tool unchanged and must keep only the first valid repeated email/tool row.
 non_functional_requirements:
   - id: NFR-001
     text: Production traffic must use HTTPS.

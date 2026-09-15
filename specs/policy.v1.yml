@@ -28,6 +28,14 @@ domain_policy:
   allowed_hd_env: GOOGLE_ALLOWED_HD
   deny_missing_hd: true
   deny_wrong_hd: true
+pending_grant_domain_policy:
+  allowed_domain_envs:
+    - GOOGLE_ALLOWED_HD
+    - MICROSOFT_ALLOWED_EMAIL_DOMAINS
+  configured_testbirds_domains:
+    - testbirds.com
+    - testbirds.de
+  enables_identity_provider: false
 authorization_policy:
   require_active_tool: true
   require_allowed_return_url: true

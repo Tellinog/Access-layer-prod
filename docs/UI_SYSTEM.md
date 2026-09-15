@@ -107,6 +107,8 @@ The Grants page includes two bulk grant controls:
 
 Preview must show row-level `ok`, `warning` and `error` results without writing data. Commit must refuse to write when preview contains errors, then display the applied result summary.
 
+An existing `active` or `pending_user_link` grant for the same normalized email/tool is a warning/no-op in bulk release. The existing grant stays unchanged, and repeated email/tool rows in the same input keep only the first valid row.
+
 The input accepts both comma- and semicolon-delimited CSV files, detecting the delimiter from the required header row.
 # Garden adoption status
 

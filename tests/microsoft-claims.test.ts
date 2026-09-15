@@ -77,6 +77,19 @@ describe("legacy Microsoft Entra identity validation", () => {
     expect(identity.email).toBe("fallback@testbirds.com");
   });
 
+  it("accepts the configured testbirds.de tenant email domain", () => {
+    const identity = validateMicrosoftTokenPayload({
+      payload: { ...validPayload, email: "Tester@Testbirds.de" },
+      expectedTenantId: tenantId,
+      expectedClientId: clientId,
+      allowedEmailDomains: ["testbirds.com", "testbirds.de"],
+      correlationId: "corr-microsoft-test",
+      nowSeconds: now
+    });
+
+    expect(identity).toMatchObject({ email: "tester@testbirds.de", hd: "testbirds.de" });
+  });
+
   it.each([
     ["missing payload", undefined],
     ["wrong issuer", { ...validPayload, iss: "https://login.microsoftonline.com/other/v2.0" }],

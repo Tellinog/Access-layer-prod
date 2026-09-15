@@ -481,10 +481,9 @@ class AdminRepos {
       });
   }
 
-  async findGrantForBulkTarget(input: { toolId: string; userId?: string | null; emailNormalized: string; role: string }) {
+  async findGrantForBulkTarget(input: { toolId: string; userId?: string | null; emailNormalized: string }) {
     if (!this.grant) return null;
     if (this.grant.tool_id !== input.toolId) return null;
-    if (this.grant.role !== input.role) return null;
     if (this.grant.status !== "active" && this.grant.status !== "pending_user_link") return null;
     const matchesUser = input.userId ? this.grant.user_id === input.userId || this.grant.email_normalized === input.emailNormalized : false;
     const matchesEmail = !input.userId && !this.grant.user_id && this.grant.email_normalized === input.emailNormalized;
@@ -1204,6 +1203,129 @@ describe("admin access request routes", () => {
       })
     );
     expect(repos.audits).toContainEqual(expect.objectContaining({ event_type: "admin.grant.bulk_import_committed" }));
+    await app.close();
+  });
+
+  it.each(["testbirds.com", "testbirds.de"])("creates pending grants for the configured %s domain", async (domain) => {
+    const repos = new AdminRepos();
+    const app = await buildAdminApp(repos, PLATFORM_ADMIN_PERMISSIONS, {
+      microsoftAllowedEmailDomains: ["testbirds.com", "testbirds.de"]
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/admin/grants",
+      headers: { authorization: "Bearer admin-token" },
+      payload: {
+        tool_slug: "crm",
+        email: `tester@${domain}`,
+        role: "tool_user",
+        permissions: ["crm:read"]
+      }
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(repos.grant).toMatchObject({
+      email_normalized: `tester@${domain}`,
+      status: "pending_user_link"
+    });
+    await app.close();
+  });
+
+  it("keeps an existing bulk grant unchanged even when the incoming role and permissions differ", async () => {
+    const repos = new AdminRepos();
+    repos.grant = {
+      id: "first-grant-id",
+      tool_id: tool.id,
+      user_id: null,
+      email_normalized: "tester@testbirds.com",
+      role: "original_role",
+      permissions: ["crm:read"],
+      status: "pending_user_link",
+      valid_from: new Date(Date.now() - 1000),
+      valid_until: null,
+      created_by_user_id: adminUser.id
+    };
+    const app = await buildAdminApp(repos, PLATFORM_ADMIN_PERMISSIONS, {
+      microsoftAllowedEmailDomains: ["testbirds.com", "testbirds.de"]
+    });
+    const content = "email,tool_slug,role,permissions,valid_until,action,note\ntester@testbirds.com,crm,new_role,crm:write,2027-01-01T00:00:00Z,upsert,Do not replace\n";
+
+    const preview = await app.inject({
+      method: "POST",
+      url: "/v1/admin/grants/bulk/preview",
+      headers: { authorization: "Bearer admin-token" },
+      payload: { content }
+    });
+    expect(preview.json()).toMatchObject({
+      summary: { total_rows: 1, ok: 0, warning: 1, error: 0 },
+      rows: [{
+        result: "warning",
+        reason: "EXISTING_GRANT_KEPT",
+        existing_grant_id: "first-grant-id",
+        operation: "skip",
+        status_after: "pending_user_link"
+      }]
+    });
+
+    const commit = await app.inject({
+      method: "POST",
+      url: "/v1/admin/grants/bulk/commit",
+      headers: { authorization: "Bearer admin-token" },
+      payload: { content }
+    });
+    expect(commit.statusCode).toBe(201);
+    expect(commit.json()).toMatchObject({
+      committed: true,
+      summary: { total_rows: 1, ok: 0, warning: 1, error: 0, created: 0, updated: 0, skipped: 1 },
+      rows: [{ reason: "EXISTING_GRANT_KEPT", operation: "skip" }]
+    });
+    expect(repos.grant).toMatchObject({
+      id: "first-grant-id",
+      role: "original_role",
+      permissions: ["crm:read"],
+      valid_until: null
+    });
+    expect(repos.audits).not.toContainEqual(expect.objectContaining({ event_type: "admin.grant.created" }));
+    expect(repos.audits).not.toContainEqual(expect.objectContaining({ event_type: "admin.grant.updated" }));
+    await app.close();
+  });
+
+  it("creates only the first valid bulk row for a repeated email and tool", async () => {
+    const repos = new AdminRepos();
+    const app = await buildAdminApp(repos);
+    const content = [
+      "email,tool_slug,role,permissions,valid_until,action,note",
+      "duplicate@unguess.io,crm,first_role,crm:read,,upsert,First",
+      "duplicate@unguess.io,crm,second_role,crm:write,,upsert,Second",
+      ""
+    ].join("\n");
+
+    const preview = await app.inject({
+      method: "POST",
+      url: "/v1/admin/grants/bulk/preview",
+      headers: { authorization: "Bearer admin-token" },
+      payload: { content }
+    });
+    expect(preview.json()).toMatchObject({
+      summary: { total_rows: 2, ok: 1, warning: 1, error: 0 },
+      rows: [
+        { row: 2, operation: "create", result: "ok" },
+        { row: 3, operation: "skip", result: "warning", reason: "EARLIER_BULK_ROW_WILL_CREATE_GRANT" }
+      ]
+    });
+
+    const commit = await app.inject({
+      method: "POST",
+      url: "/v1/admin/grants/bulk/commit",
+      headers: { authorization: "Bearer admin-token" },
+      payload: { content }
+    });
+    expect(commit.json()).toMatchObject({
+      summary: { total_rows: 2, ok: 1, warning: 1, error: 0, created: 1, updated: 0, skipped: 1 }
+    });
+    expect(repos.grant).toMatchObject({ role: "first_role", permissions: ["crm:read"] });
+    expect(repos.audits.filter((event) => (event as { event_type?: string }).event_type === "admin.grant.created")).toHaveLength(1);
     await app.close();
   });
 
@@ -2035,6 +2157,7 @@ describe("admin access request routes", () => {
     expect(html).toContain("permissionPickerMarkup('grant-create-permissions'");
     expect(html).toContain('id="grant-create-valid-until"');
     expect(html).toContain('id="bulk-grants"');
+    expect(html).toContain("il primo grant resta invariato");
     expect(html).toContain('id="csv-grants"');
     expect(html).toContain('id="grant-template"');
     expect(html).toContain('id="grant-export"');

@@ -185,6 +185,7 @@ The v1 implementation includes Vitest tests for:
 - mocked auditor denial when attempting to approve access requests.
 - explicit backup permission behavior and encrypted backup surfaces through admin route coverage.
 - pending grant email validation for company-domain-only pending grants.
+- pending grant creation for configured `testbirds.com` and `testbirds.de` domains without changing Google `hd` validation.
 - configured access-request reopen delay behavior through repository/service coverage.
 - audit log filter forwarding and fail-closed validation for invalid audit filters.
 - Admin UI tool search/status/owner filters, metadata, permission-key onboarding controls and inline create/secret result forms.
@@ -317,7 +318,7 @@ For the configured v1 environment:
 - Cookie-authenticated admin write requests require same-origin validation.
 - Pending email grants reject external or malformed email addresses.
 - Bulk grant import accepts comma- and semicolon-delimited templates, and rejects external domains, unknown tools, unassigned tools for delegated admins, malformed dates and unknown permission keys before writing.
-- Bulk grant commit creates or updates grants idempotently, keeps unknown company emails as `pending_user_link`, and revokes matching sessions on `revoke` rows.
+- Bulk grant commit creates at most the first grant for an email/tool, keeps an existing active/pending grant unchanged across role/permission differences, keeps unknown allowed emails as `pending_user_link`, and revokes matching sessions on `revoke` rows.
 
 ## Manual test checklist
 

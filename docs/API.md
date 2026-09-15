@@ -111,7 +111,7 @@ Confidential token/revocation callers use registered OAuth client Basic credenti
 | GET | `/v1/admin/grants/export` | Export grants CSV | Admin/tool admin | Export current grant rows scoped by actor |
 | GET | `/v1/admin/grants/bulk/template` | Download grant bulk CSV template | Admin/tool admin | Template for operational bulk import |
 | POST | `/v1/admin/grants/bulk/preview` | Preview grant bulk CSV | Admin/tool admin | Validates rows without writing data |
-| POST | `/v1/admin/grants/bulk/commit` | Commit grant bulk CSV | Admin/tool admin | Applies only when preview has no errors; writes audit events |
+| POST | `/v1/admin/grants/bulk/commit` | Commit grant bulk CSV | Admin/tool admin | Applies only when preview has no errors; existing email/tool grants are warning no-ops |
 | GET | `/v1/admin/tools/permissions/export` | Export tool permission catalog CSV | Admin/tool admin | Shows tool slugs and registered permission keys scoped by actor |
 | GET | `/v1/admin/access-requests` | List access requests | Admin/tool admin | Filter by status/tool/email/date |
 | POST | `/v1/admin/grants` | Create grant | Admin | User ID or email required |

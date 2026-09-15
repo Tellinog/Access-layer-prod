@@ -2524,7 +2524,11 @@ function registerAdminApi(
       const emailNormalized = user ? user.email_normalized : body.email ? normalizeEmail(body.email) : undefined;
       if (body.user_id && !user) throw new AppError("VALIDATION_ERROR", ctx.correlationId);
       if (!body.user_id && !emailNormalized) throw new AppError("VALIDATION_ERROR", ctx.correlationId);
-      if (!user && emailNormalized && !isAllowedPendingGrantEmail(emailNormalized, deps.config.googleAllowedHd)) {
+      if (!user && emailNormalized && !isAllowedPendingGrantEmail(
+        emailNormalized,
+        deps.config.googleAllowedHd,
+        deps.config.microsoftAllowedEmailDomains ?? []
+      )) {
         throw new AppError("VALIDATION_ERROR", ctx.correlationId);
       }
       const grant = await deps.repositories.db.transaction(async (tx) => {
@@ -2880,6 +2884,7 @@ async function previewBulkGrantImport(
   input: { rows: BulkGrantInputRow[] }
 ): Promise<{ rows: BulkGrantPreviewRow[]; summary: BulkGrantSummary }> {
   const rows: BulkGrantPreviewRow[] = [];
+  const acceptedUpsertTargets = new Set<string>();
   for (const row of input.rows) {
     const errors: string[] = [];
     let tool: Tool | null = null;
@@ -2890,7 +2895,12 @@ async function previewBulkGrantImport(
     let statusAfter: GrantStatus | null = null;
 
     if (!row.action) errors.push("INVALID_ACTION");
-    if (!row.email || !isAllowedPendingGrantEmail(row.email, deps.config.googleAllowedHd)) {
+    const emailAllowed = row.email && isAllowedPendingGrantEmail(
+      row.email,
+      deps.config.googleAllowedHd,
+      deps.config.microsoftAllowedEmailDomains ?? []
+    );
+    if (!emailAllowed) {
       errors.push("EMAIL_DOMAIN_NOT_ALLOWED");
     }
     if (!row.tool_slug || !validateToolSlug(row.tool_slug)) {
@@ -2907,7 +2917,7 @@ async function previewBulkGrantImport(
       errors.push("INVALID_VALID_UNTIL");
     }
 
-    if (row.email && isAllowedPendingGrantEmail(row.email, deps.config.googleAllowedHd)) {
+    if (emailAllowed) {
       user = await deps.repositories.findUserByEmail(row.email);
       resolvedUser = user ? "known_user" : "pending_user_link";
     }
@@ -2927,11 +2937,13 @@ async function previewBulkGrantImport(
         const existing = await deps.repositories.findGrantForBulkTarget({
           toolId: tool.id,
           userId: user?.id ?? null,
-          emailNormalized: row.email,
-          role: row.role
+          emailNormalized: row.email
         });
         existingGrantId = existing?.id ?? null;
-        operation = existing ? "update" : "create";
+        statusAfter = existing?.status ?? statusAfter;
+        const targetKey = `${tool.id}\u0000${row.email}`;
+        operation = existing || acceptedUpsertTargets.has(targetKey) ? "skip" : "create";
+        acceptedUpsertTargets.add(targetKey);
       }
     } else if (row.action === "revoke") {
       statusAfter = "revoked";
@@ -2951,10 +2963,12 @@ async function previewBulkGrantImport(
     const reason = errors.length
       ? errors.join("; ")
       : operation === "skip"
-        ? "NO_MATCHING_GRANT"
-        : existingGrantId && operation === "update"
-          ? "EXISTING_GRANT_WILL_BE_UPDATED"
-          : null;
+        ? row.action === "upsert"
+          ? existingGrantId
+            ? "EXISTING_GRANT_KEPT"
+            : "EARLIER_BULK_ROW_WILL_CREATE_GRANT"
+          : "NO_MATCHING_GRANT"
+        : null;
     rows.push({
       ...row,
       result,
@@ -2992,43 +3006,45 @@ async function commitBulkGrantImport(
         const existing = await repos.findGrantForBulkTarget({
           toolId: row.tool_id,
           userId: row.user_id ?? null,
-          emailNormalized: row.email,
-          role: row.role
+          emailNormalized: row.email
         });
-        const grant = existing
-          ? await repos.updateGrantTarget(existing.id, {
-              userId: row.user_id ?? null,
-              emailNormalized: row.email,
-              role: row.role,
-              permissions: row.permissions,
-              status,
-              validUntil: row.valid_until
-            })
-          : await repos.createGrant({
-              toolId: row.tool_id,
-              userId: row.user_id ?? null,
-              emailNormalized: row.email,
-              role: row.role,
-              permissions: row.permissions,
-              status,
-              validUntil: row.valid_until,
-              createdByUserId: actor.userId
-            });
+        if (existing) {
+          summary.warning += 1;
+          summary.skipped = (summary.skipped ?? 0) + 1;
+          committedRows.push({
+            ...row,
+            result: "warning",
+            reason: "EXISTING_GRANT_KEPT",
+            existing_grant_id: existing.id,
+            operation: "skip",
+            status_after: existing.status
+          });
+          continue;
+        }
+        const grant = await repos.createGrant({
+          toolId: row.tool_id,
+          userId: row.user_id ?? null,
+          emailNormalized: row.email,
+          role: row.role,
+          permissions: row.permissions,
+          status,
+          validUntil: row.valid_until,
+          createdByUserId: actor.userId
+        });
         if (!grant) throw new AppError("VALIDATION_ERROR", ctx.correlationId);
-        const operation: BulkGrantOperation = existing ? "update" : "create";
-        if (operation === "create") summary.created = (summary.created ?? 0) + 1;
-        if (operation === "update") summary.updated = (summary.updated ?? 0) + 1;
+        const operation: BulkGrantOperation = "create";
+        summary.created = (summary.created ?? 0) + 1;
         summary.ok += 1;
         committedRows.push({
           ...row,
           result: "ok",
-          reason: operation === "update" ? "EXISTING_GRANT_UPDATED" : "GRANT_CREATED",
+          reason: "GRANT_CREATED",
           existing_grant_id: grant.id,
           operation,
           status_after: grant.status
         });
         await audit.write({
-          event_type: operation === "update" ? "admin.grant.updated" : "admin.grant.created",
+          event_type: "admin.grant.created",
           outcome: "success",
           correlation_id: ctx.correlationId,
           tool_id: row.tool_id,
@@ -4137,7 +4153,7 @@ function adminHtml(config: Config): string {
       await loadToolCatalog();
       content.innerHTML = '<form class="form-card" id="grant-bulk-form">' +
         '<h2>Rilascia grant in blocco</h2>' +
-        '<p class="field-help">Inserisci un indirizzo email aziendale per riga, poi scegli tool e permessi. La preview resta obbligatoria: nessun grant viene scritto finché non confermi una preview senza errori.</p>' +
+        '<p class="field-help">Inserisci un indirizzo email aziendale per riga, poi scegli tool e permessi. La preview resta obbligatoria: nessun grant viene scritto finché non confermi una preview senza errori. Se email e tool hanno già un grant attivo o pendente, il primo grant resta invariato.</p>' +
         '<div class="form-grid">' +
         '<label class="full-row">Email aziendali<br><textarea id="grant-bulk-emails" rows="12" required placeholder="mario.rossi@unguess.io\\nanna.bianchi@unguess.io"></textarea><span class="field-help">Una email per riga. Le email non ancora registrate diventano grant pendenti e si attivano al primo login verificato.</span></label>' +
         '<label>Tool<br><select id="grant-bulk-tool" required>'+toolOptions('')+'</select></label>' +

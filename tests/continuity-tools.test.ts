@@ -155,8 +155,8 @@ describe("production continuity helper safety", () => {
     expect(inventory.variables).toHaveLength(53);
   });
 
-  it("keeps runtime and entrypoint invariant and pins the approved Compose continuity correction", () => {
-    expect(sha256Lf("src/config.ts")).toBe("9bcd9efe5abb181621fbc0acbe60d8374f4ce5b5d662f3c74f094cd42d75c82e");
+  it("pins the D-046 grant-domain configuration and the approved Compose continuity correction", () => {
+    expect(sha256Lf("src/config.ts")).toBe("3b1652adef4eb1482722af9abf181647226e27ce05241dd093c760ba0dc6c75f");
     expect(sha256Lf("docker-compose.yaml")).toBe("7315710b8581c7e8dc3d6423df5ac11f8767fb29a8e12bdd571174f41a4a6359");
     expect(sha256Lf("docker/entrypoint.sh")).toBe("07d57fbdbb6bc09268b154c7d97afbfc5f8d5699b0378c747057393769ec6d76");
   });

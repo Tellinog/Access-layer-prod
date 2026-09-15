@@ -116,6 +116,7 @@ Required fields:
 - `google_sub` is the only stable user identity key from Google.
 - `email` may change and must not be used as primary key.
 - A grant is evaluated against both user identity and tool.
+- Bulk release keeps the earliest `active` or `pending_user_link` grant for a normalized email/tool and never overwrites it with a later bulk row.
 - A one-time code can be consumed once only.
 - Access tokens are tool-scoped: a token issued for `tool_a` is invalid for `tool_b`.
 - Admin changes are themselves audited.

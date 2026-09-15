@@ -1,5 +1,30 @@
 # DEVLOG.md
 
+## 2026-09-15 - Testbirds pending grants and bulk first-grant-wins behavior
+
+Changed by: Codex
+Related task: Allow grants for `testbirds.com` and `testbirds.de`, and prevent bulk release from replacing or duplicating an existing grant.
+
+### Implementation
+
+- Pending-email grant validation now uses the union of `GOOGLE_ALLOWED_HD` and `MICROSOFT_ALLOWED_EMAIL_DOMAINS`. The checked-in Testbirds configuration contains `testbirds.com,testbirds.de`; Google authentication continues to validate only the Google `hd` allowlist.
+- Microsoft email domains are parsed and validated even when the bridge flag is false, so pending grants can be prepared without registering a Microsoft callback or enabling any provider/tool path.
+- Bulk `upsert` now finds the earliest `active` or `pending_user_link` grant for the same normalized email/tool without considering the incoming role. An existing grant is returned as warning `EXISTING_GRANT_KEPT`, is not updated, creates no per-row create/update audit, and remains unchanged.
+- Repeated email/tool rows in the same payload allow only the first valid row to create a grant; later rows are previewed and committed as warning skips. Bulk revoke and direct grant editing are unchanged.
+- Added D-046 and aligned Admin, API payload, UX, security, domain, DB, deployment, Testbirds setup, testing and machine policy/requirements/bridge documentation. The historical OpenAPI shape and frozen legacy baseline remain unchanged; no migration was added.
+
+### Verification
+
+- `npm.cmd run lint` passed.
+- `npm.cmd run build` passed.
+- Full Vitest passed 357 tests across 19 files, including direct pending grants for both Testbirds domains, `testbirds.de` Entra claim acceptance, existing-grant preservation across changed role/permissions/expiry, and first-row-only duplicate handling.
+- Python discovery passed 64 tests with two expected skips. OAuth P0 validation passed all 24 check groups. Non-strict platform validation passed 27 checks with seven known warnings.
+- Production-continuity evidence remains schema-valid `VALID_BUT_NOT_READY` with `ready_for_isolated_restore=false` and `ready_for_n_to_n_plus_1=false`, as expected from the existing operational blockers.
+
+### Boundary
+
+- No production, Coolify, database, Entra tenant, secret, tool registration or deployment change was performed. OAuth vNext, Google `hd` authentication, grant/session/token contracts and migrations remain unchanged.
+
 ## 2026-09-14 - Temporary legacy Microsoft Entra bridge for Testbirds
 
 Changed by: Codex

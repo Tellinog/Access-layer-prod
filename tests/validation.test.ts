@@ -15,6 +15,8 @@ describe("validation", () => {
   it("allows pending grants only for well-formed company emails", () => {
     expect(isAllowedPendingGrantEmail("mario.rossi@unguess.io", ["unguess.io", "nuotounostiledivita.it"])).toBe(true);
     expect(isAllowedPendingGrantEmail("lorenzo@nuotounostiledivita.it", ["unguess.io", "nuotounostiledivita.it"])).toBe(true);
+    expect(isAllowedPendingGrantEmail("tester@testbirds.com", ["unguess.io"], ["testbirds.com", "testbirds.de"])).toBe(true);
+    expect(isAllowedPendingGrantEmail("tester@testbirds.de", ["unguess.io"], ["testbirds.com", "testbirds.de"])).toBe(true);
     expect(isAllowedPendingGrantEmail("mario.rossi@gmail.com", ["unguess.io", "nuotounostiledivita.it"])).toBe(false);
     expect(isAllowedPendingGrantEmail("not-an-email", ["unguess.io"])).toBe(false);
   });

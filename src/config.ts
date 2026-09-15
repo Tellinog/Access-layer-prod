@@ -125,9 +125,8 @@ export function loadConfig(): Config {
   const microsoftClientSecret = legacyMicrosoftEnabled ? readRequired("MICROSOFT_CLIENT_SECRET") : undefined;
   const microsoftRedirectUri = legacyMicrosoftEnabled ? readRequired("MICROSOFT_REDIRECT_URI") : undefined;
   const microsoftOidcScope = readOptional("MICROSOFT_OIDC_SCOPE", "openid profile email") ?? "openid profile email";
-  const microsoftAllowedEmailDomains = legacyMicrosoftEnabled
-    ? readCsv("MICROSOFT_ALLOWED_EMAIL_DOMAINS").map((domain) => domain.toLowerCase())
-    : [];
+  const microsoftAllowedEmailDomains = readCsv("MICROSOFT_ALLOWED_EMAIL_DOMAINS")
+    .map((domain) => domain.toLowerCase());
   const legacyMicrosoftToolSlugs = legacyMicrosoftEnabled
     ? readCsv("LEGACY_MICROSOFT_TOOL_SLUGS").map((slug) => slug.toLowerCase())
     : [];
@@ -205,9 +204,6 @@ export function loadConfig(): Config {
     if (!config.microsoftAllowedEmailDomains?.length) {
       throw new Error("MICROSOFT_ALLOWED_EMAIL_DOMAINS must include at least one hosted domain");
     }
-    if (config.microsoftAllowedEmailDomains.some((domain) => !isHostedDomain(domain))) {
-      throw new Error("MICROSOFT_ALLOWED_EMAIL_DOMAINS may only include hosted domains, not URLs, IP addresses or localhost");
-    }
     if (!config.legacyMicrosoftToolSlugs?.length) {
       throw new Error("LEGACY_MICROSOFT_TOOL_SLUGS must include at least one tool slug");
     }
@@ -223,6 +219,9 @@ export function loadConfig(): Config {
         throw new Error(`MICROSOFT_OIDC_SCOPE must include ${requiredScope}`);
       }
     }
+  }
+  if (config.microsoftAllowedEmailDomains?.some((domain) => !isHostedDomain(domain))) {
+    throw new Error("MICROSOFT_ALLOWED_EMAIL_DOMAINS may only include hosted domains, not URLs, IP addresses or localhost");
   }
 
   for (const [name, value] of [

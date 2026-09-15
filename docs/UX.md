@@ -105,3 +105,4 @@ Bulk grant release is designed as a guarded admin operation:
 - advanced CSV import remains available for mixed tool/role/action batches;
 - the CSV separator may be either a comma or a semicolon and is detected from the header row;
 - `pending_user_link` copy must clarify that approval already exists and the grant will activate automatically at first verified Google login.
+- an `active` or `pending_user_link` grant already present for the same normalized email/tool is shown as a warning and kept unchanged; repeated email/tool rows keep the first valid row.

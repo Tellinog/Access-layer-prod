@@ -11,7 +11,9 @@ export const PLATFORM_ADMIN_PERMISSIONS = [
   "admin:backup:read",
   "admin:backup:write",
   "admin:backup:secrets",
-  "admin:secrets:rotate"
+  "admin:secrets:rotate",
+  "admin:oauth:read",
+  "admin:oauth:write"
 ];
 
 export const TOOL_ADMIN_PERMISSIONS = [

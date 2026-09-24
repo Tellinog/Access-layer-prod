@@ -1,0 +1,314 @@
+openapi: 3.1.0
+info:
+  title: Access Layer OAuth P0 Administration API
+  version: 1.0.0-candidate
+  description: >-
+    Platform-admin-only control surface for the existing default-off OAuth P0
+    data model. It does not enable OAuth, alter the protocol runtime, migrate
+    legacy consumers, or implement native OAuth entitlement domains.
+servers:
+  - url: https://access-layer.unguess-internal.net
+security:
+  - adminBearer: []
+  - adminCookie: []
+x-response-cache-control: no-store
+paths:
+  /v1/admin/oauth:
+    get:
+      operationId: listOAuthAdministrationState
+      summary: List OAuth registrations and public lifecycle metadata
+      responses:
+        '200': {description: Secret-free OAuth administration state}
+        '403': {$ref: '#/components/responses/Error'}
+  /v1/admin/oauth/scopes:
+    post:
+      operationId: createOAuthScope
+      summary: Create one canonical OAuth scope
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ScopeCreate'}
+      responses:
+        '200': {description: Scope created}
+        '400': {$ref: '#/components/responses/Error'}
+        '403': {$ref: '#/components/responses/Error'}
+  /v1/admin/oauth/scopes/{id}:
+    patch:
+      operationId: updateOAuthScope
+      summary: Update scope description or active/disabled status
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                description: {type: string, minLength: 1}
+                status: {enum: [active, disabled]}
+      responses:
+        '200': {description: Scope updated}
+        '400': {$ref: '#/components/responses/Error'}
+  /v1/admin/oauth/resources:
+    post:
+      operationId: createOAuthResource
+      summary: Create a resource, scope mappings, entitlement binding and first resource credential
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ResourceCreate'}
+      responses:
+        '200':
+          description: Resource created; resource credential plaintext appears only here
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ResourceCreateResponse'}
+        '400': {$ref: '#/components/responses/Error'}
+  /v1/admin/oauth/resources/{id}/status:
+    patch:
+      operationId: updateOAuthResourceStatus
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RegistrationStatus'}
+      responses:
+        '200': {description: Resource status updated}
+  /v1/admin/oauth/resources/{id}/entitlement-binding:
+    put:
+      operationId: replaceOAuthResourceEntitlementBinding
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [legacy_tool_slug, status]
+              properties:
+                legacy_tool_slug: {type: string, pattern: '^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$'}
+                status: {enum: [active, disabled]}
+      responses:
+        '200': {description: Temporary entitlement-only binding updated}
+  /v1/admin/oauth/resources/{resourceId}/scopes/{scopeId}:
+    put:
+      operationId: putOAuthResourceScopeMapping
+      parameters:
+        - {in: path, name: resourceId, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: scopeId, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [legacy_permission_key, status]
+              properties:
+                legacy_permission_key: {type: string, pattern: '^[a-z0-9-]+(?::[a-z0-9-]+)+$'}
+                status: {enum: [active, disabled]}
+      responses:
+        '200': {description: Explicit resource-scope mapping updated}
+  /v1/admin/oauth/clients:
+    post:
+      operationId: createOAuthClient
+      summary: Create one controlled confidential first-party client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ClientCreate'}
+      responses:
+        '200':
+          description: Client created; client secret plaintext appears only here
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ClientCreateResponse'}
+        '400': {$ref: '#/components/responses/Error'}
+  /v1/admin/oauth/clients/{id}/status:
+    patch:
+      operationId: updateOAuthClientStatus
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RegistrationStatus'}
+      responses:
+        '200': {description: Client status updated}
+  /v1/admin/oauth/clients/{id}/redirect-uris:
+    put:
+      operationId: replaceOAuthClientRedirectUris
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [redirect_uris]
+              properties:
+                redirect_uris:
+                  type: array
+                  minItems: 1
+                  uniqueItems: true
+                  items: {type: string, format: uri}
+      responses:
+        '200': {description: Exact redirect URI set replaced}
+  /v1/admin/oauth/clients/{id}/allowances:
+    put:
+      operationId: replaceOAuthClientAllowances
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [allowances]
+              properties:
+                allowances:
+                  type: array
+                  minItems: 1
+                  uniqueItems: true
+                  items: {$ref: '#/components/schemas/Allowance'}
+      responses:
+        '200': {description: Explicit client-resource-scope set replaced}
+  /v1/admin/oauth/clients/{id}/credentials/rotate:
+    post:
+      operationId: rotateOAuthClientCredential
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '200': {description: Previous active credentials retired; new plaintext secret returned once}
+  /v1/admin/oauth/resources/{id}/credentials/rotate:
+    post:
+      operationId: rotateOAuthResourceCredential
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '200': {description: Previous active credentials retired; new credential ID and plaintext secret returned once}
+  /v1/admin/oauth/clients/credentials/{credentialId}/retire:
+    post:
+      operationId: retireOAuthClientCredential
+      parameters: [{$ref: '#/components/parameters/CredentialId'}]
+      responses:
+        '200': {description: Credential retired}
+  /v1/admin/oauth/resources/credentials/{credentialId}/retire:
+    post:
+      operationId: retireOAuthResourceCredential
+      parameters: [{$ref: '#/components/parameters/CredentialId'}]
+      responses:
+        '200': {description: Credential retired}
+  /v1/admin/oauth/signing-keys:
+    post:
+      operationId: generateOAuthSigningKey
+      summary: Generate a staged RSA key inside OAUTH_SIGNING_KEY_ROOT
+      description: The private key and its protected reference are never returned.
+      responses:
+        '200': {description: Staged public key metadata}
+  /v1/admin/oauth/signing-keys/{id}/publish:
+    post:
+      operationId: publishOAuthSigningKey
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '200': {description: Published with activation eligibility no earlier than 300 seconds}
+  /v1/admin/oauth/signing-keys/{id}/activate:
+    post:
+      operationId: activateOAuthSigningKey
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '200': {description: Activated only after publication lead is satisfied}
+  /v1/admin/oauth/signing-keys/{id}/retire:
+    post:
+      operationId: retireOAuthSigningKey
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '200': {description: Retirement scheduled or completed with verifier grace preserved}
+  /v1/admin/oauth/signing-keys/{id}/disable:
+    post:
+      operationId: disableUnusedOAuthSigningKey
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '200': {description: Unused staged, published or never-used active key disabled}
+components:
+  securitySchemes:
+    adminBearer: {type: http, scheme: bearer, bearerFormat: JWT, description: Active access-admin platform_admin grant with the operation's admin:oauth permission}
+    adminCookie: {type: apiKey, in: cookie, name: access_layer_admin_session, description: Default Admin session cookie name; mutations also require an exact same-origin Origin header}
+  parameters:
+    Id: {in: path, name: id, required: true, schema: {type: string, format: uuid}}
+    CredentialId: {in: path, name: credentialId, required: true, schema: {type: string, format: uuid}}
+  responses:
+    Error:
+      description: Existing Access Layer admin error envelope
+  schemas:
+    RegistrationStatus:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties: {status: {enum: [draft, active, disabled]}}
+    ScopeCreate:
+      type: object
+      additionalProperties: false
+      required: [scope, description]
+      properties:
+        scope: {type: string, pattern: '^[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}$'}
+        description: {type: string, minLength: 1}
+    ScopeMapping:
+      type: object
+      additionalProperties: false
+      required: [scope, legacy_permission_key]
+      properties:
+        scope: {type: string}
+        legacy_permission_key: {type: string}
+    Allowance:
+      type: object
+      additionalProperties: false
+      required: [resource_id, scope]
+      properties:
+        resource_id: {type: string, format: uri}
+        scope: {type: string}
+    ResourceCreate:
+      type: object
+      additionalProperties: false
+      required: [resource_id, display_name, owner_team, status, protected_resource_metadata_url, legacy_tool_slug, scope_mappings]
+      properties:
+        resource_id: {type: string, format: uri}
+        display_name: {type: string, minLength: 1}
+        owner_team: {type: string, minLength: 1}
+        owner_contact: {type: [string, 'null']}
+        status: {enum: [draft, active, disabled]}
+        protected_resource_metadata_url: {type: string, format: uri}
+        legacy_tool_slug: {type: string}
+        scope_mappings: {type: array, minItems: 1, uniqueItems: true, items: {$ref: '#/components/schemas/ScopeMapping'}}
+    ClientCreate:
+      type: object
+      additionalProperties: false
+      required: [client_id, client_name, owner_team, status, grant_types, redirect_uris, allowances]
+      properties:
+        client_id: {type: string}
+        client_name: {type: string, minLength: 1}
+        owner_team: {type: string, minLength: 1}
+        owner_contact: {type: [string, 'null']}
+        status: {enum: [draft, active, disabled]}
+        grant_types: {type: array, uniqueItems: true, items: {enum: [authorization_code, refresh_token]}}
+        redirect_uris: {type: array, minItems: 1, uniqueItems: true, items: {type: string, format: uri}}
+        allowances: {type: array, minItems: 1, uniqueItems: true, items: {$ref: '#/components/schemas/Allowance'}}
+    ClientCreateResponse:
+      type: object
+      required: [client, client_secret]
+      properties:
+        client: {type: object}
+        client_secret: {type: string, readOnly: true, description: Returned once and never persisted as plaintext}
+    ResourceCreateResponse:
+      type: object
+      required: [resource, resource_credential_id, resource_credential_secret]
+      properties:
+        resource: {type: object}
+        resource_credential_id: {type: string}
+        resource_credential_secret: {type: string, readOnly: true, description: Returned once and never persisted as plaintext}

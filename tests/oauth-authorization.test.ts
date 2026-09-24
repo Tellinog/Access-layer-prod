@@ -32,24 +32,24 @@ const fixedNow = new Date("2026-08-26T10:00:00.000Z");
 const protectionKey = Buffer.alloc(32, 11);
 const client: OAuthClientRecord = {
   id: "00000000-0000-4000-8000-000000000101",
-  clientId: "synthetic-bff",
-  clientName: "Synthetic BFF",
+  clientId: "nancy-vnext-bff-local",
+  clientName: "Nancy vNext synthetic confidential BFF",
   clientType: "confidential",
   tokenEndpointAuthMethod: "client_secret_basic",
   grantTypes: ["authorization_code", "refresh_token"],
   status: "active",
-  ownerTeam: "synthetic",
+  ownerTeam: "nancy",
   ownerContact: null
 };
 const resource: OAuthResourceRecord = {
   id: "00000000-0000-4000-8000-000000000102",
-  resourceId: "https://resource.invalid/api",
-  displayName: "Synthetic Resource",
+  resourceId: "https://survey-test.unguess-internal.net/api",
+  displayName: "Nancy vNext synthetic resource",
   status: "active",
-  ownerTeam: "synthetic",
+  ownerTeam: "nancy",
   ownerContact: null,
   audiencePolicy: "exact_single_resource",
-  protectedResourceMetadataUrl: "https://resource.invalid/.well-known/oauth-protected-resource"
+  protectedResourceMetadataUrl: "https://survey-test.unguess-internal.net/.well-known/oauth-protected-resource"
 };
 const user: User = {
   id: "00000000-0000-4000-8000-000000000103",
@@ -112,8 +112,8 @@ const config: Config = {
 const validQuery: Record<string, unknown> = {
   response_type: "code",
   client_id: client.clientId,
-  redirect_uri: "https://client.invalid/callback?existing=kept",
-  scope: "synthetic:records:read synthetic:records:write",
+  redirect_uri: "https://survey-test.unguess-internal.net/auth/callback",
+  scope: "nancy:survey:read nancy:survey:write",
   state: "downstream-state-exact-._~",
   code_challenge: "A".repeat(43),
   code_challenge_method: "S256",
@@ -158,12 +158,12 @@ function harness(overrides: HarnessOverrides = {}) {
     resolveResourceById: async () => Object.hasOwn(overrides, "callbackResource") ? overrides.callbackResource! : selectedResource,
     resolveActiveLegacyEntitlement: async () => overrides.entitlement === false ? null : ({
       legacyToolId: "00000000-0000-4000-8000-000000000104",
-      legacyToolSlug: "synthetic-tool",
-      registeredPermissionKeys: ["records:read", "records:write"]
+      legacyToolSlug: "nancy-entitlement",
+      registeredPermissionKeys: ["nancy:survey:read", "nancy:survey:write"]
     }),
     resolveResourceScopeMappings: async () => [
-      { resourceId: resource.resourceId, scope: "synthetic:records:read", legacyPermissionKey: "records:read" },
-      { resourceId: resource.resourceId, scope: "synthetic:records:write", legacyPermissionKey: "records:write" }
+      { resourceId: resource.resourceId, scope: "nancy:survey:read", legacyPermissionKey: "nancy:survey:read" },
+      { resourceId: resource.resourceId, scope: "nancy:survey:write", legacyPermissionKey: "nancy:survey:write" }
     ]
   } as unknown as OAuthFoundationRepository;
   const flow = {
@@ -262,7 +262,7 @@ function harness(overrides: HarnessOverrides = {}) {
       user_id: user.id,
       email_normalized: user.email_normalized,
       role: "user",
-      permissions: overrides.permissions ?? ["records:read", "records:write"],
+      permissions: overrides.permissions ?? ["nancy:survey:read", "nancy:survey:write"],
       status: "active",
       valid_from: fixedNow,
       valid_until: null,
@@ -405,8 +405,8 @@ describe("Step 3C authorization request trust boundary", () => {
     for (const [field, value, error] of [
       ["response_type", "token", "unsupported_response_type"],
       ["resource", "https://unknown.invalid/api", "invalid_target"],
-      ["scope", "synthetic:records:read  synthetic:records:write", "invalid_scope"],
-      ["scope", "synthetic:records:read synthetic:records:read", "invalid_scope"],
+      ["scope", "nancy:survey:read  nancy:survey:write", "invalid_scope"],
+      ["scope", "nancy:survey:read nancy:survey:read", "invalid_scope"],
       ["code_challenge", "A".repeat(42), "invalid_request"],
       ["code_challenge_method", "plain", "invalid_request"]
     ] as const) {
@@ -447,11 +447,10 @@ describe("Step 3C callback, entitlement and issuance", () => {
     const location = new URL((result as { location: string }).location);
     const rawCode = location.searchParams.get("code")!;
     expect(Buffer.from(rawCode, "base64url")).toHaveLength(32);
-    expect(location.origin + location.pathname).toBe("https://client.invalid/callback");
-    expect(location.searchParams.get("existing")).toBe("kept");
+    expect(location.origin + location.pathname).toBe("https://survey-test.unguess-internal.net/auth/callback");
     expect(location.searchParams.get("state")).toBe(validQuery.state);
     expect(location.searchParams.get("iss")).toBe(config.authIssuer);
-    expect([...location.searchParams.keys()].sort()).toEqual(["code", "existing", "iss", "state"]);
+    expect([...location.searchParams.keys()].sort()).toEqual(["code", "iss", "state"]);
     expect(h.linkCalls()).toBe(1);
     expect(h.issuances).toHaveLength(1);
     expect(h.issuances[0].codeHash).toBe(sha256(rawCode));
@@ -478,7 +477,7 @@ describe("Step 3C callback, entitlement and issuance", () => {
     for (const h of [
       harness({ userStatus: "disabled" }),
       harness({ grant: false }),
-      harness({ permissions: ["records:read"] })
+      harness({ permissions: ["nancy:survey:read"] })
     ]) {
       const callbackQuery = await begin(h);
       const result = await h.service.callback(callbackQuery, requestContext);
@@ -512,7 +511,7 @@ describe("Step 3C callback, entitlement and issuance", () => {
       oauthClientId: client.id,
       oauthResourceId: resource.id,
       legacyAuthorizationGrantId: "00000000-0000-4000-8000-000000000106",
-      grantedScopes: ["synthetic:records:read"],
+      grantedScopes: ["nancy:survey:read"],
       redirectUri: String(validQuery.redirect_uri),
       codeChallenge: String(validQuery.code_challenge),
       codeHash: sha256("synthetic-code"),

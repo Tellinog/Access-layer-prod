@@ -16,9 +16,9 @@ const OAUTH_REDIRECT_SCHEMA_REGEX = /^(https:\/\/|http:\/\/localhost(?::[0-9]{1,
 const RAW_URI_FORBIDDEN_REGEX = /[\u0000-\u0020\u007f-\u009f\s\\]/u;
 const MALFORMED_PERCENT_ESCAPE_REGEX = /%(?![0-9a-f]{2})/i;
 const RFC3339_DATE_TIME_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
-const OAUTH_SIGNING_PUBLISH_LEAD_MS = 300_000;
-const OAUTH_SIGNING_RETIRE_GRACE_MS = 1_260_000;
-const OAUTH_RS256_MIN_MODULUS_BITS = 2_048;
+export const OAUTH_SIGNING_PUBLISH_LEAD_MS = 300_000;
+export const OAUTH_SIGNING_RETIRE_GRACE_MS = 1_260_000;
+export const OAUTH_RS256_MIN_MODULUS_BITS = 2_048;
 const PRIVATE_JWK_MEMBERS = ["d", "p", "q", "dp", "dq", "qi", "oth", "k"] as const;
 
 export class OAuthRegistrationValidationError extends Error {

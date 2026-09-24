@@ -33,3 +33,11 @@ ON CONFLICT DO NOTHING;
 INSERT INTO tool_permissions (tool_id, permission_key, description)
 SELECT id, 'admin:backup:secrets', 'Export restore secret material' FROM tools WHERE slug = 'access-admin'
 ON CONFLICT DO NOTHING;
+
+INSERT INTO tool_permissions (tool_id, permission_key, description)
+SELECT id, 'admin:oauth:read', 'Read OAuth P0 administrative configuration' FROM tools WHERE slug = 'access-admin'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO tool_permissions (tool_id, permission_key, description)
+SELECT id, 'admin:oauth:write', 'Manage OAuth P0 registrations, credentials and signing keys' FROM tools WHERE slug = 'access-admin'
+ON CONFLICT DO NOTHING;

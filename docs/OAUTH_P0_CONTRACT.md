@@ -1,12 +1,20 @@
 # OAuth vNext P0 contract
 
-Status: frozen protocol contract; Step 3E complete dark HTTP runtime implemented and default-disabled
+Status: frozen protocol contract; Step 3E dark runtime plus controlled P0 administration candidate, protocol default-disabled
 Machine source: `../specs/oauth-p0.v1.yml`
 Target OpenAPI: `../schemas/access-layer-oauth-v1.openapi.yaml`
 
 ## Boundary and compatibility
 
-P0 is an additive OAuth authorization-server contract. Step 2 created no runtime endpoint, table, migration, dependency, client registration or production configuration. Step 3A added the disabled foundation, Step 3B added flag-gated read-only `/oauth/jwks` plus RFC 9728 metadata, Step 3C added flag-gated authorization/code issuance, and Step 3D added four lifecycle tables plus the audited service/repository core. Step 3E mounts RFC 8414, token, revoke and introspect through a strict form/Basic boundary only when the default-false flag is true. Registration APIs, seeds, pilots and production configuration remain absent. The frozen `access-layer-legacy-v1` contract remains authoritative for `/v1/*`, Google callback, JWT/JWKS, sessions, refresh tokens, grants, permissions, cookies, tool clients, Admin UI and current consumers. OAuth failure never falls back to legacy credentials, and no consumer is forced to migrate.
+P0 is an additive OAuth authorization-server contract. Step 3A added the disabled foundation, Step 3B added flag-gated read-only `/oauth/jwks` plus RFC 9728 metadata, Step 3C added flag-gated authorization/code issuance, and Step 3D added four lifecycle tables plus the audited service/repository core. Step 3E mounts RFC 8414, token, revoke and introspect through a strict form/Basic boundary only when the default-false flag is true. D-047 now adds controlled same-service administration over the existing tables; it does not enable the protocol. Seeds, pilots and production registrations remain absent. The frozen `access-layer-legacy-v1` contract remains authoritative for existing `/v1/*` routes, Google callback, JWT/JWKS, sessions, refresh tokens, grants, permissions, cookies, tool clients, legacy Admin workflows and current consumers. OAuth failure never falls back to legacy credentials, and no consumer is forced to migrate.
+
+## P0 administration boundary
+
+`/v1/admin/oauth/*` and `/admin/oauth` are mounted independently of `OAUTH_P0_ENABLED`, so reviewed records may be prepared while the protocol remains dark. They require active `platform_admin` grants with explicit `admin:oauth:read`/`admin:oauth:write`; no `tool_admin` fallback exists. Cookie mutations use the existing exact same-origin CSRF model and a dedicated rate bucket.
+
+Client/resource credentials are server-generated, returned only in the create/rotate response, hashed using the existing dedicated OAuth pepper contract and never returned by reads. Signing keys are RSA 2048-bit or stronger, generated server-side into an already-provisioned absolute `OAUTH_SIGNING_KEY_ROOT`. Private keys and protected references are never returned through HTTP; DB and backup retain only the accepted protected reference plus public metadata, never private key bytes.
+
+The Admin surface reuses the exact P0 validation rules and does not infer redirects, resources, scopes, permissions or allowances. Existing Users/Grants UI/API remains the only P0 human-grant authority. The resource binding remains a temporary entitlement-only bridge scheduled for replacement by native OAuth entitlement domains after Nancy Phase 8 and before broad SDK-native rollout.
 
 Stable RFCs are normative: RFC 6749 where applicable, RFC 6750, RFC 7636, RFC 7009, RFC 7662, RFC 8414, RFC 8707, RFC 9068, RFC 9207, RFC 9700, RFC 9728 and RFC 10017. OAuth 2.1 is an aligned work-in-progress draft profile, not a published RFC.
 

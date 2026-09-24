@@ -46,7 +46,9 @@ The dashboard is at `/admin`; admin and tool-management APIs are under `/v1/admi
 
 `OAUTH_P0_ENABLED` is optional and defaults to `false`; absent/false preserves the exact legacy route inventory and requires no OAuth-only input. True mounts the complete Step 3E dark surface: Step 3B metadata/JWKS, Step 3C authorization/Google callback, token, revoke, introspect and RFC 8414, with no implicit HEAD on GET routes. It then requires a dedicated canonical 32-byte `OAUTH_TRANSACTION_PROTECTION_KEY`, distinct `OAUTH_CREDENTIAL_SECRET_PEPPER` and absolute dedicated `OAUTH_SIGNING_KEY_ROOT`. Never reuse the tool-client pepper or legacy JWT key/root, and never record real values or key paths in Git.
 
-Do not set or enable those OAuth values in production under this step. No callback registration, pilot/key provisioning, controlled registration, backup expansion or production action is authorised; Step 3E does not modify Compose/Coolify or production secrets.
+Do not set or enable those OAuth values in production under this task. D-047 adds controlled administration and Compose passthrough for the already-defined variables, but it does not authorise callback registration, pilot records, production key/credential provisioning, Coolify mutation or OAuth enablement.
+
+The Admin API may manage non-secret registration records while `OAUTH_P0_ENABLED=false`. Credential create/rotate additionally requires the dedicated `OAUTH_CREDENTIAL_SECRET_PEPPER`. Signing-key generation additionally requires an already-provisioned persistent protected directory at absolute `OAUTH_SIGNING_KEY_ROOT`; the service deliberately fails closed rather than creating an unproven ephemeral root. A suitable production mount, owner and continuity proof remain release inputs.
 
 ### Optional temporary legacy Microsoft bridge
 

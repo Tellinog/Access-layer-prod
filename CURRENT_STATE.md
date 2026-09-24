@@ -2,7 +2,17 @@
 
 ## Phase
 
-V1 legacy implementation complete. Step 4B hardened candidate `d8998e1fbc1789d71a19cef78714c74c3dbfed37` has three complete consecutive local PostgreSQL 16.15 qualification PASS results, but Step 4B is not approved until a new independent audit passes. OAuth remains default-off; no pilot, production registration, production key/secret provisioning, production restore or production enablement exists.
+V1 legacy implementation complete. The working tree is an **OAuth P0 runtime + administration candidate** based on exact commit `bae112404a8432b4d4ce7e3e70d96f2217ac7597`. OAuth remains default-off; no pilot, production Nancy registration, production key/secret provisioning, production restore, Coolify mutation or production enablement exists. The earlier Step 4B hardened candidate `d8998e1fbc1789d71a19cef78714c74c3dbfed37` retains three complete consecutive local PostgreSQL 16.15 qualification PASS results, but a new independent audit of this administration candidate is still required.
+
+## OAuth P0 administration candidate, 2026-09-23
+
+- Added a same-service `/admin/oauth` surface and `/v1/admin/oauth/*` API for the existing ten-table OAuth foundation: signing keys, clients, client credentials, exact redirect URIs, resources, separate resource credentials, canonical scopes, resource-scope mappings, explicit client-resource-scope allowances and temporary resource-to-legacy-tool entitlement bindings.
+- Access is fail-closed to an active `platform_admin` grant carrying `admin:oauth:read` or `admin:oauth:write`. Normal users, auditors and `tool_admin` are not authorised. Cookie mutations retain exact same-origin CSRF enforcement and have a dedicated mutation rate limit.
+- Client/resource credentials are generated server-side, returned only from create/rotate, stored only as the existing peppered scrypt hash and omitted from every list/read response and audit event. Client and resource credentials remain separate.
+- OAuth RSA keys are generated server-side at 2048 bits into an already-provisioned absolute `OAUTH_SIGNING_KEY_ROOT`. HTTP and DB receive only public JWK/fingerprint/lifecycle metadata; the protected private-key reference remains DB/backup internal and is omitted from Admin reads. Staged, publish, activation-lead, active overlap/retirement and safe disable transitions are enforced.
+- Added the local-only Nancy-shaped fixture `examples/oauth/nancy-admin-p0.local.json`; it contains synthetic IDs and no credential/user material. Tests prove exact callback/resource/scopes/mappings/allowances, distinct credentials, deterministic publication lead, public-only JWKS and token verification from JWKS material.
+- Native OAuth entitlement domains remain explicitly deferred. The P0 legacy-tool binding is entitlement-only and is scheduled for replacement after the Nancy Phase 8 pilot and before broad SDK-native onboarding.
+- Repository lint/build and all 362 Vitest tests pass. Python discovery ran 64 tests with two expected skips, the OAuth contract validator passed all 26 groups, the platform checker passed 27 checks with seven documented warnings, Compose rendered, continuity remained valid but not ready, and `git diff --check` passed. Docker/PostgreSQL is unavailable on this host, so a new real-PostgreSQL qualification and independent review remain open; historical Step 4B evidence is not weakened or relabelled.
 
 ## Testbirds grant-domain and bulk first-grant-wins update, 2026-09-15
 

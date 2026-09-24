@@ -18,7 +18,7 @@ This project does not track product analytics for user behavior. It tracks secur
 | Refresh failures | `token.refresh.denied` | Expiry, replay, integration and authorization monitoring |
 | Admin grant changes | `admin.grant.*` | Change tracking |
 
-Steps 3C–3E can derive dark/local authorization, exchange, refresh, replay, revocation and introspection metrics only when OAuth is explicitly enabled in an isolated environment. The HTTP routes are mounted but remain absent under the default-false production posture. Registration/key-management metrics remain disabled. Metric labels may use aggregate client/resource/scope dimensions but never tokens, codes, state, nonce, PKCE, email or subject.
+Steps 3C–3E can derive dark/local authorization, exchange, refresh, replay, revocation and introspection metrics only when OAuth is explicitly enabled in an isolated environment. The protocol routes remain absent under the default-false production posture. D-047 registration/key-management audit events may exist while the protocol is disabled; metrics may count their action/outcome and stable public client/resource/scope/`kid` dimensions, never credentials, hashes, private references, tokens, codes, state, nonce, PKCE, email or subject.
 
 ## Dashboards
 

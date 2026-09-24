@@ -44,8 +44,8 @@ Minimum production variables:
 - `ACCESS_REQUEST_REOPEN_AFTER_DAYS` defaults to `30`
 - `OAUTH_P0_ENABLED` is optional and defaults to `false`; absent/false preserves the exact legacy route inventory and requires no OAuth-only input.
 - `OAUTH_TRANSACTION_PROTECTION_KEY` is required only when OAuth is true. It must be a dedicated canonical unpadded base64url encoding of exactly 32 random bytes. Never store a real value in Git or derive it from legacy secrets.
-- `OAUTH_CREDENTIAL_SECRET_PEPPER` is required only when OAuth is true. It must contain at least 16 characters and must never equal or derive from `TOOL_CLIENT_SECRET_PEPPER`.
-- `OAUTH_SIGNING_KEY_ROOT` is required only when OAuth is true and names an absolute dedicated local filesystem root. Key references, including paths, must not be logged. Missing or invalid persisted signing material remains a sanitized runtime 503 rather than permission to use the legacy key.
+- `OAUTH_CREDENTIAL_SECRET_PEPPER` is required when OAuth is true and also for Admin client/resource credential create or rotate while the protocol is disabled. It must contain at least 16 characters and must never equal or derive from `TOOL_CLIENT_SECRET_PEPPER`.
+- `OAUTH_SIGNING_KEY_ROOT` is required when OAuth is true and also for Admin signing-key generation while the protocol is disabled. It names an absolute, already-provisioned, persistent protected filesystem root. Key references, including paths, must not be logged. The Admin operation fails closed when the root is missing or inaccessible; filesystem persistence cannot be inferred by the application and must be proven by the operator before generation. Missing or invalid persisted signing material remains a sanitized runtime 503 rather than permission to use the legacy key.
 - `LEGACY_MICROSOFT_ENABLED` is optional and defaults to `false`. Absent/false registers no Microsoft callback and requires no Microsoft value.
 - When `LEGACY_MICROSOFT_ENABLED=true`, all of `MICROSOFT_TENANT_ID`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_REDIRECT_URI`, `MICROSOFT_ALLOWED_EMAIL_DOMAINS` and `LEGACY_MICROSOFT_TOOL_SLUGS` are required. `MICROSOFT_OIDC_SCOPE` defaults to `openid profile email` and must retain all three scopes.
 - `MICROSOFT_ALLOWED_EMAIL_DOMAINS` is parsed and domain-validated even while the bridge is disabled because it also allows administrators to prepare pending grants. The Testbirds production value is `testbirds.com,testbirds.de`; this setting alone does not register or enable Microsoft routes.
@@ -104,7 +104,7 @@ When `RUN_SEED_ON_START=true`, the seed reconciles the reserved `access-admin` r
 
 The optional Microsoft bridge adds no migration step. After separate authorization, configure the Entra Web redirect and runtime values, leave the flag false for configuration validation, then enable only for the approved pilot slugs and run the controlled smoke matrix. Roll back by disabling the flag and restarting.
 
-Steps 3A–3E implement the complete OAuth P0 surface only for local/default-off dark operation. They do not authorise a production flag/key/pepper/root, Google callback registration, pilot, key provisioning, controlled registration or deploy. Production remains blocked by the continuity/release gates below.
+Steps 3A–3E implement the complete OAuth P0 protocol surface for local/default-off dark operation, and D-047 adds controlled administration. They do not authorise a production flag/key/pepper/root, Google callback registration, pilot record, key provisioning, deploy or Coolify mutation. Production remains blocked by the continuity/release gates below.
 
 ## Rollback
 

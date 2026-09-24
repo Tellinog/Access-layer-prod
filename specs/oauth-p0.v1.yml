@@ -233,6 +233,21 @@ registration:
   legacy_tool_slug_pattern: ^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$
   scope_entitlement_mappings: exactly_one_explicit_legacy_permission_per_resource_scope
   native_oauth_entitlement_domains: deferred_beyond_p0
+administration:
+  status: candidate_implemented
+  openapi: ../schemas/access-layer-oauth-admin-p0.openapi.yaml
+  ui_path: /admin/oauth
+  api_base_path: /v1/admin/oauth
+  runtime_enablement_independent: true
+  required_role: platform_admin
+  required_permissions: [admin:oauth:read, admin:oauth:write]
+  tool_admin_default_access: forbidden
+  cookie_mutation_csrf: exact_same_origin
+  credential_plaintext_return: create_or_rotate_response_only
+  credential_hash_storage: existing_oauth_scrypt_peppered
+  signing_key_generation: server_side_rsa_2048
+  signing_private_key_http_or_database_exposure: forbidden
+  synthetic_fixture: ../examples/oauth/nancy-admin-p0.local.json
 development_and_release_gates:
   step_3_local_dark_development_after_step_2_approval: allowed
   oauth_globally_disabled_by_default: true

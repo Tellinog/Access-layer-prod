@@ -87,6 +87,8 @@ Default retention:
 
 ## Step 3A OAuth dark foundation
 
+D-047 adds no migration and reuses these tables. OAuth Admin writes registration, credential and signing lifecycle changes together with one sanitized `audit_logs` row in a transaction. Secret hashes and protected key references are never selected by the Admin list API. Private key bytes remain filesystem-only and are absent from PostgreSQL and encrypted DB backup data.
+
 `migrations/003_oauth_dark_foundation.sql` is expand-only and creates exactly these independent tables:
 
 | Table | Step 3A purpose |

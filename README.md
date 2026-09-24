@@ -4,7 +4,7 @@
 
 > Platform status (2026-08-25): Template v2.1 is adopted in `legacy-migration` mode. Live evidence resolved the source Compose PostgreSQL logical-volume mismatch without renaming the live volume. Deployment remains blocked by the backup/restore, ownership, registry and remaining continuity gates in `BACKLOG.md`.
 
-> OAuth vNext status: Step 3E mounts the complete frozen P0 HTTP surface over the audited Step 3C/3D core, still behind default-false `OAUTH_P0_ENABLED`. Absent/false leaves every OAuth route at 404 and requires no OAuth-only secret. True additionally requires the dedicated transaction key, credential pepper and signing-key root. No pilot, production key/secret, registration or enablement exists, and `specs/oauth-p0.v1.yml` remains protocol-frozen.
+> OAuth vNext status (2026-09-23): the complete frozen P0 HTTP runtime remains behind default-false `OAUTH_P0_ENABLED`; D-047 adds a platform-admin-only `/admin/oauth` and `/v1/admin/oauth/*` administration candidate for that existing model. Administration does not enable protocol routes. No production Nancy record, signing key, secret, deployment or enablement exists, and native OAuth entitlement domains remain deferred until after the Nancy Phase 8 pilot and before broad SDK-native onboarding.
 
 Layer di accesso condiviso per tool web interni aziendali.
 

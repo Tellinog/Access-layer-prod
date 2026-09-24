@@ -35,16 +35,17 @@ import { readFileSync } from "node:fs";
 
 const fixedNow = new Date("2026-08-27T10:00:00.000Z");
 const issuer = "https://access-layer.example.test";
-const resourceId = "https://api.example.test/v1";
-const clientId = "client.test";
+const resourceId = "https://survey-test.unguess-internal.net/api";
+const clientId = "nancy-vnext-bff-local";
+const redirectUri = "https://survey-test.unguess-internal.net/auth/callback";
 const oauthClientId = "11111111-1111-4111-8111-111111111111";
 const oauthResourceId = "22222222-2222-4222-8222-222222222222";
 const userId = "33333333-3333-4333-8333-333333333333";
 const authorizationId = "44444444-4444-4444-8444-444444444444";
 const grantId = "55555555-5555-4555-8555-555555555555";
 const toolId = "66666666-6666-4666-8666-666666666666";
-const scopes = ["project:domain:read", "project:domain:write"];
-const permissions = ["legacy:read", "legacy:write"];
+const scopes = ["nancy:survey:read", "nancy:survey:write"];
+const permissions = ["nancy:survey:read", "nancy:survey:write"];
 const pepper = "oauth-only-pepper-value";
 const clientSecret = "oauth-client-secret-value";
 const resourceSecret = "oauth-resource-secret-value";
@@ -281,7 +282,7 @@ function codeContext(): OAuthAuthorizationCodeContext {
     codeId: "code-id", oauthAuthorizationId: authorizationId, oauthClientId, clientId,
     clientStatus: "active", clientGrantTypes: ["authorization_code", "refresh_token"],
     oauthResourceId, resourceId, resourceStatus: "active", audiencePolicy: "exact_single_resource",
-    userId, googleSub: "google-subject", userStatus: "active", redirectUri: "https://client.example.test/callback",
+    userId, googleSub: "google-subject", userStatus: "active", redirectUri,
     grantedScopes: [...scopes], authorizationGrantedScopes: [...scopes],
     codeChallenge: challenge, codeChallengeMethod: "S256",
     correlationId: "correlation-code", issuedAt: fixedNow,
@@ -528,11 +529,11 @@ describe("OAuth token-lifecycle service", () => {
       key: privateKeyPem
     };
     for (const request of [
-      { code: "unknown-code", clientId, clientSecret, redirectUri: "https://client.example.test/callback",
+      { code: "unknown-code", clientId, clientSecret, redirectUri,
         resource: resourceId, codeVerifier: verifier },
-      { code: "raw-code", clientId: "unknown-client", clientSecret, redirectUri: "https://client.example.test/callback",
+      { code: "raw-code", clientId: "unknown-client", clientSecret, redirectUri,
         resource: resourceId, codeVerifier: verifier },
-      { code: "raw-code", clientId, clientSecret, redirectUri: "https://client.example.test/callback",
+      { code: "raw-code", clientId, clientSecret, redirectUri,
         resource: resourceId, codeVerifier: "x".repeat(43) }
     ]) {
       const { repository, service } = await serviceFixture();
@@ -545,7 +546,7 @@ describe("OAuth token-lifecycle service", () => {
     const { repository, service } = await serviceFixture();
     repository.failCodeDenialAudit = true;
     await expect(service.exchangeAuthorizationCode({
-      code: "unknown-code", clientId, clientSecret, redirectUri: "https://client.example.test/callback",
+      code: "unknown-code", clientId, clientSecret, redirectUri,
       resource: resourceId, codeVerifier: verifier
     })).rejects.toMatchObject({ code: "temporarily_unavailable" });
   });
@@ -694,11 +695,11 @@ describe("OAuth token-lifecycle service", () => {
       (context) => { context.tokenGeneration = context.familyCurrentGeneration + 1; },
       (context) => { context.tokenScopes = [scopes[0]]; },
       (context) => {
-        context.currentScopes = [...scopes, "project:domain:admin"];
+        context.currentScopes = [...scopes, "nancy:survey:admin"];
         context.tokenScopes = [...context.currentScopes];
         context.authorizationGrantedScopes = [...context.currentScopes];
       },
-      (context) => { context.scopeCeiling = [...scopes, "project:domain:admin"]; },
+      (context) => { context.scopeCeiling = [...scopes, "nancy:survey:admin"]; },
       (context) => { context.authorizationGrantedScopes = [scopes[0]]; }
     ];
     for (const corrupt of corruptions) {

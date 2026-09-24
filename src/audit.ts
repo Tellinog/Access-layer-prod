@@ -60,5 +60,5 @@ function looksTokenLike(value: string): boolean {
   if (/^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(value)) {
     return true;
   }
-  return /^(otc_|rt_)[A-Za-z0-9_-]{20,}/.test(value);
+  return /^(otc_|rt_|ocs_|ors_)[A-Za-z0-9_-]{20,}/.test(value);
 }

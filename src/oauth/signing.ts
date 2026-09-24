@@ -5,7 +5,12 @@ import { fileURLToPath } from "node:url";
 import { decodeProtectedHeader, exportJWK, jwtVerify, SignJWT, type JWTPayload } from "jose";
 import { randomToken } from "../security.js";
 import type { OAuthSigningKeyPublicMetadata } from "./types.js";
-import { isCanonicalOAuthScope, isValidOAuthPublicJwk, validateOAuthSigningKeyLifecycle } from "./validation.js";
+import {
+  isCanonicalOAuthScope,
+  isValidOAuthPublicJwk,
+  OAUTH_RS256_MIN_MODULUS_BITS,
+  validateOAuthSigningKeyLifecycle
+} from "./validation.js";
 
 export const OAUTH_ACCESS_TOKEN_TTL_SECONDS = 900;
 export const OAUTH_SIGNING_KEY_MAX_BYTES = 64 * 1024;
@@ -39,7 +44,7 @@ function failSigning(): never {
   throw new OAuthSigningUnavailableError();
 }
 
-function canonicalPublicFingerprint(publicJwk: Record<string, unknown>): string {
+export function canonicalOAuthPublicFingerprint(publicJwk: Record<string, unknown>): string {
   if (typeof publicJwk.e !== "string" || typeof publicJwk.n !== "string") return failSigning();
   const canonical = JSON.stringify({ e: publicJwk.e, kty: "RSA", n: publicJwk.n });
   return createHash("sha256").update(canonical).digest("hex");
@@ -109,7 +114,7 @@ export async function loadOAuthPrivateSigningKey(input: {
     const privateKey = createPrivateKey(pem);
     if (privateKey.asymmetricKeyType !== "rsa") return failSigning();
     const modulusLength = privateKey.asymmetricKeyDetails?.modulusLength ?? 0;
-    if (modulusLength < 2048) return failSigning();
+    if (modulusLength < OAUTH_RS256_MIN_MODULUS_BITS) return failSigning();
 
     if (!isValidOAuthPublicJwk(input.key.publicJwk, input.key.kid)) return failSigning();
     const derived = await exportJWK(createPublicKey(privateKey));
@@ -126,7 +131,7 @@ export async function loadOAuthPrivateSigningKey(input: {
         return failSigning();
       }
     }
-    if (canonicalPublicFingerprint(input.key.publicJwk) !== input.key.publicKeyFingerprintSha256) {
+    if (canonicalOAuthPublicFingerprint(input.key.publicJwk) !== input.key.publicKeyFingerprintSha256) {
       return failSigning();
     }
     return privateKey;

@@ -33,9 +33,13 @@ visibility:
       - all_grants
       - all_access_requests
       - audit_logs
+      - oauth_public_registration_and_lifecycle_metadata_with_admin_oauth_read
+      - oauth_one_time_generated_credentials_with_admin_oauth_write
     cannot_view:
       - stored_secret_hash_plaintext
       - token_plaintext
+      - oauth_private_signing_keys
+      - oauth_credential_secrets_after_create_or_rotate
   auditor:
     can_view:
       - audit_logs

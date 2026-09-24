@@ -8,7 +8,7 @@ The exception does not change exchange/JWT/refresh/introspection/logout contract
 
 Rollback requires only `LEGACY_MICROSOFT_ENABLED=false` and restart. Existing synthetic users are retained as inert audit/history records; no destructive data rollback or migration is required.
 
-> Current status: the legacy runtime surface remains frozen in `../specs/legacy-contract-baseline.v1.json`. Step 3E adds the complete default-off OAuth P0 HTTP adapter outside `src/app.ts`; absent/false retains the exact legacy route inventory. Step 4A extends only the encrypted version-1 backup data sections while retaining legacy-only import compatibility. No production/pilot action exists. Dual-run material below remains a future constraint, not a passed N→N+1 result.
+> Current status: the legacy runtime surface remains frozen in `../specs/legacy-contract-baseline.v1.json`. Step 3E adds the complete default-off OAuth P0 HTTP adapter outside `src/app.ts`; D-047 adds administration for the already-accepted OAuth tables without changing legacy routes, credentials, grants or consumers. Step 4A extends only the encrypted version-1 backup data sections while retaining legacy-only import compatibility. No production/pilot action exists. Dual-run material below remains a future constraint, not a passed N→N+1 result.
 
 ## Objective
 

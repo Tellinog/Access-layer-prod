@@ -21,6 +21,12 @@ The historical OpenAPI and OAuth vNext surfaces are intentionally unchanged. The
 - Admin endpoints require Access Layer admin session/token.
 - Every endpoint that makes an access decision writes an audit event.
 
+## OAuth P0 Admin API
+
+The separately described `../schemas/access-layer-oauth-admin-p0.openapi.yaml` surface is mounted at `/v1/admin/oauth/*` even while `OAUTH_P0_ENABLED=false`. It is controlled administration, not dynamic client registration. Only an active `platform_admin` with `admin:oauth:read`/`admin:oauth:write` is accepted; no assigned-tool fallback exists.
+
+The surface covers scope create/update, resource creation/status, exact resource-scope mapping, temporary entitlement binding, client creation/status, exact redirect replacement, explicit allowance replacement, separate client/resource credential rotation/retirement, and signing-key generate/publish/activate/retire/disable. Read/list output omits hashes, secrets and protected private-key references. Secret plaintext is returned only by create/rotate responses.
+
 ## Authentication requirements
 
 | API area | Required auth |
@@ -35,6 +41,7 @@ The historical OpenAPI and OAuth vNext surfaces are intentionally unchanged. The
 | `/v1/auth/logout` | Tool token or admin/user session |
 | `/v1/me` | Access Layer JWT or admin session |
 | `/v1/admin/*` | Platform admin role, or delegated tool admin where explicitly allowed |
+| `/v1/admin/oauth/*` | Explicit `platform_admin` plus `admin:oauth:read`/`admin:oauth:write`; never delegated tool admin |
 | `/v1/.well-known/jwks.json` | Public |
 | OAuth metadata/JWKS | Public, only when `OAUTH_P0_ENABLED=true` |
 | `/oauth/authorize` and OAuth upstream callback | Validated OAuth/Google transaction, only when enabled |

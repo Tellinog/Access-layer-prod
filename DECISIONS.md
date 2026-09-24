@@ -519,3 +519,17 @@ Decision: pending-email grant validation uses the union of `GOOGLE_ALLOWED_HD` a
 For bulk `upsert`, an existing `active` or `pending_user_link` grant for the same normalized email and tool is never updated or duplicated, regardless of the incoming role, permissions or validity. The earliest existing grant is retained. If the same email/tool occurs more than once in one bulk payload, only the first valid row may create a grant and later rows are skipped with a warning. Bulk `revoke` and direct grant editing remain unchanged. The legacy response fields `updated` and operation enum member `update` remain for compatibility but bulk upsert no longer produces them.
 
 Rationale: Testbirds users must be grantable through the approved Entra domains without weakening Google `hd` validation. Keeping the first bulk grant prevents a repeated list or changed form selection from silently replacing an already valid authorization.
+
+## D-047 - Add a platform-admin-only OAuth P0 administration boundary
+
+Status: accepted
+
+Confirmed: 2026-09-23
+
+Decision: compose OAuth P0 administration beside the frozen legacy builder through `/v1/admin/oauth/*` and `/admin/oauth`, independently of `OAUTH_P0_ENABLED`. Only an active `platform_admin` grant carrying the explicit `admin:oauth:read` or `admin:oauth:write` capability may use it; `tool_admin` has no assigned-tool fallback. Browser writes retain exact same-origin CSRF enforcement and a separate rate bucket.
+
+The surface writes only the existing migrations 003–005 model and append-only audit rows. It reuses the accepted URI, scope, resource, mapping, allowance, credential-hash, key-loader and lifecycle contracts. Client and resource secrets are generated server-side and returned only once; their hashes are the only persisted secret representation. RSA private keys are generated server-side into an already-provisioned realpath-rooted `OAUTH_SIGNING_KEY_ROOT`, never accepted over HTTP, returned, logged, or stored in PostgreSQL.
+
+The temporary resource-to-legacy-tool binding remains entitlement-only. Existing Users/Grants administration remains authoritative for human grants. Native OAuth entitlement domains are explicitly deferred until after the Nancy Phase 8 pilot and must replace the bridge before broad SDK-native rollout.
+
+Rationale: Nancy vNext and later controlled consumers require onboarding without direct SQL, while keeping protocol semantics, key domains, credential identities and every frozen legacy contract unchanged. Separating administration from protocol enablement permits safe default-off preparation and review.

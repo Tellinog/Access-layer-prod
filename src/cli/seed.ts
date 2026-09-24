@@ -37,7 +37,9 @@ await repos.replaceToolPermissions(accessAdmin.id, [
   "admin:backup:read",
   "admin:backup:write",
   "admin:backup:secrets",
-  "admin:secrets:rotate"
+  "admin:secrets:rotate",
+  "admin:oauth:read",
+  "admin:oauth:write"
 ]);
 
 if (["1", "true", "yes", "on"].includes((process.env.SEED_EXAMPLE_TOOLS ?? "").toLowerCase())) {

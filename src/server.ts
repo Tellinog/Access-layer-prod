@@ -9,6 +9,8 @@ import { OAuthAuthorizationFlowRepository } from "./oauth/flow-repository.js";
 import { OAuthGoogleAuthLibraryOidcClient } from "./oauth/google.js";
 import { OAuthTokenRepository } from "./oauth/token-repository.js";
 import { OAuthTokenLifecycleService } from "./oauth/token-service.js";
+import { OAuthAdminRepository } from "./oauth/admin-repository.js";
+import { OAuthAdminService } from "./oauth/admin-service.js";
 import { Repositories } from "./repositories.js";
 import { TokenService } from "./token-service.js";
 
@@ -29,6 +31,10 @@ const app = await buildApplication({
   oauthTokenService: new OAuthTokenLifecycleService({
     config,
     repository: oauthTokenRepository
+  }),
+  oauthAdminService: new OAuthAdminService({
+    config,
+    repository: new OAuthAdminRepository(db)
   }),
   audit,
   google: new GoogleAuthLibraryOidcClient(config),

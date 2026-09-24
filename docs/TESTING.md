@@ -1,5 +1,17 @@
 # TESTING.md
 
+## OAuth P0 administration candidate coverage
+
+`tests/oauth-admin.test.ts` uses the local-only Nancy-shaped origin, callback and resource fixture. It proves canonical scopes, exact scope-to-permission mappings, explicit client-resource-scope allowances, a confidential BFF registration, separate resource identity/credential, distinct one-time secrets, accepted OAuth hash verification, rotation invalidation, no secret in subsequent snapshots, and malformed wildcard/duplicate/unknown-legacy input rejection.
+
+The key workflow generates a real RSA 2048-bit private key in a disposable directory, proves the private path/key are absent from the Admin response, publishes the public key, rejects early activation using a deterministic test clock, advances exactly through the 300-second lead, activates, receives HTTP 200 from `/oauth/jwks`, verifies exactly one expected public JWK without private members, issues an RFC 9068 token with the expected `kid`, `aud`, `client_id` and `scope`, and verifies it using only reconstructed JWKS public metadata.
+
+Admin HTTP coverage proves unauthenticated denial, `tool_admin` denial even with injected OAuth permission strings, explicit platform-admin permissions, same-origin CSRF for cookie mutations and same-service UI gating. Existing OAuth authorization/token suites retain denied grant, removed/disabled scope/allowance, disabled client/resource/binding, refresh, resource introspection, audience-mismatch inactive response, revocation and no legacy credential fallback coverage.
+
+`scripts/oauth-admin/run-qualification.ps1` is the additive real-PostgreSQL 16 gate for this candidate. It requires a clean exact commit, a local Docker Desktop Linux context, and starts only one randomly named disposable database published on loopback. The companion `qualify.ts` exercises the actual Admin repository against migrations 001–005, the Nancy-shaped graph, credential rotation, binding/status updates, real key generation/publication/activation, JWKS 503→200, JWKS-only token verification, and secret-free backup/audit data. It removes its synthetic database container and temporary key directory. This gate is separate from—and cannot substitute for—the unchanged full Step 4B source/restore qualification.
+
+Candidate result: TypeScript lint/build and 362 Vitest tests across 20 files pass. Python discovery ran 64 tests with two expected skips; all 26 OAuth validator groups passed; non-strict platform validation passed 27 checks with seven documented warnings; Compose rendering, continuity schema validation as `VALID_BUT_NOT_READY`, and `git diff --check` passed. Docker Desktop is installed but its API pipe is access-denied to this session, and neither `psql` nor a local PostgreSQL listener is available. New repository SQL, backup/restore and Step 4B qualification on the administration candidate remain required and are not claimed by deterministic tests.
+
 ## Temporary legacy Microsoft bridge coverage
 
 The bridge suite uses only synthetic provider data. `tests/microsoft-claims.test.ts` covers tenant-specific URLs and strict issuer/audience/tenant/expiry/object/nonce/email/domain checks, preferred-username fallback, synthetic subject mapping, no Graph dependency and sanitized upstream failures. `tests/config.test.ts` covers default-off behavior and conditional completeness/format/callback/scope/slug validation.

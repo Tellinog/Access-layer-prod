@@ -9,6 +9,27 @@
 | `auditor` | Legge audit log senza modificare configurazione |
 | `user` | Accede solo ai tool autorizzati |
 
+OAuth P0 administration is intentionally narrower: only `platform_admin` with `admin:oauth:read` or `admin:oauth:write` may use it. `tool_admin` assignments do not grant OAuth administration.
+
+## OAuth P0 administration
+
+Open `/admin/oauth` in production (or `/access-control/oauth` under the local base path). The page is part of the same Access Layer service and uses the existing Admin session, CSRF and audit model.
+
+Recommended onboarding order:
+
+1. create each canonical `project:domain:action` scope;
+2. create the HTTPS resource, select one existing entitlement-only legacy tool and map every scope to one exact registered legacy permission;
+3. copy the generated resource introspection credential once;
+4. create the confidential BFF client with exact redirects and explicit resource/scope allowances;
+5. copy the generated client secret once;
+6. use the existing Users/Grants UI to create the human grant on the bound legacy tool;
+7. generate a staged OAuth signing key, publish it, wait until the displayed activation time, then activate it;
+8. keep `OAUTH_P0_ENABLED=false` until separate pilot and production gates approve enablement.
+
+Secrets shown in a one-time result panel cannot be retrieved again. Rotation immediately retires the previous active credential and returns a new plaintext value once. Client secrets, resource secrets, hashes and private signing keys never appear in list/read responses or audit metadata.
+
+The legacy tool is only the temporary P0 entitlement anchor. It must not be used as `client_id`, resource/audience or introspection credential. Native OAuth entitlement domains must replace this bridge after Nancy Phase 8 and before broad SDK-native rollout.
+
 ## Bootstrap primo admin
 
 Aprendo la root Admin UI senza sessione valida, il servizio avvia direttamente il login Google per il tool riservato `access-admin`; la dashboard viene servita solo dopo una sessione admin valida.

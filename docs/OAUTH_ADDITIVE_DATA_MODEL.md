@@ -1,6 +1,12 @@
 # Proposed additive OAuth data model
 
-Status: Step 3A foundation, Step 3C authorization issuance, Step 3D token lifecycle and Step 3E strict default-off HTTP mounting implemented; no further migration is added.
+Status: Step 3A foundation, Step 3C authorization issuance, Step 3D token lifecycle, Step 3E strict default-off HTTP mounting and D-047 controlled administration implemented; no further migration is added.
+
+## Administration write ownership
+
+D-047 adds the first supported write path for the ten Step 3A foundation tables. `OAuthAdminRepository` performs registration/credential/key mutations and the matching sanitized audit insert in one PostgreSQL transaction. The surface never writes authorization, code, session, refresh or revocation rows; those remain protocol-owned. It also never creates legacy users or grants. Resource creation selects one existing legacy tool and exact registered permission keys through read-only locks.
+
+Admin list/read projections exclude `secret_hash` and `protected_private_key_ref`. Credential create/rotate returns plaintext once from request memory, while DB persistence receives only the accepted OAuth-peppered scrypt hash. Server-side RSA generation writes PEM only below the configured signing root before the transaction stores public JWK, canonical public fingerprint, `kid`, protected reference and lifecycle metadata. A failed DB insert removes the newly-created file.
 
 ## Migration boundary
 

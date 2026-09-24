@@ -78,3 +78,12 @@ The Admin UI root does not show unauthenticated dashboard copy. It redirects int
 - `Se email e tool hanno già un grant attivo o pendente, il primo grant resta invariato.`
 - `Client ID e client secret generati per il tool. Client secret mostrato una sola volta: copia entrambi ora e conservali in modo sicuro.`
 - `Compila slug, nome e almeno una Return URL.`
+
+## OAuth P0 administration
+
+- `Temporary P0 compatibility state.`
+- `Native OAuth entitlement domains must replace this bridge after the Nancy Phase 8 pilot and before broad SDK-native rollout.`
+- `Protocol enablement remains controlled separately by OAUTH_P0_ENABLED.`
+- `Rotate and show secret once`
+- `Copy now; it cannot be shown again.`
+- `Private keys are generated server-side into the configured protected root and are never returned.`

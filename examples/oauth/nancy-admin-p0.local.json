@@ -1,0 +1,49 @@
+{
+  "fixture_id": "nancy-vnext-phase-8-local",
+  "production_record": false,
+  "origin": "https://survey-test.unguess-internal.net",
+  "client": {
+    "client_id": "nancy-vnext-bff-local",
+    "client_name": "Nancy vNext synthetic confidential BFF",
+    "client_type": "confidential",
+    "token_endpoint_auth_method": "client_secret_basic",
+    "grant_types": ["authorization_code", "refresh_token"],
+    "redirect_uris": ["https://survey-test.unguess-internal.net/auth/callback"]
+  },
+  "resource": {
+    "resource_id": "https://survey-test.unguess-internal.net/api",
+    "audience_policy": "exact_single_resource",
+    "protected_resource_metadata_url": "https://survey-test.unguess-internal.net/.well-known/oauth-protected-resource",
+    "introspection_authentication": "separate_resource_client_secret_basic"
+  },
+  "scopes": [
+    {
+      "scope": "nancy:survey:read",
+      "legacy_permission_key": "nancy:survey:read"
+    },
+    {
+      "scope": "nancy:survey:write",
+      "legacy_permission_key": "nancy:survey:write"
+    }
+  ],
+  "allowances": [
+    {
+      "client_id": "nancy-vnext-bff-local",
+      "resource_id": "https://survey-test.unguess-internal.net/api",
+      "scope": "nancy:survey:read"
+    },
+    {
+      "client_id": "nancy-vnext-bff-local",
+      "resource_id": "https://survey-test.unguess-internal.net/api",
+      "scope": "nancy:survey:write"
+    }
+  ],
+  "temporary_entitlement_bridge": {
+    "type": "legacy_tool",
+    "legacy_tool_slug": "nancy-entitlement",
+    "entitlement_only": true,
+    "scheduled_for_removal": "after_phase_8_before_broad_sdk_native_rollout"
+  },
+  "credential_values": "generated_during_test_only_and_never_stored_in_this_fixture",
+  "user_values": "synthetic_only"
+}

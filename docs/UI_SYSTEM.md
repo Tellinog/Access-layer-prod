@@ -14,10 +14,13 @@ Required pages:
 - Grants
 - Audit logs
 - Settings / OAuth configuration summary
+- OAuth P0 administration
 
 The same-service v1 Admin UI implements tool and user detail as lightweight in-page views opened from the list tables.
 
 The D-045 provider chooser is a separate, minimal legacy authentication page, not an Admin UI redesign. It contains a heading naming the escaped target tool and two keyboard-focusable links in one labelled navigation region. Existing Admin UI/Garden freeze rules remain unchanged.
+
+The D-047 OAuth page is a same-service English-first administrative extension at `/admin/oauth`. It provides labelled forms for registration, exact redirects, explicit resource/scope mappings and allowances, credential lifecycle and signing-key lifecycle. One-time secrets appear only in a dedicated copy-now result region. Public lifecycle state remains distinct from secret output, and the temporary entitlement bridge warning is always visible.
 
 ## Layout
 

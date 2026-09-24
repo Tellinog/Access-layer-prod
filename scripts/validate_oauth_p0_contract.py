@@ -25,6 +25,28 @@ EXPECTED_PATHS = {
     "/oauth/introspect",
     "/oauth/jwks",
 }
+EXPECTED_ADMIN_PATHS = {
+    "/v1/admin/oauth",
+    "/v1/admin/oauth/scopes",
+    "/v1/admin/oauth/scopes/{id}",
+    "/v1/admin/oauth/resources",
+    "/v1/admin/oauth/resources/{id}/status",
+    "/v1/admin/oauth/resources/{id}/entitlement-binding",
+    "/v1/admin/oauth/resources/{resourceId}/scopes/{scopeId}",
+    "/v1/admin/oauth/resources/{id}/credentials/rotate",
+    "/v1/admin/oauth/resources/credentials/{credentialId}/retire",
+    "/v1/admin/oauth/clients",
+    "/v1/admin/oauth/clients/{id}/status",
+    "/v1/admin/oauth/clients/{id}/redirect-uris",
+    "/v1/admin/oauth/clients/{id}/allowances",
+    "/v1/admin/oauth/clients/{id}/credentials/rotate",
+    "/v1/admin/oauth/clients/credentials/{credentialId}/retire",
+    "/v1/admin/oauth/signing-keys",
+    "/v1/admin/oauth/signing-keys/{id}/publish",
+    "/v1/admin/oauth/signing-keys/{id}/activate",
+    "/v1/admin/oauth/signing-keys/{id}/retire",
+    "/v1/admin/oauth/signing-keys/{id}/disable",
+}
 FORBIDDEN_P0_MARKERS = {
     "/.well-known/openid-configuration",
     "/oauth/userinfo",
@@ -121,6 +143,7 @@ def validate() -> list[str]:
     errors: list[str] = []
     spec = load_yaml("specs/oauth-p0.v1.yml")
     openapi = load_yaml("schemas/access-layer-oauth-v1.openapi.yaml")
+    admin_openapi = load_yaml("schemas/access-layer-oauth-admin-p0.openapi.yaml")
     metadata = load_json("examples/oauth/authorization-server-metadata.expected.json")
 
     validation_spec = load_yaml("specs/validation.v1.yml")
@@ -144,6 +167,15 @@ def validate() -> list[str]:
         errors.append("OAuth 2.1 must not be represented as a final RFC")
     if set(openapi.get("paths", {})) != EXPECTED_PATHS:
         errors.append("target OpenAPI path set differs from the frozen P0 surface")
+    if set(admin_openapi.get("paths", {})) != EXPECTED_ADMIN_PATHS:
+        errors.append("OAuth Admin OpenAPI path set differs from the D-047 surface")
+    administration = spec.get("administration", {})
+    if administration.get("status") != "candidate_implemented":
+        errors.append("OAuth Admin machine profile does not record candidate implementation")
+    if administration.get("runtime_enablement_independent") is not True:
+        errors.append("OAuth Admin machine profile incorrectly depends on protocol enablement")
+    if set(administration.get("required_permissions", [])) != {"admin:oauth:read", "admin:oauth:write"}:
+        errors.append("OAuth Admin machine profile permissions differ from the fail-closed boundary")
 
     request_context_schema = load_json("schemas/request-context.schema.json")
     if request_context_schema.get("$id") != "https://platform.unguess-internal.net/schemas/request-context.schema.json":
@@ -463,6 +495,40 @@ def validate() -> list[str]:
     if len(operation_ids) != len(set(operation_ids)):
         errors.append("target OpenAPI operationId values are not unique")
 
+    admin_operation_ids: list[str] = []
+    for node in iter_nodes(admin_openapi):
+        reference = node.get("$ref") if isinstance(node, dict) else None
+        if isinstance(reference, str) and reference.startswith("#/"):
+            try:
+                resolve_json_pointer(admin_openapi, reference)
+            except (KeyError, TypeError):
+                errors.append(f"unresolved OAuth Admin OpenAPI component reference: {reference}")
+        operation_id = node.get("operationId") if isinstance(node, dict) else None
+        if isinstance(operation_id, str):
+            admin_operation_ids.append(operation_id)
+    if len(admin_operation_ids) != len(set(admin_operation_ids)):
+        errors.append("OAuth Admin OpenAPI operationId values are not unique")
+    if admin_openapi.get("security") != [{"adminBearer": []}, {"adminCookie": []}]:
+        errors.append("OAuth Admin OpenAPI is not fail-closed behind admin authentication")
+    admin_security = admin_openapi.get("components", {}).get("securitySchemes", {})
+    if admin_security.get("adminBearer", {}).get("scheme") != "bearer" or admin_security.get("adminCookie", {}).get("in") != "cookie":
+        errors.append("OAuth Admin bearer/cookie security schemes are missing")
+    serialized_admin_openapi = json.dumps(admin_openapi, sort_keys=True)
+    if "private_key" in serialized_admin_openapi or "protected_private_key_ref" in serialized_admin_openapi:
+        errors.append("OAuth Admin OpenAPI exposes private signing-key material or references")
+
+    nancy_fixture = load_json("examples/oauth/nancy-admin-p0.local.json")
+    if nancy_fixture.get("production_record") is not False:
+        errors.append("Nancy administration fixture must remain local-only")
+    if nancy_fixture.get("origin") != "https://survey-test.unguess-internal.net":
+        errors.append("Nancy administration fixture origin drifted")
+    if nancy_fixture.get("client", {}).get("redirect_uris") != ["https://survey-test.unguess-internal.net/auth/callback"]:
+        errors.append("Nancy administration fixture callback drifted")
+    if nancy_fixture.get("resource", {}).get("resource_id") != "https://survey-test.unguess-internal.net/api":
+        errors.append("Nancy administration fixture resource drifted")
+    if nancy_fixture.get("temporary_entitlement_bridge", {}).get("scheduled_for_removal") != "after_phase_8_before_broad_sdk_native_rollout":
+        errors.append("Nancy administration fixture does not preserve the native-entitlement deferral")
+
     fixture_text = "\n".join(
         path.read_text(encoding="utf-8") for path in sorted((ROOT / "examples/oauth").glob("*.json"))
     )
@@ -492,7 +558,7 @@ def main() -> int:
     parser.add_argument("--json", action="store_true", help="Emit a JSON result.")
     args = parser.parse_args()
     errors = validate()
-    result = {"result": "PASS" if not errors else "FAIL", "errors": errors, "checks": 24}
+    result = {"result": "PASS" if not errors else "FAIL", "errors": errors, "checks": 26}
     if args.json:
         print(json.dumps(result, indent=2))
     elif errors:
@@ -500,7 +566,7 @@ def main() -> int:
         for error in errors:
             print(f"- {error}")
     else:
-        print("OAuth P0 contract validation passed (24 check groups).")
+        print("OAuth P0 contract validation passed (26 check groups).")
     return 0 if not errors else 1
 
 

@@ -2,6 +2,9 @@
 
 ## BLOCKER
 
+- 2026-09-23 OAuth administration candidate: run the new admin repository and Nancy-shaped onboarding flow against fresh disposable PostgreSQL 16, then rerun the complete Step 4B qualification and independent audit on the final commit. Docker Desktop is installed but this session receives access-denied on its API pipe and cannot start its Windows service; `psql` and a listener on `127.0.0.1:5432` are absent. Deterministic service/HTTP/JWKS tests are not a substitute for that evidence.
+- 2026-09-23 production signing administration: before production use, approve and mount a persistent protected directory for `OAUTH_SIGNING_KEY_ROOT`, provision the distinct `OAUTH_CREDENTIAL_SECRET_PEPPER`, assign their operational/backup owners, and prove continuity without recording values or private paths. The Admin API fails closed when either operation-specific input is absent. No production key may be generated before this is resolved.
+
 - 2026-08-31 Step 4B approval gate: hardened candidate `d8998e1fbc1789d71a19cef78714c74c3dbfed37` passed three complete consecutive local qualifications on fresh paired PostgreSQL 16.15 targets, including 24/24 same-refresh races and the full snapshot/restore/legacy-smoke chain. A new independent audit must reproduce the result before `step-4b-completed` may be created. Until then do not enable OAuth, deploy, access production/Coolify or proceed to Step 5.
 - Confirm who receives bootstrap platform admin access after first deploy.
 - 2026-08-26 Step 3C: before any OAuth enablement, provision `OAUTH_TRANSACTION_PROTECTION_KEY` as a dedicated canonical base64url 32-byte secret through the approved secret manager and add the separate OAuth callback URI in Google Cloud without removing the legacy callback. Neither action is authorised or performed by Step 3C.
@@ -98,9 +101,10 @@
 - Full SIEM integration.
 - Dedicated SDK packages per framework.
 - Immutable append-only log storage with WORM retention.
-- OAuth registration/admin HTTP APIs, pilot records, production client/resource/scope/mapping/credential registration and any enablement remain deferred until separately approved steps and the release gates pass. Step 3E completes only the default-off protocol mount.
+- Production pilot records, production client/resource/scope/mapping/credential registration and any OAuth enablement remain deferred until separately approved release gates pass. The local administration API/UI now exists, but no production record or secret was created.
 - OAuth P1 features: service principals, `client_credentials`, token exchange, `private_key_jwt`, downstream OIDC ID Token/UserInfo/discovery and dynamic client registration.
 - Native OAuth entitlement domains; every P0 resource instead requires exactly one existing `legacy_tool` entitlement-only binding.
+- Post-Nancy Phase 8: replace the P0 legacy entitlement binding with native OAuth entitlement domains before broad SDK-native consumer rollout. Do not generalise the legacy bridge during the pilot.
 - UNGUESS Platform SDK dependency adoption and telemetry SDK integration.
 - Tool Observatory registration and synthetic monitor deployment.
 - MCP exposure and stable platform capability/OAuth-scope mapping.

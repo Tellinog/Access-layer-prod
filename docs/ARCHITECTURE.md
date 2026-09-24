@@ -168,6 +168,20 @@ default-false composer
 
 The form parser and routes are Fastify-encapsulated so enabling OAuth does not add form parsing to legacy routes. Route logging is silent for secret-bearing OAuth POSTs, credentials are redacted by the parent logger, and rate keys contain only validated identifiers plus HMAC output. RFC 8414 is mounted only now that every advertised P0 endpoint exists and has no automatic HEAD route.
 
+D-047 composes an independent administration adapter after the legacy builder, regardless of the protocol feature flag:
+
+```text
+active platform_admin + admin:oauth:* -> /v1/admin/oauth/*
+                                       |-> accepted validation helpers
+                                       |-> OAuthAdminRepository transaction
+                                       |     `-> registration mutation + sanitized audit
+                                       `-> server-side credential/key generation
+
+/admin/oauth -> same Admin session/CSRF boundary -> OAuth Admin API
+```
+
+The adapter never writes legacy grants/users and does not mount or enable protocol routes. Its only legacy read is the selected entitlement tool and its registered permission catalogue. Private signing bytes remain below the configured root; PostgreSQL stores only the protected reference and public metadata.
+
 ## Risks
 
 | Risk | Mitigation |

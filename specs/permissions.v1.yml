@@ -19,6 +19,8 @@ roles:
       - admin:backup:write
       - admin:backup:secrets
       - admin:secrets:rotate
+      - admin:oauth:read
+      - admin:oauth:write
   tool_admin:
     description: Delegated administrator for one or more tools.
     permissions:

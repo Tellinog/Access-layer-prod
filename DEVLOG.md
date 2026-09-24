@@ -1,5 +1,25 @@
 # DEVLOG.md
 
+## 2026-09-23 - OAuth P0 runtime + administration candidate
+
+Changed by: Codex
+Related task: Add the minimum OAuth P0 administration surface for Nancy vNext and future SDK-native consumers without redesigning or enabling the protocol runtime.
+
+### Implementation
+
+- Started from exact clean commit `bae112404a8432b4d4ce7e3e70d96f2217ac7597` and left `src/app.ts`, migrations 001–005, frozen legacy contracts, OAuth protocol semantics, Nancy and production state unchanged.
+- Added same-service platform-admin-only OAuth API/UI composition for scopes, resources, exact mappings, temporary entitlement bindings, confidential clients, redirect URIs, explicit allowances, separate client/resource credentials and the dedicated signing-key lifecycle.
+- Added server-generated one-time credentials, RSA-2048 generation into the protected signing root, secret-free reads, sanitized transaction-bound audit events, exact-origin browser CSRF, a separate mutation limit, local Nancy fixture, Admin OpenAPI and deterministic JWKS-only verification evidence.
+- Added a separate guarded disposable-PostgreSQL Admin qualification harness without changing the established Step 4B harness or its evidence criteria.
+- Added default-off Compose passthrough for already-defined OAuth variables without adding a volume, public port, value or Coolify mutation. Native OAuth entitlement domains remain deferred until after the Nancy Phase 8 pilot and before broad SDK-native rollout.
+
+### Verification
+
+- TypeScript lint and build passed; Vitest passed 362 tests across 20 files.
+- Python discovery ran 64 tests with two expected skips; the OAuth validator passed all 26 groups; non-strict platform validation passed 27 checks with seven documented warnings.
+- Compose rendering with `.env.production.example`, continuity schema validation (`VALID_BUT_NOT_READY`) and `git diff --check` passed. The legacy baseline and Step 4B evidence were not weakened.
+- Docker/PostgreSQL is unavailable on this host, so fresh real-PostgreSQL repository/backup/restore qualification and independent review remain explicit blockers; no production operation was attempted.
+
 ## 2026-09-15 - Testbirds pending grants and bulk first-grant-wins behavior
 
 Changed by: Codex

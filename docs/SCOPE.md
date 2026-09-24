@@ -78,6 +78,12 @@ Step 4A extends only `Repositories.exportBackup()` and `importBackup()` so the e
 
 Still out of scope are a real PostgreSQL restore, OAuth E2E/concurrency/old-binary execution, pilot registration, enablement, real secrets/keys, Google Cloud, production/Coolify, SDK/consumer, protocol, migration, dependency, OpenAPI and legacy runtime changes. Those executable release checks remain Step 4B or later.
 
+## OAuth P0 administration candidate boundary
+
+D-047 adds only same-service, platform-admin-controlled administration for the existing OAuth P0 tables and signing root. It includes local synthetic Nancy-shaped onboarding but no production record, production key, consumer migration, Nancy code change, Google Cloud/Coolify mutation, OAuth enablement, Agent Gateway work or native entitlement domain.
+
+Native OAuth entitlement domains remain deferred through Nancy Phase 8. They must replace the temporary resource-to-legacy-tool entitlement bridge before broad SDK-native consumer onboarding.
+
 ## Personas
 
 | Persona | Goal | Main needs | Notes |

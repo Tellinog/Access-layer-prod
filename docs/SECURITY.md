@@ -31,6 +31,14 @@ Do not trust the email domain alone.
 
 ## OAuth vNext P0 target security
 
+### OAuth administration security
+
+The same-service OAuth administration surface is mounted while the protocol flag is false, but it is not public registration. It requires an active `access-admin` session/token whose active grant has role `platform_admin` and explicit `admin:oauth:read` or `admin:oauth:write`. `tool_admin`, auditor and user roles fail closed even if a malformed grant carries an OAuth permission string. Cookie-authenticated writes require the exact configured origin; bearer-authenticated API clients retain the existing non-cookie CSRF boundary. Mutations have a separate rate bucket and secret-producing routes use silent automatic request logs.
+
+Client and resource secrets use at least 32 random bytes, the dedicated OAuth pepper and the existing scrypt hash format. Plaintext exists only in request memory and the create/rotate response. List/read projections, audits and backups never contain plaintext; client and resource credentials cannot authenticate as each other or as a legacy tool client.
+
+Signing-key generation accepts no PEM, JWK private member or filesystem path from the request. It generates RSA 2048-bit key material server-side, creates a new mode-0600 file below the realpath-resolved configured root, fsyncs it, and stores only public JWK/fingerprint, `kid`, a local `file://` protected reference and lifecycle metadata. The private key and protected reference are omitted from Admin responses. A failed DB insert removes the just-created file. Publication sets activation eligibility at least 300 seconds later; activation fails before that time and schedules/retires any old signing key without reducing the 1,260-second verifier grace.
+
 The additive OAuth protocol contract is frozen and implemented as a default-off dark runtime through Step 3E. `OAUTH_P0_CONTRACT.md` and `../specs/oauth-p0.v1.yml` require Authorization Code plus Refresh Token only, PKCE `S256` for every code flow, RFC 7636 verifier grammar and exact unpadded S256 challenge grammar, exact redirects, one RFC 8707 resource, exact single audience, RFC 9068 `typ=at+jwt`, RFC 9207 response issuer, header-only bearer transport, OAuth-standard errors, refresh-family replay revocation and a dedicated OAuth key ring. Human OAuth `sub` remains Google `sub`; email, hosted domain, role and legacy permission arrays are excluded from OAuth access tokens by default.
 
 Step 3B implements only a read-only, default-off metadata/JWKS surface over the Step 3A foundation; the authorization protocol remains unimplemented. `OAUTH_P0_ENABLED` defaults to `false`, requires no additional OAuth secret/key input, and leaves every new route at 404 when false/absent. When true, only GET OAuth JWKS and GET RFC 9728 protected-resource metadata are registered outside the unchanged legacy builder; automatic `HEAD` siblings are disabled.

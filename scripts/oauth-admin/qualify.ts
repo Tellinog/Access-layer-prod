@@ -1,24 +1,63 @@
 /** Fresh, loopback-only PostgreSQL qualification for the OAuth P0 Admin repository. */
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import Fastify from "fastify";
 import { decodeProtectedHeader, importJWK, jwtVerify } from "jose";
+import { AuditLogger } from "../../src/audit.js";
+import { buildApplication } from "../../src/application.js";
 import { PostgresDb } from "../../src/db.js";
+import type { GoogleOidcClient } from "../../src/google.js";
 import { OAuthAdminRepository } from "../../src/oauth/admin-repository.js";
 import { OAuthAdminService } from "../../src/oauth/admin-service.js";
 import type { OAuthAdminAuditContext } from "../../src/oauth/admin-types.js";
+import { OAuthAuthorizationFlowRepository } from "../../src/oauth/flow-repository.js";
+import type { OAuthUpstreamGoogleClient } from "../../src/oauth/google.js";
 import { registerOAuthReadOnlyHttp } from "../../src/oauth/http.js";
 import { OAuthFoundationRepository } from "../../src/oauth/repository.js";
 import { OAuthAccessTokenSigner, type OAuthSigningKeyRecord } from "../../src/oauth/signing.js";
+import { OAuthTokenRepository } from "../../src/oauth/token-repository.js";
+import { OAuthTokenLifecycleService } from "../../src/oauth/token-service.js";
 import { Repositories } from "../../src/repositories.js";
-import { verifyOAuthCredentialSecret } from "../../src/security.js";
-import type { Config } from "../../src/types.js";
+import { hashToolSecret, sha256, verifyOAuthCredentialSecret } from "../../src/security.js";
+import { TokenService } from "../../src/token-service.js";
+import type { Config, GoogleIdentity } from "../../src/types.js";
 
 function assert(condition: unknown, message: string): asserts condition {
-  if (!condition) throw new Error(message);
+  if (!condition) throw new Error(`ASSERTION_FAILED:${message}`);
+}
+
+function form(values: Record<string, string>): string {
+  return new URLSearchParams(values).toString();
+}
+
+function basic(username: string, password: string): string {
+  const user = encodeURIComponent(username).replace(/%20/g, "+");
+  const secret = encodeURIComponent(password).replace(/%20/g, "+");
+  return `Basic ${Buffer.from(`${user}:${secret}`).toString("base64")}`;
+}
+
+class SyntheticGoogle implements GoogleOidcClient, OAuthUpstreamGoogleClient {
+  nonce = "";
+
+  createAuthorizationUrl(input: { state: string; nonce: string }): string {
+    this.nonce = input.nonce;
+    const url = new URL("https://accounts.google.invalid/o/oauth2/v2/auth");
+    url.searchParams.set("state", input.state);
+    url.searchParams.set("nonce", input.nonce);
+    return url.toString();
+  }
+
+  async exchangeCodeForIdentity(): Promise<GoogleIdentity> {
+    return {
+      googleSub: "oauth-admin-local-human", email: "human@example.invalid", emailVerified: true,
+      hd: "example.invalid", displayName: "Synthetic human", pictureUrl: null, nonce: this.nonce,
+      issuer: "https://accounts.google.com", audience: "synthetic-google-client.apps.googleusercontent.com",
+      expiresAt: Math.floor(Date.now() / 1000) + 300
+    };
+  }
 }
 
 const rawUrl = process.env.OAUTH_ADMIN_QUALIFY_DATABASE_URL;
@@ -30,13 +69,42 @@ assert(databaseUrl.protocol === "postgresql:" && databaseUrl.hostname === "127.0
 const db = new PostgresDb(rawUrl);
 const root = await mkdtemp(join(tmpdir(), "access-layer-oauth-admin-"));
 const pepper = `synthetic-oauth-admin-pepper-${randomUUID()}`;
+const toolPepper = `synthetic-legacy-pepper-${randomUUID()}`;
 const config = {
+  appEnv: "test",
+  appBaseUrl: "https://access-layer.example.invalid",
+  authIssuer: "https://access-layer.example.invalid",
+  publicBasePath: "",
+  port: 8080,
+  logLevel: "silent",
+  databaseUrl: rawUrl,
+  googleClientId: "synthetic-google-client.apps.googleusercontent.com",
+  googleClientSecret: `synthetic-google-secret-${randomUUID()}`,
+  googleRedirectUri: "https://access-layer.example.invalid/v1/auth/google/callback",
+  googleAllowedHd: ["example.invalid"],
+  googleOidcScope: "openid email profile",
+  jwtPublicKeyId: "synthetic-legacy-key",
+  accessTokenTtlSeconds: 900,
+  refreshTokenTtlSeconds: 28_800,
+  oneTimeCodeTtlSeconds: 60,
   oauthCredentialSecretPepper: pepper,
-  toolClientSecretPepper: `synthetic-legacy-pepper-${randomUUID()}`,
+  toolClientSecretPepper: toolPepper,
   oauthSigningKeyRoot: root,
   oauthP0Enabled: true,
-  appBaseUrl: "https://access-layer.example.invalid",
-  authIssuer: "https://access-layer.example.invalid"
+  oauthTransactionProtectionKey: randomBytes(32),
+  sessionCookieName: "synthetic_admin_session",
+  sessionSecret: `synthetic-session-${randomUUID()}`,
+  backupEncryptionKey: `synthetic-backup-${randomUUID()}`,
+  corsAllowedOrigins: [],
+  returnUrlAllowedSchemes: ["https", "http"],
+  adminBootstrapEmails: [],
+  logIpSalt: `synthetic-log-${randomUUID()}`,
+  auditLogRetentionDays: 365,
+  auditLogRawIp: false,
+  accessRequestReopenAfterDays: 30,
+  enableRefreshTokens: true,
+  siemExportEnabled: false,
+  trustProxyHops: 0
 } as Config;
 const repository = new OAuthAdminRepository(db);
 let now = new Date(Date.now() - 301_000);
@@ -60,6 +128,10 @@ try {
   for (const permission of ["nancy:survey:read", "nancy:survey:write"]) {
     await db.query("INSERT INTO tool_permissions (tool_id, permission_key) VALUES ($1, $2)", [toolId, permission]);
   }
+  const legacyClientId = "nancy-entitlement-legacy-local";
+  const legacySecret = `synthetic-legacy-${randomUUID()}`;
+  await db.query(`INSERT INTO tool_clients (tool_id, client_id, client_secret_hash, status)
+    VALUES ($1, $2, $3, 'active')`, [toolId, legacyClientId, await hashToolSecret(legacySecret, toolPepper)]);
   await db.query(`INSERT INTO authorization_grants (tool_id, user_id, role, permissions, status)
     VALUES ($1, $2, 'user', '["nancy:survey:read","nancy:survey:write"]'::jsonb, 'active')`, [toolId, humanId]);
   const ctx: OAuthAdminAuditContext = {
@@ -185,6 +257,151 @@ try {
   assert(verified.payload.client_id === "nancy-vnext-bff-local" && verified.payload.scope === "nancy:survey:read",
     "JWKS-only token verification failed");
 
+  const google = new SyntheticGoogle();
+  const legacyRepositories = new Repositories(db);
+  const legacyTokenService = new TokenService(config);
+  await legacyTokenService.init();
+  const runtimeApp = await buildApplication({
+    config, repositories: legacyRepositories, oauthRepository: foundation,
+    oauthFlowRepository: new OAuthAuthorizationFlowRepository(db), oauthGoogle: google,
+    oauthTokenService: new OAuthTokenLifecycleService({ config, repository: new OAuthTokenRepository(db) }),
+    oauthAdminService: service, audit: new AuditLogger(legacyRepositories), google,
+    tokenService: legacyTokenService
+  });
+  try {
+    const callbackUri = "https://survey-test.unguess-internal.net/auth/callback";
+    const authorizeUrl = (scope: string, verifier: string) => {
+      const url = new URL(`${config.authIssuer}/oauth/authorize`);
+      for (const [key, value] of Object.entries({
+        response_type: "code", client_id: "nancy-vnext-bff-local", redirect_uri: callbackUri,
+        scope, state: `synthetic-state-${randomUUID()}`, code_challenge: sha256(verifier),
+        code_challenge_method: "S256", resource: resourceId
+      })) url.searchParams.set(key, value);
+      return `${url.pathname}${url.search}`;
+    };
+    const verifier = randomBytes(48).toString("base64url");
+    const authorize = await runtimeApp.inject({ method: "GET", url: authorizeUrl("nancy:survey:read", verifier) });
+    assert(authorize.statusCode === 302, "Nancy authorization did not redirect upstream");
+    const upstream = new URL(String(authorize.headers.location));
+    assert(upstream.hostname === "accounts.google.invalid", "unexpected upstream identity boundary");
+    const callback = await runtimeApp.inject({ method: "GET",
+      url: `/oauth/upstream/google/callback?state=${encodeURIComponent(upstream.searchParams.get("state") ?? "")}&code=synthetic-google-code` });
+    assert(callback.statusCode === 302, "Nancy Google callback did not redirect downstream");
+    const downstream = new URL(String(callback.headers.location));
+    assert(downstream.origin + downstream.pathname === callbackUri && downstream.searchParams.get("iss") === config.authIssuer,
+      "Nancy downstream redirect was not exact");
+    const code = downstream.searchParams.get("code");
+    assert(code, "Nancy callback did not issue a code");
+    const token = await runtimeApp.inject({ method: "POST", url: "/oauth/token",
+      headers: { "content-type": "application/x-www-form-urlencoded",
+        authorization: basic("nancy-vnext-bff-local", rotatedClient.client_secret!) },
+      payload: form({ grant_type: "authorization_code", code, redirect_uri: callbackUri,
+        client_id: "nancy-vnext-bff-local", code_verifier: verifier, resource: resourceId }) });
+    assert(token.statusCode === 200, "Admin-onboarded Nancy code exchange failed");
+    const initialTokens = token.json<{ access_token: string; refresh_token: string; scope: string }>();
+    assert(initialTokens.scope === "nancy:survey:read", "Nancy token scope mismatch");
+    const tokenClaims = await jwtVerify(initialTokens.access_token, jwksOnlyKey, {
+      algorithms: ["RS256"], issuer: config.authIssuer, audience: resourceId
+    });
+    assert(decodeProtectedHeader(initialTokens.access_token).kid === staged.kid &&
+      tokenClaims.payload.client_id === "nancy-vnext-bff-local" && tokenClaims.payload.scope === "nancy:survey:read",
+    "Nancy access-token kid/client/scope mismatch");
+
+    const introspect = (username: string, secret: string, accessToken: string) => runtimeApp.inject({
+      method: "POST", url: "/oauth/introspect",
+      headers: { "content-type": "application/x-www-form-urlencoded", authorization: basic(username, secret) },
+      payload: form({ token: accessToken, token_type_hint: "access_token" })
+    });
+    const active = await introspect(rotatedResource.resource_credential_id!,
+      rotatedResource.resource_credential_secret!, initialTokens.access_token);
+    assert(active.statusCode === 200 && active.json<{ active: boolean }>().active === true,
+      "Nancy resource introspection not active");
+    const mismatch = await service.createResource({
+      resourceId: "https://other-local.unguess-internal.net/api", displayName: "Synthetic mismatch resource",
+      ownerTeam: "nancy-local", ownerContact: null, status: "active",
+      protectedResourceMetadataUrl: "https://other-local.unguess-internal.net/.well-known/oauth-protected-resource",
+      legacyToolSlug: "nancy-entitlement-local", scopeMappings: [
+        { scope: "nancy:survey:read", legacyPermissionKey: "nancy:survey:read" }
+      ]
+    }, ctx);
+    const wrongAudience = await introspect(mismatch.resource_credential_id,
+      mismatch.resource_credential_secret, initialTokens.access_token);
+    assert(wrongAudience.statusCode === 200 && wrongAudience.json<{ active: boolean }>().active === false,
+      "audience-mismatch introspection disclosed active state");
+    const legacyResource = await introspect(legacyClientId, legacySecret, initialTokens.access_token);
+    assert(legacyResource.statusCode !== 200, "legacy credential authenticated as OAuth resource");
+    const oldResource = await introspect(resourceCreated.resource_credential_id,
+      resourceCreated.resource_credential_secret, initialTokens.access_token);
+    assert(oldResource.statusCode !== 200, "retired resource credential remained valid");
+
+    const refresh = await runtimeApp.inject({ method: "POST", url: "/oauth/token",
+      headers: { "content-type": "application/x-www-form-urlencoded",
+        authorization: basic("nancy-vnext-bff-local", rotatedClient.client_secret!) },
+      payload: form({ grant_type: "refresh_token", refresh_token: initialTokens.refresh_token,
+        client_id: "nancy-vnext-bff-local", resource: resourceId }) });
+    assert(refresh.statusCode === 200, "Nancy refresh failed");
+    const refreshed = refresh.json<{ access_token: string; refresh_token: string }>();
+    assert((await introspect(rotatedResource.resource_credential_id!,
+      rotatedResource.resource_credential_secret!, refreshed.access_token)).json<{ active: boolean }>().active === true,
+    "refreshed Nancy access token inactive");
+    const oldClient = await runtimeApp.inject({ method: "POST", url: "/oauth/token",
+      headers: { "content-type": "application/x-www-form-urlencoded",
+        authorization: basic("nancy-vnext-bff-local", clientCreated.client_secret) },
+      payload: form({ grant_type: "refresh_token", refresh_token: refreshed.refresh_token,
+        client_id: "nancy-vnext-bff-local", resource: resourceId }) });
+    assert(oldClient.statusCode !== 200, "retired client credential remained valid");
+    const legacyClient = await runtimeApp.inject({ method: "POST", url: "/oauth/token",
+      headers: { "content-type": "application/x-www-form-urlencoded", authorization: basic(legacyClientId, legacySecret) },
+      payload: form({ grant_type: "refresh_token", refresh_token: refreshed.refresh_token,
+        client_id: legacyClientId, resource: resourceId }) });
+    assert(legacyClient.statusCode !== 200, "legacy credential authenticated as OAuth client");
+    const revoked = await runtimeApp.inject({ method: "POST", url: "/oauth/revoke",
+      headers: { "content-type": "application/x-www-form-urlencoded",
+        authorization: basic("nancy-vnext-bff-local", rotatedClient.client_secret!) },
+      payload: form({ token: refreshed.access_token, token_type_hint: "access_token" }) });
+    assert(revoked.statusCode === 200, "Nancy revocation failed");
+    assert((await introspect(rotatedResource.resource_credential_id!,
+      rotatedResource.resource_credential_secret!, refreshed.access_token)).json<{ active: boolean }>().active === false,
+    "revoked Nancy access token remained active");
+
+    await db.query("UPDATE authorization_grants SET status = 'revoked' WHERE tool_id = $1 AND user_id = $2", [toolId, humanId]);
+    const deniedAuthorize = await runtimeApp.inject({ method: "GET",
+      url: authorizeUrl("nancy:survey:read", randomBytes(48).toString("base64url")) });
+    assert(deniedAuthorize.statusCode === 302, "denied grant did not reach upstream identity boundary");
+    const deniedUpstream = new URL(String(deniedAuthorize.headers.location));
+    const deniedCallback = await runtimeApp.inject({ method: "GET",
+      url: `/oauth/upstream/google/callback?state=${encodeURIComponent(deniedUpstream.searchParams.get("state") ?? "")}&code=synthetic-denied-code` });
+    const deniedLocation = deniedCallback.headers.location ? new URL(String(deniedCallback.headers.location)) : null;
+    assert(deniedCallback.statusCode !== 200 && !deniedLocation?.searchParams.get("code"),
+      "revoked entitlement grant issued a code");
+    await db.query("UPDATE authorization_grants SET status = 'active' WHERE tool_id = $1 AND user_id = $2", [toolId, humanId]);
+
+    const assertAuthorizeDenied = async (label: string) => {
+      const response = await runtimeApp.inject({ method: "GET",
+        url: authorizeUrl("nancy:survey:read", randomBytes(48).toString("base64url")) });
+      assert(response.statusCode !== 302, `${label} still authorized`);
+    };
+    await service.updateScope(String(readScope.id), { status: "disabled" }, ctx);
+    await assertAuthorizeDenied("disabled scope");
+    await service.updateScope(String(readScope.id), { status: "active" }, ctx);
+    await service.replaceAllowances(clientPk, [{ resourceId, scope: "nancy:survey:write" }], ctx);
+    await assertAuthorizeDenied("removed client allowance");
+    await service.replaceAllowances(clientPk, [
+      { resourceId, scope: "nancy:survey:read" }, { resourceId, scope: "nancy:survey:write" }
+    ], ctx);
+    await service.updateRegistrationStatus("client", clientPk, "disabled", ctx);
+    await assertAuthorizeDenied("disabled client");
+    await service.updateRegistrationStatus("client", clientPk, "active", ctx);
+    await service.updateRegistrationStatus("resource", resourcePk, "disabled", ctx);
+    await assertAuthorizeDenied("disabled resource");
+    await service.updateRegistrationStatus("resource", resourcePk, "active", ctx);
+    await service.setEntitlementBinding(resourcePk, "nancy-entitlement-local", "disabled", ctx);
+    await assertAuthorizeDenied("disabled entitlement binding");
+    await service.setEntitlementBinding(resourcePk, "nancy-entitlement-local", "active", ctx);
+  } finally {
+    await runtimeApp.close();
+  }
+
   const backup = await new Repositories(db).exportBackup();
   const backupJson = JSON.stringify(backup);
   assert(!backupJson.includes(clientCreated.client_secret) && !backupJson.includes(resourceCreated.resource_credential_secret) &&
@@ -199,12 +416,14 @@ try {
     !JSON.stringify(audit.rows).includes(privatePem), "Admin audit incomplete or secret-bearing");
 
   process.stdout.write(JSON.stringify({ result: "PASS", postgres: "disposable-loopback", scopes: 2,
-    clients: 1, resources: 1, allowances: 2, signing_keys: 1, admin_audit_events: audit.rows.length,
+    clients: 1, resources: 2, allowances: 2, signing_keys: 1, admin_audit_events: audit.rows.length,
     checks: ["real_repository", "credential_rotation", "binding_lifecycle", "jwks_503_200",
-      "publication_lead", "jwks_only_token_verification", "secret_free_backup_and_audit"] }) + "\n");
+      "publication_lead", "jwks_only_token_verification", "nancy_http_authorize_code_refresh_introspect_revoke",
+      "nancy_negative_lifecycle", "legacy_credential_isolation", "secret_free_backup_and_audit"] }) + "\n");
 } catch (error) {
-  const safe = error && typeof error === "object" ? error as { name?: string; code?: string; constraint?: string } : {};
+  const safe = error && typeof error === "object" ? error as { name?: string; message?: string; code?: string; constraint?: string } : {};
   process.stderr.write(JSON.stringify({ result: "FAIL", error_type: safe.name ?? "unknown",
+    assertion: safe.message?.startsWith("ASSERTION_FAILED:") ? safe.message : null,
     sqlstate: safe.code ?? null, constraint: safe.constraint ?? null }) + "\n");
   process.exitCode = 1;
 } finally {

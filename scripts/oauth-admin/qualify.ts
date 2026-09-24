@@ -379,7 +379,18 @@ try {
     const assertAuthorizeDenied = async (label: string) => {
       const response = await runtimeApp.inject({ method: "GET",
         url: authorizeUrl("nancy:survey:read", randomBytes(48).toString("base64url")) });
-      assert(response.statusCode !== 302, `${label} still authorized`);
+      if (response.statusCode !== 302) return;
+      const location = new URL(String(response.headers.location));
+      if (location.hostname !== "accounts.google.invalid") {
+        assert(!location.searchParams.get("code"), `${label} issued a code`);
+        return;
+      }
+      const callbackResponse = await runtimeApp.inject({ method: "GET",
+        url: `/oauth/upstream/google/callback?state=${encodeURIComponent(location.searchParams.get("state") ?? "")}&code=synthetic-denied-code` });
+      const downstreamLocation = callbackResponse.headers.location
+        ? new URL(String(callbackResponse.headers.location)) : null;
+      assert(callbackResponse.statusCode !== 200 && !downstreamLocation?.searchParams.get("code"),
+        `${label} issued a code`);
     };
     await service.updateScope(String(readScope.id), { status: "disabled" }, ctx);
     await assertAuthorizeDenied("disabled scope");

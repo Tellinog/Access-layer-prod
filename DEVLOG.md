@@ -18,7 +18,7 @@ Related task: Add the minimum OAuth P0 administration surface for Nancy vNext an
 - TypeScript lint and build passed; Vitest passed 362 tests across 20 files.
 - Python discovery ran 64 tests with two expected skips; the OAuth validator passed all 26 groups; non-strict platform validation passed 27 checks with seven documented warnings.
 - Compose rendering with `.env.production.example`, continuity schema validation (`VALID_BUT_NOT_READY`) and `git diff --check` passed. The legacy baseline and Step 4B evidence were not weakened.
-- Docker/PostgreSQL is unavailable on this host, so fresh real-PostgreSQL repository/backup/restore qualification and independent review remain explicit blockers; no production operation was attempted.
+- On `eb98638419b63dca6a3bcbddf59dd69a4c42b984`, the separate Admin qualifier passed against a fresh disposable PostgreSQL 16.15 target (two scopes, one client/resource, two allowances, one signing key, 21 sanitized admin audit events). The unchanged Step 4B qualifier passed on two additional fresh loopback-only PostgreSQL 16.15 targets: OAuth HTTP lifecycle, 8/8 same-refresh races, repeatable-read snapshot, encrypted replace restore, post-restore token continuity and legacy smoke. All qualifier containers were removed. Independent review remains open; no production operation was attempted.
 
 ## 2026-09-15 - Testbirds pending grants and bulk first-grant-wins behavior
 

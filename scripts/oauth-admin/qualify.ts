@@ -141,6 +141,7 @@ try {
 
   const staged = await service.generateSigningKey(ctx);
   assert(!JSON.stringify(staged).includes(root), "private reference in Admin response");
+  assert(!JSON.stringify(await service.snapshot()).includes(root), "private reference in Admin read");
   assert((await app.inject({ method: "GET", url: "/oauth/jwks" })).statusCode === 503, "staged key must not publish JWKS");
   await service.publishSigningKey(String(staged.id), ctx);
   let earlyDenied = false;
@@ -192,7 +193,10 @@ try {
   const audit = await db.query<{ metadata: Record<string, unknown> }>(
     "SELECT metadata FROM audit_logs WHERE event_type LIKE 'oauth.%.changed'");
   assert(audit.rows.length >= 17 && !JSON.stringify(audit.rows).includes(clientCreated.client_secret) &&
-    !JSON.stringify(audit.rows).includes(resourceCreated.resource_credential_secret), "Admin audit incomplete or secret-bearing");
+    !JSON.stringify(audit.rows).includes(resourceCreated.resource_credential_secret) &&
+    !JSON.stringify(audit.rows).includes(rotatedClient.client_secret!) &&
+    !JSON.stringify(audit.rows).includes(rotatedResource.resource_credential_secret!) &&
+    !JSON.stringify(audit.rows).includes(privatePem), "Admin audit incomplete or secret-bearing");
 
   process.stdout.write(JSON.stringify({ result: "PASS", postgres: "disposable-loopback", scopes: 2,
     clients: 1, resources: 1, allowances: 2, signing_keys: 1, admin_audit_events: audit.rows.length,

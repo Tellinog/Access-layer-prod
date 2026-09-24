@@ -10,7 +10,9 @@ $containerName = "access-layer-oauth-admin-$runId"
 $databaseName = "access_layer_oauth_admin_$runId"
 $databaseUser = "oauth_admin_qualifier"
 $passwordBytes = [byte[]]::new(24)
-[Security.Cryptography.RandomNumberGenerator]::Fill($passwordBytes)
+$passwordGenerator = [Security.Cryptography.RandomNumberGenerator]::Create()
+$passwordGenerator.GetBytes($passwordBytes)
+$passwordGenerator.Dispose()
 $databasePassword = -join ($passwordBytes | ForEach-Object { $_.ToString("x2") })
 $started = $false
 

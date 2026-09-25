@@ -15,6 +15,10 @@ OAuth P0 administration is intentionally narrower: only `platform_admin` with `a
 
 Open `/admin/oauth` in production (or `/access-control/oauth` under the local base path). The page is part of the same Access Layer service and uses the existing Admin session, CSRF and audit model.
 
+The Admin navigation shows **OAuth P0** after `/v1/me` confirms `role=platform_admin` and `admin:oauth:read`. The server checks the active session grant again on every OAuth Admin request; the link alone does not authorize access.
+
+If `/admin/oauth` returns `ADMIN_FORBIDDEN`, check the current `/v1/me` response and the active `access-admin` grant. The grant must have role `platform_admin` and explicit `admin:oauth:read`; mutations also require `admin:oauth:write`. If adding those keys to a grant returns `VALIDATION_ERROR` with `details.unknown_permissions`, verify the registered keys in **Tools > access-admin** before editing the tool. The September 2026 incident exposed a different issue: selecting all 15 official `access-admin` keys includes `admin:access_requests:read/write`, whose underscores the current grant validator rejects. Do not remove those two keys from an existing grant merely to bypass the validation; a reviewed compatibility correction is required. A `400` without a response body needs `error.details` and correlation ID investigated separately; request-completion logs do not include response bodies.
+
 Recommended onboarding order:
 
 1. create each canonical `project:domain:action` scope;

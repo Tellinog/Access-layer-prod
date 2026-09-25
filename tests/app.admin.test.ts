@@ -704,6 +704,7 @@ describe("admin access request routes", () => {
     expect(htmlResponse.body).toContain("/access-control/v1");
     expect(htmlResponse.body).toContain('rel="icon" href="/access-control/favicon.svg"');
     expect(htmlResponse.body).toContain('ADMIN_BASE_PATH = "/access-control"');
+    expect(htmlResponse.body).toContain('href="/access-control/oauth" hidden>OAuth P0</a>');
     expect(htmlResponse.body).toContain('id="auth-action">Logout</button>');
     expect(htmlResponse.body).not.toContain('id="login"');
 

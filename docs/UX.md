@@ -79,6 +79,8 @@ Desktop admin views use the full available main-content width. Forms distribute 
 
 ## Admin login gate
 
+The existing Admin navigation exposes a direct **OAuth P0** link only after the current `/v1/me` response reports `platform_admin` with `admin:oauth:read`. The destination still performs its server-side grant check. Grant creation and edit forms show the backend's `unknown_permissions` detail when a permission is absent from the selected tool's registered catalog; a failed grant edit stays on the detail view.
+
 The Admin UI root must not render navigation, dashboard cards, tables or inline admin scripts before a valid admin session exists.
 
 Unauthenticated visits to the Admin UI root redirect to the login route, which starts Google OAuth for the reserved `access-admin` tool.

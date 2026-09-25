@@ -1,5 +1,17 @@
 # DEVLOG.md
 
+## 2026-09-25 - Admin OAuth access diagnosis and navigation
+
+Changed by: Codex
+Related task: Investigate `ADMIN_FORBIDDEN` on `/admin/oauth` and unsuccessful Admin grant changes.
+
+- Read the supplied request-completion log: existing Admin session/API calls succeeded, OAuth Admin returned 403, and grant create/update returned 400. The 400 response details and production permission catalog are not present in the log.
+- The user-provided grant form confirms that the production catalog includes both OAuth Admin keys and has all 15 official `access-admin` keys selected. `admin:access_requests:read/write` are official platform-admin keys but fail the current underscore-free permission regex; the local built validator reproduced this. Correcting frozen legacy validation remains pending explicit approval and a compatibility decision.
+- Added an OAuth P0 link to the existing Admin navigation for current `platform_admin` sessions with `admin:oauth:read`. The server-side authorization check is unchanged.
+- Grant create/edit UI now displays `unknown_permissions` details from existing 400 responses, and edit errors remain visible in the detail view.
+- Documented the existing tool-permission registration and grant remediation flow. No frozen endpoint, payload, grant validation rule, production data or deployment configuration changed.
+- Verified with `npm.cmd run lint`, `npm.cmd run build`, `npm.cmd test -- tests/app.admin.test.ts tests/legacy-contract-baseline.test.ts` (63 tests passed), and `git diff --check`. No live Admin session or production database was available to verify the incident's exact `400` response.
+
 ## 2026-09-23 - OAuth P0 runtime + administration candidate
 
 Changed by: Codex

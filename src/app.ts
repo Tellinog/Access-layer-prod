@@ -3350,10 +3350,11 @@ function adminHtml(config: Config): string {
     nav { position: sticky; top: 0; height: 100vh; background: var(--primary-dark); color: #ffffff; padding: 32px 20px; border-right: 1px solid rgba(255, 255, 255, .08); }
     nav h1 { position: relative; font-size: 1.12rem; line-height: 1.2; margin: 0 0 32px; font-weight: 800; letter-spacing: 0; }
     nav h1::after { content: ""; display: block; width: 40px; height: 3px; margin-top: 14px; border-radius: 999px; background: var(--accent); }
-    nav button { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: left; border: 1px solid transparent; color: rgba(255, 255, 255, .78); background: transparent; padding: 12px 14px; border-radius: 14px; cursor: pointer; font: inherit; font-weight: 650; transition: background-color .22s ease-in-out, color .22s ease-in-out, border-color .22s ease-in-out; }
+    nav button, nav a { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: left; border: 1px solid transparent; color: rgba(255, 255, 255, .78); background: transparent; padding: 12px 14px; border-radius: 14px; cursor: pointer; font: inherit; font-weight: 650; text-decoration: none; transition: background-color .22s ease-in-out, color .22s ease-in-out, border-color .22s ease-in-out; }
+    nav a[hidden] { display: none; }
     nav button + button { margin-top: 4px; }
     nav button[aria-current="page"] { background: rgba(255, 255, 255, .1); color: #ffffff; border-color: rgba(116, 198, 157, .35); box-shadow: inset 3px 0 0 var(--accent); }
-    nav button:hover { background: rgba(255, 255, 255, .08); color: #ffffff; }
+    nav button:hover, nav a:hover { background: rgba(255, 255, 255, .08); color: #ffffff; }
     main { min-width: 0; background: var(--bg); }
     header { min-height: 88px; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 48px; border-bottom: 1px solid var(--border); background: rgba(255, 255, 255, .96); position: sticky; top: 0; z-index: 3; backdrop-filter: blur(10px); }
     header > span { display: flex; align-items: center; justify-content: flex-end; gap: 12px; color: var(--text-soft); font-size: .92rem; }
@@ -3425,7 +3426,7 @@ function adminHtml(config: Config): string {
       .shell { grid-template-columns: 1fr; }
       nav { position: static; height: auto; display: flex; gap: 8px; overflow: auto; padding: 14px; }
       nav h1 { display: none; }
-      nav button { width: auto; white-space: nowrap; }
+      nav button, nav a { width: auto; white-space: nowrap; }
       header { align-items: flex-start; height: auto; padding: 24px; flex-direction: column; position: static; }
       .content { padding: 24px; }
       .form-grid, .dashboard-kpis { grid-template-columns: 1fr; }
@@ -3445,6 +3446,7 @@ function adminHtml(config: Config): string {
       <button data-view="audit">Audit log</button>
       <button data-view="backup">Backup</button>
       <button data-view="settings">Settings</button>
+      <a id="oauth-admin-link" href="${escapeHtml(`${adminBasePath}/oauth`)}" hidden>OAuth P0</a>
     </nav>
     <main>
       <header>
@@ -3631,6 +3633,10 @@ function adminHtml(config: Config): string {
       const target = document.getElementById(id);
       if (target) target.textContent = error ? error.message || String(error) : '';
     }
+    function grantErrorMessage(error) {
+      const unknown = error && error.details && error.details.unknown_permissions;
+      return error.message + (Array.isArray(unknown) && unknown.length ? ' Permessi non registrati per il tool: ' + unknown.join(', ') + '.' : '');
+    }
     function feedback(id, message, type = 'success') {
       const target = document.getElementById(id);
       if (!target) return;
@@ -3664,8 +3670,10 @@ function adminHtml(config: Config): string {
         const current = await api(apiUrl('/me'));
         state.me = current;
         me.textContent = current.user.email;
+        document.getElementById('oauth-admin-link').hidden = current.role !== 'platform_admin' || !hasAdminPermission('admin:oauth:read');
         setAuthAction('logout');
       } catch {
+        document.getElementById('oauth-admin-link').hidden = true;
         me.textContent = 'Non autenticato';
         setAuthAction('login');
       }
@@ -4048,7 +4056,7 @@ function adminHtml(config: Config): string {
             renderUserDetail(user);
           }
         } catch (error) {
-          formError('user-grant-create-error', error);
+          formError('user-grant-create-error', grantErrorMessage(error));
         }
       };
     }
@@ -4144,7 +4152,7 @@ function adminHtml(config: Config): string {
           state.grantFilters = { tool_slug: payload.tool_slug, email: payload.email };
           render();
         } catch (error) {
-          formError('grant-create-error', error);
+          formError('grant-create-error', grantErrorMessage(error));
         }
       };
     }
@@ -4277,7 +4285,8 @@ function adminHtml(config: Config): string {
         '<label>Ruolo<br><input id="grant-role" value="'+esc(grant.role)+'"></label><br><br>' +
         '<div class="permission-field"><span>Permessi</span>'+permissionPickerMarkup('grant-permissions', grant.tool_slug, grant.permissions || [], 'grant-permissions-help')+'<span class="field-help" id="grant-permissions-help">Apri l’elenco e seleziona i permessi con le checkbox.</span></div><br><br>' +
         '<label>Stato<br><select id="grant-status"><option value="active">active</option><option value="revoked">revoked</option><option value="expired">expired</option><option value="pending_user_link">pending_user_link</option></select></label><br><br>' +
-        '<label>Scadenza<br><input id="grant-valid-until" placeholder="2026-12-31T23:59:59Z" value="'+esc(grant.valid_until || '')+'"></label>';
+        '<label>Scadenza<br><input id="grant-valid-until" placeholder="2026-12-31T23:59:59Z" value="'+esc(grant.valid_until || '')+'"></label>' +
+        '<p class="danger" id="grant-detail-error" role="alert"></p>';
       document.getElementById('grant-status').value = grant.status;
       bindPermissionPicker('grant-permissions');
       document.getElementById('back-grants').onclick = () => {
@@ -4286,15 +4295,20 @@ function adminHtml(config: Config): string {
         return render();
       };
       document.getElementById('save-grant').onclick = async () => {
-        await api(apiUrl('/admin/grants/') + grant.id, { method:'PATCH', body: JSON.stringify({
-          role: document.getElementById('grant-role').value,
-          permissions: selectedValues('grant-permissions'),
-          status: document.getElementById('grant-status').value,
-          valid_until: document.getElementById('grant-valid-until').value.trim() || null
-        }) });
-        if (back) return back();
-        state.view = 'grants';
-        render();
+        formError('grant-detail-error');
+        try {
+          await api(apiUrl('/admin/grants/') + grant.id, { method:'PATCH', body: JSON.stringify({
+            role: document.getElementById('grant-role').value,
+            permissions: selectedValues('grant-permissions'),
+            status: document.getElementById('grant-status').value,
+            valid_until: document.getElementById('grant-valid-until').value.trim() || null
+          }) });
+          if (back) return back();
+          state.view = 'grants';
+          render();
+        } catch (error) {
+          formError('grant-detail-error', grantErrorMessage(error));
+        }
       };
       document.getElementById('revoke-grant').onclick = async () => {
         if (!confirm("Confermi la revoca dell'accesso? Le sessioni attive potrebbero essere terminate.")) return;

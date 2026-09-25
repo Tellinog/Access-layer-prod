@@ -4,6 +4,12 @@
 
 V1 legacy implementation complete. The **OAuth P0 runtime + administration candidate** descends from exact commit `bae112404a8432b4d4ce7e3e70d96f2217ac7597`. OAuth remains default-off; no pilot, production Nancy registration, production key/secret provisioning, production restore, Coolify mutation or production enablement exists. The full Nancy-shaped Admin-to-OAuth HTTP flow passed on a disposable PostgreSQL 16.15 target at `ce9668f514c9da0c55d33ae4b0da28527595e0fb`; the unchanged Step 4B qualification remains a separate full regression gate. Independent review is still required.
 
+## Admin OAuth access investigation, 2026-09-25
+
+- A supplied production request-completion log shows a valid legacy Admin session (`/admin`, `/v1/me` and existing Admin reads returned 200), `GET /admin/oauth` returned 403, and grant create/update attempts returned 400. The user-provided grant form shows all 15 registered `access-admin` keys selected. Two official keys, `admin:access_requests:read/write`, fail the existing permission-key regex due to `_`; a local runtime check reproduced the rejection before catalog lookup. The 400 response body remains unavailable, so any additional validation failure is not excluded.
+- The repository's OAuth Admin guard requires the active session grant to carry `platform_admin` plus explicit `admin:oauth:read`/`admin:oauth:write`. The seed and the shown production form include both OAuth keys, so missing catalog registration does not explain the shown attempt. The Admin UI now links to OAuth P0 for authorized sessions and displays missing registered permission keys from grant validation errors. A correction to frozen legacy permission validation awaits explicit approval and a compatibility decision.
+- No production data, environment variable, deployment or OAuth protocol flag was changed by this investigation. Confirm the live 400 `error.details` and current tool/grant state before claiming the access incident resolved.
+
 ## OAuth P0 administration candidate, 2026-09-23
 
 - Added a same-service `/admin/oauth` surface and `/v1/admin/oauth/*` API for the existing ten-table OAuth foundation: signing keys, clients, client credentials, exact redirect URIs, resources, separate resource credentials, canonical scopes, resource-scope mappings, explicit client-resource-scope allowances and temporary resource-to-legacy-tool entitlement bindings.

@@ -666,7 +666,7 @@ components:
             role: { type: string }
             permissions:
               type: array
-              items: { type: string, pattern: "^[a-z0-9-]+(?::[a-z0-9-]+)+$" }
+              items: { type: string, pattern: "^(?:[a-z0-9-]+(?::[a-z0-9-]+)+|admin:access_requests:(?:read|write))$" }
         correlation_id: { type: string }
     RefreshRequest:
       type: object
@@ -694,7 +694,7 @@ components:
           $ref: '#/components/schemas/UserIdentity'
         permissions:
           type: array
-          items: { type: string, pattern: "^[a-z0-9-]+(?::[a-z0-9-]+)+$" }
+          items: { type: string, pattern: "^(?:[a-z0-9-]+(?::[a-z0-9-]+)+|admin:access_requests:(?:read|write))$" }
     UserIdentity:
       type: object
       properties:
@@ -748,7 +748,7 @@ components:
           items: { type: string, format: uri }
         permission_keys:
           type: array
-          items: { type: string, pattern: "^[a-z0-9-]+(?::[a-z0-9-]+)+$" }
+          items: { type: string, pattern: "^(?:[a-z0-9-]+(?::[a-z0-9-]+)+|admin:access_requests:(?:read|write))$" }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
     ToolListResponse:
@@ -788,7 +788,7 @@ components:
           items: { type: string, format: uri }
         permission_keys:
           type: array
-          items: { type: string, pattern: "^[a-z0-9-]+(?::[a-z0-9-]+)+$" }
+          items: { type: string, pattern: "^(?:[a-z0-9-]+(?::[a-z0-9-]+)+|admin:access_requests:(?:read|write))$" }
     ToolUpdateRequest:
       type: object
       properties:
@@ -801,7 +801,7 @@ components:
           items: { type: string, format: uri }
         permission_keys:
           type: array
-          items: { type: string, pattern: "^[a-z0-9-]+(?::[a-z0-9-]+)+$" }
+          items: { type: string, pattern: "^(?:[a-z0-9-]+(?::[a-z0-9-]+)+|admin:access_requests:(?:read|write))$" }
     GrantCreateRequest:
       type: object
       required: [tool_slug, role, permissions]
@@ -812,7 +812,7 @@ components:
         role: { type: string }
         permissions:
           type: array
-          items: { type: string, pattern: "^[a-z0-9-]+(?::[a-z0-9-]+)+$" }
+          items: { type: string, pattern: "^(?:[a-z0-9-]+(?::[a-z0-9-]+)+|admin:access_requests:(?:read|write))$" }
         valid_until: { type: string, format: date-time }
     GrantUpdateRequest:
       type: object
@@ -820,7 +820,7 @@ components:
         role: { type: string }
         permissions:
           type: array
-          items: { type: string, pattern: "^[a-z0-9-]+(?::[a-z0-9-]+)+$" }
+          items: { type: string, pattern: "^(?:[a-z0-9-]+(?::[a-z0-9-]+)+|admin:access_requests:(?:read|write))$" }
         status: { type: string, enum: [active, revoked, expired, pending_user_link] }
         valid_until: { type: string, format: date-time, nullable: true }
     BulkGrantImportRequest:
@@ -844,7 +844,7 @@ components:
         role: { type: string }
         permissions:
           type: array
-          items: { type: string, pattern: "^[a-z0-9-]+(?::[a-z0-9-]+)+$" }
+          items: { type: string, pattern: "^(?:[a-z0-9-]+(?::[a-z0-9-]+)+|admin:access_requests:(?:read|write))$" }
         valid_until: { type: string, format: date-time, nullable: true }
         action: { type: string, enum: [upsert, revoke], nullable: true }
         note: { type: string, nullable: true }
@@ -926,7 +926,7 @@ components:
         role: { type: string }
         permissions:
           type: array
-          items: { type: string, pattern: "^[a-z0-9-]+(?::[a-z0-9-]+)+$" }
+          items: { type: string, pattern: "^(?:[a-z0-9-]+(?::[a-z0-9-]+)+|admin:access_requests:(?:read|write))$" }
         valid_until: { type: string, format: date-time, nullable: true }
         note: { type: string }
     AccessRequestRejectRequest:

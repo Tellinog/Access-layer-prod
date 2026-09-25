@@ -533,3 +533,17 @@ The surface writes only the existing migrations 003–005 model and append-only 
 The temporary resource-to-legacy-tool binding remains entitlement-only. Existing Users/Grants administration remains authoritative for human grants. Native OAuth entitlement domains are explicitly deferred until after the Nancy Phase 8 pilot and must replace the bridge before broad SDK-native rollout.
 
 Rationale: Nancy vNext and later controlled consumers require onboarding without direct SQL, while keeping protocol semantics, key domains, credential identities and every frozen legacy contract unchanged. Separating administration from protocol enablement permits safe default-off preparation and review.
+
+## D-048 - Accept two existing platform-admin permission keys during legacy validation
+
+Status: accepted
+
+Confirmed: 2026-09-25, with explicit user approval for the frozen legacy permission correction.
+
+Decision: legacy permission-key validation accepts the two exact, already documented and seeded keys `admin:access_requests:read` and `admin:access_requests:write` in addition to the existing hierarchical regex. It does not allow arbitrary underscores, add a permission, change role membership, relax the registered-key check, or change OAuth resource/scope mapping grammar. The exception applies to existing Admin tool and grant write paths that use the shared validator; their endpoint, payload, error and database shapes remain unchanged.
+
+The legacy OpenAPI and JSON permission-item patterns record the same exact exception. The frozen Step 1 baseline remains unchanged; its test removes only this exact OpenAPI regex addition before comparing the historical source hash, and checks the expected number of fields. OAuth registration schemas retain their strict independent regex.
+
+Rationale: selecting all official `platform_admin` permissions for `access-admin` previously failed as `VALIDATION_ERROR` before registered-key lookup because these two longstanding keys contain an underscore. That blocked adding `admin:oauth:read/write` to an existing admin grant. The exact exception lets a platform admin preserve access-request permissions while editing the grant and keeps unknown keys denied.
+
+Rollback: revert the validator and spec exception only if the active Admin grants no longer require editing with these two official keys. Reverting earlier would restore the reported 400 and impede grant maintenance; existing grants are not rewritten by this change.

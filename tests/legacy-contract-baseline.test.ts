@@ -6,6 +6,8 @@ import { httpStatusByCode } from "../src/errors.js";
 
 const root = resolve(import.meta.dirname, "..");
 const baseline = JSON.parse(readFileSync(resolve(root, "specs/legacy-contract-baseline.v1.json"), "utf8"));
+const historicalPermissionPattern = "^[a-z0-9-]+(?::[a-z0-9-]+)+$";
+const d048PermissionPattern = "^(?:[a-z0-9-]+(?::[a-z0-9-]+)+|admin:access_requests:(?:read|write))$";
 
 function text(path: string): string {
   return readFileSync(resolve(root, path), "utf8").replaceAll("\r\n", "\n");
@@ -18,7 +20,9 @@ function sha256Lf(path: string): string {
       .replace(/  const oauthP0Enabled = readBoolean\("OAUTH_P0_ENABLED", false\);[\s\S]*?  const config: Config = \{\n/, "  const config: Config = {\n")
       .replace("    oauthP0Enabled,\n    oauthTransactionProtectionKey,\n    oauthCredentialSecretPepper,\n    oauthSigningKeyRoot,\n", "")
       .replace(/\n  if \(config\.oauthCredentialSecretPepper !== undefined &&[\s\S]*?OAuth credential secret isolation is invalid"\);\n  \}\n/, "")
-    : text(path);
+    : path === "schemas/openapi.yaml"
+      ? text(path).replaceAll(d048PermissionPattern, historicalPermissionPattern)
+      : text(path);
   return createHash("sha256").update(source, "utf8").digest("hex");
 }
 
@@ -28,6 +32,10 @@ function gitBlobSha1(path: string): string {
 }
 
 describe("legacy compatibility baseline", () => {
+  it("limits the D-048 OpenAPI addendum to the exact historical permission fields", () => {
+    expect(text("schemas/openapi.yaml").split(d048PermissionPattern).length - 1).toBe(9);
+  });
+
   it("pins unchanged historical sources while preserving the explicit Microsoft bridge addendum", () => {
     const intentionalBridgeExceptions = new Set(["src/app.ts", "src/config.ts", "src/errors.ts", "docker-compose.yaml"]);
     for (const [path, expected] of Object.entries(baseline.source_sha256_lf)) {

@@ -33,6 +33,10 @@ describe("validation", () => {
     expect(validatePermissionKey("crm:export-data")).toBe(true);
     expect(validatePermissionKey("petyr:read:all")).toBe(true);
     expect(validatePermissionKey("admin:tools:write")).toBe(true);
+    expect(validatePermissionKey("admin:access_requests:read")).toBe(true);
+    expect(validatePermissionKey("admin:access_requests:write")).toBe(true);
+    expect(validatePermissionKey("admin:other_requests:read")).toBe(false);
+    expect(validatePermissionKey("admin:access_requests:delete")).toBe(false);
     expect(validatePermissionKey("crm.read")).toBe(false);
     expect(validatePermissionKey("crm:read:")).toBe(false);
     expect(validatePermissionKey("crm::read")).toBe(false);

@@ -95,6 +95,8 @@ Confidential token/revocation callers use registered OAuth client Basic credenti
 
 ## Endpoints
 
+Legacy Admin permission arrays accept the two exact existing keys `admin:access_requests:read` and `admin:access_requests:write` alongside the normal hierarchical permission-key regex (D-048). Every key supplied on a grant must still be registered for its tool. The legacy OpenAPI and JSON schemas include this exception; OAuth resource/scope mapping schemas retain their strict regex.
+
 | Method | Path | Purpose | Auth required | Notes |
 |---|---|---|---:|---|
 | GET | `/health` | Health check | No | Includes DB status in non-public detail mode |

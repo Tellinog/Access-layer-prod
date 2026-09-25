@@ -1,5 +1,16 @@
 # DEVLOG.md
 
+## 2026-09-25 - D-048 platform-admin grant validation correction
+
+Changed by: Codex
+Related task: Allow the existing super admin to save the official `access-admin` grant and reach OAuth administration.
+
+- With explicit user approval, accepted only `admin:access_requests:read/write` as exact exceptions to the existing legacy permission-key regex. General tool permission syntax, registered-key checks, OAuth mapping grammar and the frozen baseline file are unchanged. Updated the legacy OpenAPI and JSON permission patterns; the baseline test strips only the exact D-048 OpenAPI addition before checking its historical hash.
+- Added D-048 and the machine-readable validation exception, updated Admin/API/security/testing guidance and current state, and left production grant verification in the backlog.
+- Added regression coverage for rejecting unrelated underscore keys and for `PATCH` of the active Admin grant, immediate `/v1/me` permission visibility, and `POST` with all 15 registered platform-admin keys.
+- `npm.cmd run lint` and `npm.cmd run build` passed; the full Vitest suite passed 364 tests across 20 files; the four changed legacy schema documents parsed and contained exactly the expected 14 exception patterns; `git diff --check` passed. The Python OAuth contract validator could not run because `jsonschema` is absent from the available Python runtime. Its strict OAuth permission regex and schemas were not changed.
+- No production database, Coolify resource, OAuth enablement flag or live grant was changed by this task.
+
 ## 2026-09-25 - Admin OAuth access diagnosis and navigation
 
 Changed by: Codex

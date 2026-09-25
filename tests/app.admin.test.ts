@@ -1721,6 +1721,53 @@ describe("admin access request routes", () => {
     await app.close();
   });
 
+  it("updates the active access-admin grant and creates another with all official platform permissions", async () => {
+    const repos = new AdminRepos();
+    repos.toolPermissions.set(accessAdminTool.id, [...PLATFORM_ADMIN_PERMISSIONS]);
+    const app = await buildAdminApp(repos);
+    repos.adminGrant = {
+      ...repos.adminGrant,
+      permissions: PLATFORM_ADMIN_PERMISSIONS.filter((permission) => !permission.startsWith("admin:oauth:"))
+    };
+
+    const updated = await app.inject({
+      method: "PATCH",
+      url: `/v1/admin/grants/${adminGrant.id}`,
+      headers: { cookie: adminSessionCookie(), origin: "http://localhost:8080" },
+      payload: {
+        role: "platform_admin",
+        permissions: PLATFORM_ADMIN_PERMISSIONS,
+        status: "active",
+        valid_until: "2026-12-31T23:59:59Z"
+      }
+    });
+    expect(updated.statusCode).toBe(200);
+    expect(repos.adminGrant.permissions).toEqual(PLATFORM_ADMIN_PERMISSIONS);
+
+    const current = await app.inject({ method: "GET", url: "/v1/me", headers: { cookie: adminSessionCookie() } });
+    expect(current.statusCode).toBe(200);
+    expect(current.json()).toMatchObject({
+      role: "platform_admin",
+      permissions: expect.arrayContaining(["admin:access_requests:read", "admin:oauth:read", "admin:oauth:write"])
+    });
+
+    const created = await app.inject({
+      method: "POST",
+      url: "/v1/admin/grants",
+      headers: { cookie: adminSessionCookie(), origin: "http://localhost:8080" },
+      payload: {
+        tool_slug: "access-admin",
+        email: targetUser.email,
+        role: "platform_admin",
+        permissions: PLATFORM_ADMIN_PERMISSIONS,
+        valid_until: "2026-12-31T23:59:59Z"
+      }
+    });
+    expect(created.statusCode).toBe(201);
+    expect(repos.grant?.permissions).toEqual(PLATFORM_ADMIN_PERMISSIONS);
+    await app.close();
+  });
+
   it("approves a pending access request by creating a grant and auditing both changes", async () => {
     const repos = new AdminRepos();
     const app = await buildAdminApp(repos);

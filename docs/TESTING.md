@@ -1,5 +1,9 @@
 # TESTING.md
 
+## D-048 Admin grant compatibility regression
+
+`tests/validation.test.ts` proves the exact two already documented `admin:access_requests:read/write` keys pass legacy permission validation and other underscore-bearing keys remain denied. `tests/app.admin.test.ts` proves an active `access-admin` session can update its own existing `platform_admin` grant with all 15 registered role keys, immediately read the resulting `admin:oauth:read/write` permissions from `/v1/me`, and create a grant with the same key set. The legacy baseline suite checks route and response compatibility and normalizes only D-048's exact OpenAPI regex addition before comparing the historical hash. Production completion still requires an operator to edit the existing grant after deploying the fix and confirm `/admin/oauth` succeeds; the local tests do not modify production data.
+
 ## OAuth P0 administration candidate coverage
 
 `tests/oauth-admin.test.ts` uses the local-only Nancy-shaped origin, callback and resource fixture. It proves canonical scopes, exact scope-to-permission mappings, explicit client-resource-scope allowances, a confidential BFF registration, separate resource identity/credential, distinct one-time secrets, accepted OAuth hash verification, rotation invalidation, no secret in subsequent snapshots, and malformed wildcard/duplicate/unknown-legacy input rejection.

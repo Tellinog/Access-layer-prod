@@ -58,7 +58,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "pattern": "^[a-z0-9-]+(?::[a-z0-9-]+)+$"
+            "pattern": "^(?:[a-z0-9-]+(?::[a-z0-9-]+)+|admin:access_requests:(?:read|write))$"
           }
         },
         "valid_until": {
@@ -121,7 +121,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "pattern": "^[a-z0-9-]+(?::[a-z0-9-]+)+$"
+            "pattern": "^(?:[a-z0-9-]+(?::[a-z0-9-]+)+|admin:access_requests:(?:read|write))$"
           }
         }
       },
@@ -141,7 +141,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "pattern": "^[a-z0-9-]+(?::[a-z0-9-]+)+$"
+            "pattern": "^(?:[a-z0-9-]+(?::[a-z0-9-]+)+|admin:access_requests:(?:read|write))$"
           }
         },
         "valid_until": {

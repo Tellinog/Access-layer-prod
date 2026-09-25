@@ -87,6 +87,8 @@ When the flag is true, configuration requires all three dedicated inputs: `OAUTH
 
 ## Authorization / permissions
 
+D-048 permits only the two exact, already registered platform-admin keys `admin:access_requests:read/write` as legacy validation exceptions to the strict permission-key regex. All other underscore-bearing keys remain rejected by this validator, and grant writes still require every requested key to be registered for the selected tool. OAuth resource/scope mapping validation retains its separate strict legacy permission grammar. This exception does not grant access by itself; `/admin/oauth` still checks the active session grant for `platform_admin` and explicit `admin:oauth:read/write`.
+
 Authentication and authorization are separate.
 
 A user can access a tool only if:

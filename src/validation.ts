@@ -1,5 +1,9 @@
 export const TOOL_SLUG_REGEX = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
 export const PERMISSION_KEY_REGEX = /^[a-z0-9-]+(?::[a-z0-9-]+)+$/;
+const LEGACY_ADMIN_PERMISSION_EXCEPTIONS = new Set([
+  "admin:access_requests:read",
+  "admin:access_requests:write"
+]);
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -22,7 +26,7 @@ export function validateToolSlug(slug: string): boolean {
 }
 
 export function validatePermissionKey(permission: string): boolean {
-  return PERMISSION_KEY_REGEX.test(permission);
+  return PERMISSION_KEY_REGEX.test(permission) || LEGACY_ADMIN_PERMISSION_EXCEPTIONS.has(permission);
 }
 
 export function validateState(state: string): boolean {

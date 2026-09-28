@@ -12,7 +12,7 @@ describe.skipIf(!disposableUrl || !disposableConfirmed)("Phase 9A.1 disposable P
   it("applies 001–006 and enforces native/bridge grants and authorization provenance", async () => {
     const parsed = new URL(disposableUrl!);
     expect(["localhost", "127.0.0.1", "::1"]).toContain(parsed.hostname);
-    expect(parsed.pathname).toMatch(/test/i);
+    expect(parsed.pathname).toMatch(/test|^\/access_layer_step4b_(?:source|restore)_[a-f0-9]{12}$/i);
     const client = new pg.Client({ connectionString: disposableUrl });
     await client.connect();
     const schema = `oauth_native_test_${randomUUID().replaceAll("-", "")}`;

@@ -3,6 +3,11 @@ import type {
   OAuthAuthorizationCodeIssuance,
   OAuthAuthorizationTransactionRecord
 } from "./types.js";
+import { evaluateNativeEntitlement } from "./native-entitlement.js";
+
+export class NativeEntitlementUnavailable extends Error {
+  constructor(readonly kind: "invalid_scope" | "not_entitled") { super(kind); }
+}
 
 function mapTransaction(row: Record<string, unknown>): OAuthAuthorizationTransactionRecord {
   return {
@@ -117,12 +122,26 @@ export class OAuthAuthorizationFlowRepository {
 
   async issueAuthorizationCode(input: OAuthAuthorizationCodeIssuance): Promise<{ authorizationId: string }> {
     return this.db.transaction(async (transactionDb) => {
+      if (input.entitlementSource === "native") {
+        const effective = await evaluateNativeEntitlement(transactionDb, {
+          userId: input.userId, oauthClientId: input.oauthClientId,
+          oauthResourceId: input.oauthResourceId, scopes: input.grantedScopes, now: input.issuedAt
+        });
+        if (effective.kind !== "allowed") throw new NativeEntitlementUnavailable(effective.kind);
+        if (effective.grants.length !== input.nativeGrants.length ||
+            effective.grants.some((grant) => !input.nativeGrants.some((provided) =>
+              provided.scope === grant.scope && provided.grantId === grant.grantId)) ||
+            new Set(input.nativeGrants.map((grant) => grant.scope)).size !== input.grantedScopes.length ||
+            new Set(input.nativeGrants.map((grant) => grant.grantId)).size !== input.grantedScopes.length) {
+          throw new Error("OAuth native authorization provenance is incomplete");
+        }
+      }
       const authorization = await transactionDb.query<{ id: string }>(
         `INSERT INTO oauth_authorizations (
           oauth_authorization_transaction_id, user_id, oauth_client_id, oauth_resource_id,
-          granted_scopes, legacy_authorization_grant_id, correlation_id, status,
+          granted_scopes, legacy_authorization_grant_id, entitlement_source, correlation_id, status,
           created_at, updated_at
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,'active',$8,$8)
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'active',$9,$9)
         RETURNING id`,
         [
           input.transactionId,
@@ -131,12 +150,23 @@ export class OAuthAuthorizationFlowRepository {
           input.oauthResourceId,
           input.grantedScopes,
           input.legacyAuthorizationGrantId,
+          input.entitlementSource,
           input.correlationId,
           input.issuedAt
         ]
       );
       const authorizationId = authorization.rows[0]?.id;
       if (!authorizationId) throw new Error("OAuth authorization creation failed");
+
+      if (input.entitlementSource === "native") {
+        for (const grant of input.nativeGrants) {
+          await transactionDb.query(
+            `INSERT INTO oauth_authorization_native_grants
+               (oauth_authorization_id, oauth_native_human_grant_id, created_at)
+             VALUES ($1,$2,$3)`, [authorizationId, grant.grantId, input.issuedAt]
+          );
+        }
+      }
 
       await transactionDb.query(
         `INSERT INTO oauth_authorization_codes (

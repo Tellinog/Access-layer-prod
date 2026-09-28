@@ -21,15 +21,20 @@ NOW = "2026-09-28T11:00:00Z"
 
 class NativeOAuthContractTest(unittest.TestCase):
     def test_machine_contract_preserves_p0_and_direct_mode_guard(self) -> None:
-        self.assertEqual(SPEC["phase"], "9A.1")
+        self.assertEqual(SPEC["phase"], "9A.2")
         self.assertEqual(SPEC["p0_profile"], "frozen_legacy_bridge_compatibility")
-        self.assertEqual(SPEC["runtime_evaluation"], "disabled")
+        self.assertEqual(SPEC["runtime_evaluation"], "mode_selected_exact_current_entitlement")
         self.assertEqual(SPEC["resource_entitlement_modes"], ["legacy_bridge", "native"])
         self.assertEqual(SPEC["resource_mode_phase_9A_1"], "direct_update_forbidden")
         self.assertTrue(SPEC["resource_mode_target_transition"]["same_resource_id_and_audience"] == "required")
         self.assertTrue(SPEC["authorization_provenance"]["source_must_match_resource_mode_at_insert"])
         self.assertFalse(SPEC["authorization_provenance"]["historical_links_replace_current_entitlement_evaluation"])
         self.assertEqual(SPEC["native"]["linked_principal"], "users.id")
+        self.assertFalse(SPEC["native"]["pending_email_runtime_effective"])
+        self.assertEqual(SPEC["native"]["legacy_fallback"], "forbidden")
+        self.assertTrue(SPEC["authorization_provenance"]["lifecycle_source_must_match_current_resource_mode"])
+        self.assertEqual(SPEC["backup"]["native_authorization_writer"], "implemented")
+        self.assertEqual(SPEC["backup"]["native_admin_grant_writer"], "absent")
 
     def test_schemas_compile_and_validate_native_rows(self) -> None:
         for schema in (GRANT_SCHEMA, PROVENANCE_SCHEMA):

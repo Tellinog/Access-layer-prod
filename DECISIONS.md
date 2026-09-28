@@ -1,5 +1,13 @@
 # DECISIONS.md
 
+## D-050 - Evaluate native OAuth entitlement at each live protocol decision
+
+Status: accepted for Phase 9A.2
+
+Decision: select the entitlement evaluator solely from the current OAuth resource mode. The `legacy_bridge` branch retains frozen P0 semantics; the `native` branch requires exact current linked `users.id` grants for every canonical resource scope and active client allowance. Native callback issuance stores authorization source and exact grant-ID provenance atomically with the code. Exchange, refresh and online introspection must re-evaluate current native grants; provenance is historical audit evidence only. A live authorization whose source differs from the resource's current mode fails closed. Pending email never authorizes or links automatically. No legacy fallback, provider change, token claim change, native Admin writer or direct resource-mode UPDATE is introduced.
+
+Concurrency: native grant and registration reads use transaction-duration PostgreSQL SHARE locks in canonical scope order, alongside the existing code/refresh UPDATE locks. The effective time is sampled after grant locks. A grant mutation committed before evaluation is observed; a later mutation waits for issuance/rotation to complete. Native disabled-resource credentials may authenticate only to receive inactive introspection, while legacy disabled-resource credential behavior remains unchanged.
+
 ## D-049 - Native OAuth entitlement foundation after P0
 
 Status: accepted for Phase 9A.1 dark storage only

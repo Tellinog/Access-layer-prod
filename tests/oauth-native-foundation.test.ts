@@ -67,12 +67,13 @@ describe("Phase 9A.1 dark migration contract", () => {
     expect(migration).toContain("oauth_authorization_native_grant_pair_guard_trigger");
   });
 
-  it("leaves the authorization and token runtime modules on their existing bridge path", () => {
+  it("retains legacy bridge columns alongside the additive native runtime", () => {
     const flow = readFileSync(resolve(root, "src/oauth/flow-repository.ts"), "utf8");
     const token = readFileSync(resolve(root, "src/oauth/token-repository.ts"), "utf8");
     expect(flow).toContain("legacy_authorization_grant_id");
     expect(token).toContain("legacy_authorization_grant_id");
-    expect(flow + token).not.toContain("oauth_native_human_grants");
-    expect(flow + token).not.toContain("entitlement_source");
+    expect(flow + token).toContain("entitlement_source");
+    expect(flow).toContain("oauth_authorization_native_grants");
+    expect(token).toContain("resource.entitlement_mode");
   });
 });

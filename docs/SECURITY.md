@@ -1,6 +1,10 @@
 # SECURITY.md
 
-## Phase 9A.1 native entitlement security boundary
+## Phase 9A.2 native runtime security boundary
+
+Native OAuth entitlement is exact, linked to internal `users.id` and selected solely by resource mode. Pending email, legacy grants, tool bindings and legacy permission keys cannot authorize a native resource. Callback, exchange and refresh lock current native registration/grants for the decision transaction; online introspection rechecks current grants and returns only inactive on failure. Native grant IDs stay in relational historical provenance and never appear in protocol responses or audit logs. A source/mode mismatch fails closed. Disabled native resources may still authenticate their own introspection credential to receive `active:false`; legacy disabled-resource credential behavior is unchanged. No OAuth provider linking, new secret, production change or Admin native writer is introduced.
+
+## Phase 9A.1 native entitlement security boundary (historical foundation)
 
 Native grants are database-only in this phase and cannot authorize current traffic. Linked grants reference internal `users.id`; pending email is never proof of a cross-provider identity link. No wildcard/prefix scope matching or legacy permission conversion is allowed. Authorization source is checked against resource mode at insertion, and historical grant links cannot authorize future refresh/introspection without current re-evaluation. A future evaluator must reject pending, expired, revoked, outside-window and unlinked rows. Resource/scope, grant-provenance and user deletion are restricted to preserve history. The temporary Microsoft bridge remains legacy-only. No new secret or log field is introduced; see `OAUTH_NATIVE_ENTITLEMENTS.md`.
 

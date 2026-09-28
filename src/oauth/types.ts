@@ -2,6 +2,7 @@ export type OAuthRegistrationStatus = "draft" | "active" | "disabled";
 export type OAuthClientType = "confidential" | "public";
 export type OAuthTokenEndpointAuthMethod = "client_secret_basic" | "none";
 export type OAuthGrantType = "authorization_code" | "refresh_token";
+export type OAuthEntitlementMode = "legacy_bridge" | "native";
 
 export interface OAuthClientCredentialLifecycle {
   secretPresent: boolean;
@@ -82,6 +83,7 @@ export interface OAuthResourceRecord {
   resourceId: string;
   displayName: string;
   status: OAuthRegistrationStatus;
+  entitlementMode: OAuthEntitlementMode;
   ownerTeam: string;
   ownerContact: string | null;
   audiencePolicy: "exact_single_resource";
@@ -91,7 +93,7 @@ export interface OAuthResourceRecord {
 export interface OAuthResourceScopeMappingRecord {
   resourceId: string;
   scope: string;
-  legacyPermissionKey: string;
+  legacyPermissionKey: string | null;
 }
 
 export interface OAuthResourceCredentialMetadata {
@@ -143,12 +145,11 @@ export interface OAuthAuthorizationTransactionRecord {
   createdAt: Date;
 }
 
-export interface OAuthAuthorizationCodeIssuance {
+export type OAuthAuthorizationCodeIssuance = {
   transactionId: string;
   userId: string;
   oauthClientId: string;
   oauthResourceId: string;
-  legacyAuthorizationGrantId: string;
   grantedScopes: string[];
   redirectUri: string;
   codeChallenge: string;
@@ -156,4 +157,5 @@ export interface OAuthAuthorizationCodeIssuance {
   correlationId: string;
   issuedAt: Date;
   expiresAt: Date;
-}
+} & ({ entitlementSource: "legacy_bridge"; legacyAuthorizationGrantId: string; nativeGrants?: never }
+  | { entitlementSource: "native"; legacyAuthorizationGrantId: null; nativeGrants: Array<{ scope: string; grantId: string }> });

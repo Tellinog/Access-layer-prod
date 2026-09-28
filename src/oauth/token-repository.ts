@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import type { Db } from "../db.js";
 import type { OAuthSigningKeyPublicMetadata } from "./types.js";
 import type { OAuthSigningKeyRecord } from "./signing.js";
+import type { OAuthEntitlementMode } from "./types.js";
+import { evaluateNativeEntitlement } from "./native-entitlement.js";
 
 function stringArray(value: unknown): string[] {
   if (Array.isArray(value)) return value.map(String);
@@ -42,6 +44,8 @@ export interface OAuthAuthorizationCodeContext {
   oauthResourceId: string;
   resourceId: string;
   resourceStatus: string;
+  resourceEntitlementMode: OAuthEntitlementMode;
+  entitlementSource: OAuthEntitlementMode;
   audiencePolicy: string;
   userId: string;
   googleSub: string;
@@ -56,15 +60,8 @@ export interface OAuthAuthorizationCodeContext {
   expiresAt: Date;
   consumedAt: Date | null;
   authorizationStatus: string;
-  legacyAuthorizationGrantId: string;
-  grantToolId: string;
-  grantUserId: string | null;
-  grantEmailNormalized: string | null;
+  legacyAuthorizationGrantId: string | null;
   userEmailNormalized: string;
-  grantStatus: string;
-  grantValidFrom: Date;
-  grantValidUntil: Date | null;
-  grantPermissions: string[];
 }
 
 export interface OAuthRefreshContext {
@@ -91,19 +88,14 @@ export interface OAuthRefreshContext {
   oauthResourceId: string;
   resourceId: string;
   resourceStatus: string;
+  resourceEntitlementMode: OAuthEntitlementMode;
+  entitlementSource: OAuthEntitlementMode;
   audiencePolicy: string;
   userId: string;
   googleSub: string;
   userStatus: string;
   userEmailNormalized: string;
-  legacyAuthorizationGrantId: string;
-  grantToolId: string;
-  grantUserId: string | null;
-  grantEmailNormalized: string | null;
-  grantStatus: string;
-  grantValidFrom: Date;
-  grantValidUntil: Date | null;
-  grantPermissions: string[];
+  legacyAuthorizationGrantId: string | null;
   correlationId: string;
 }
 
@@ -112,11 +104,41 @@ export interface OAuthEntitlementMapping {
   legacyPermissionKey: string;
 }
 
+export interface OAuthLegacyGrantSnapshot {
+  toolId: string;
+  userId: string | null;
+  emailNormalized: string | null;
+  status: string;
+  validFrom: Date;
+  validUntil: Date | null;
+  permissions: string[];
+}
+
 export class OAuthTokenRepository {
   constructor(private readonly db: Db) {}
 
   async transaction<T>(fn: (repository: OAuthTokenRepository) => Promise<T>): Promise<T> {
     return this.db.transaction((db) => fn(new OAuthTokenRepository(db)));
+  }
+
+  async hasCurrentNativeEntitlement(input: {
+    userId: string; oauthClientId: string; oauthResourceId: string; scopes: string[]; now: Date;
+  }): Promise<boolean> {
+    return (await evaluateNativeEntitlement(this.db, input)).kind === "allowed";
+  }
+
+  async lockCurrentLegacyGrant(id: string): Promise<OAuthLegacyGrantSnapshot | null> {
+    const result = await this.db.query<Record<string, unknown>>(
+      `SELECT tool_id, user_id, email_normalized, status, valid_from, valid_until, permissions
+       FROM authorization_grants WHERE id = $1 FOR SHARE`, [id]
+    );
+    const row = result.rows[0];
+    return row ? {
+      toolId: String(row.tool_id), userId: row.user_id === null ? null : String(row.user_id),
+      emailNormalized: row.email_normalized === null ? null : String(row.email_normalized),
+      status: String(row.status), validFrom: row.valid_from as Date,
+      validUntil: (row.valid_until as Date | null) ?? null, permissions: stringArray(row.permissions)
+    } : null;
   }
 
   async lockClientForAuthentication(clientId: string): Promise<OAuthClientAuthenticationRecord | null> {
@@ -177,7 +199,7 @@ export class OAuthTokenRepository {
           AND (credential.activated_at IS NULL OR credential.activated_at <= $2)
           AND (credential.expires_at IS NULL OR credential.expires_at > $2)
           AND credential.retired_at IS NULL
-          AND resource.status = 'active'
+          AND (resource.status = 'active' OR resource.entitlement_mode = 'native')
         ORDER BY credential.created_at DESC, credential.id
         FOR SHARE OF credential, resource`, [credentialId, now]);
     return result.rows.map((row) => ({
@@ -203,17 +225,13 @@ export class OAuthTokenRepository {
       `SELECT code.id AS code_id, code.oauth_authorization_id, code.oauth_client_id,
               client.client_id, client.status AS client_status, client.grant_types AS client_grant_types,
               code.oauth_resource_id, resource.resource_id, resource.status AS resource_status,
-              resource.audience_policy, code.user_id, human.google_sub,
+              resource.audience_policy, resource.entitlement_mode, code.user_id, human.google_sub,
               human.email_normalized AS user_email_normalized, human.status AS user_status,
               code.redirect_uri, code.granted_scopes, code.code_challenge, code.code_challenge_method,
               code.correlation_id, code.issued_at, code.expires_at, code.consumed_at,
               oauth_authorization.status AS authorization_status,
               oauth_authorization.granted_scopes AS authorization_granted_scopes,
-              oauth_authorization.legacy_authorization_grant_id,
-              legacy_grant.tool_id AS grant_tool_id, legacy_grant.user_id AS grant_user_id,
-              legacy_grant.email_normalized AS grant_email_normalized,
-              legacy_grant.status AS grant_status, legacy_grant.valid_from AS grant_valid_from,
-              legacy_grant.valid_until AS grant_valid_until, legacy_grant.permissions AS grant_permissions
+              oauth_authorization.legacy_authorization_grant_id, oauth_authorization.entitlement_source
        FROM oauth_authorization_codes code
        JOIN oauth_authorizations oauth_authorization
          ON oauth_authorization.id = code.oauth_authorization_id
@@ -223,10 +241,9 @@ export class OAuthTokenRepository {
        JOIN oauth_clients client ON client.id = code.oauth_client_id
        JOIN oauth_resources resource ON resource.id = code.oauth_resource_id
        JOIN users human ON human.id = code.user_id
-       JOIN authorization_grants legacy_grant ON legacy_grant.id = oauth_authorization.legacy_authorization_grant_id
        WHERE code.code_hash = $1
        FOR UPDATE OF code
-       FOR SHARE OF oauth_authorization, client, resource, human, legacy_grant`,
+       FOR SHARE OF oauth_authorization, client, resource, human`,
       [codeHash]
     );
     const row = result.rows[0];
@@ -240,6 +257,8 @@ export class OAuthTokenRepository {
       oauthResourceId: String(row.oauth_resource_id),
       resourceId: String(row.resource_id),
       resourceStatus: String(row.resource_status),
+      resourceEntitlementMode: row.entitlement_mode as OAuthEntitlementMode,
+      entitlementSource: row.entitlement_source as OAuthEntitlementMode,
       audiencePolicy: String(row.audience_policy),
       userId: String(row.user_id),
       googleSub: String(row.google_sub),
@@ -254,15 +273,8 @@ export class OAuthTokenRepository {
       expiresAt: row.expires_at as Date,
       consumedAt: (row.consumed_at as Date | null) ?? null,
       authorizationStatus: String(row.authorization_status),
-      legacyAuthorizationGrantId: String(row.legacy_authorization_grant_id),
-      grantToolId: String(row.grant_tool_id),
-      grantUserId: row.grant_user_id === null ? null : String(row.grant_user_id),
-      grantEmailNormalized: row.grant_email_normalized === null ? null : String(row.grant_email_normalized),
-      userEmailNormalized: String(row.user_email_normalized),
-      grantStatus: String(row.grant_status),
-      grantValidFrom: row.grant_valid_from as Date,
-      grantValidUntil: (row.grant_valid_until as Date | null) ?? null,
-      grantPermissions: stringArray(row.grant_permissions)
+      legacyAuthorizationGrantId: row.legacy_authorization_grant_id === null ? null : String(row.legacy_authorization_grant_id),
+      userEmailNormalized: String(row.user_email_normalized)
     } : null;
   }
 
@@ -426,14 +438,10 @@ export class OAuthTokenRepository {
               client.id AS oauth_client_id, client.client_id, client.status AS client_status,
               client.grant_types AS client_grant_types,
               resource.id AS oauth_resource_id, resource.resource_id,
-              resource.status AS resource_status, resource.audience_policy,
+              resource.status AS resource_status, resource.audience_policy, resource.entitlement_mode,
               human.id AS user_id, human.google_sub, human.status AS user_status,
               human.email_normalized AS user_email_normalized,
-              oauth_authorization.legacy_authorization_grant_id,
-              legacy_grant.tool_id AS grant_tool_id, legacy_grant.user_id AS grant_user_id,
-              legacy_grant.email_normalized AS grant_email_normalized,
-              legacy_grant.status AS grant_status, legacy_grant.valid_from AS grant_valid_from,
-              legacy_grant.valid_until AS grant_valid_until, legacy_grant.permissions AS grant_permissions,
+              oauth_authorization.legacy_authorization_grant_id, oauth_authorization.entitlement_source,
               session.correlation_id
        FROM oauth_refresh_tokens token
        JOIN oauth_refresh_token_families family ON family.id = token.oauth_refresh_token_family_id
@@ -446,10 +454,9 @@ export class OAuthTokenRepository {
        JOIN oauth_clients client ON client.id = family.oauth_client_id
        JOIN oauth_resources resource ON resource.id = family.oauth_resource_id
        JOIN users human ON human.id = family.user_id
-       JOIN authorization_grants legacy_grant ON legacy_grant.id = oauth_authorization.legacy_authorization_grant_id
        WHERE token.token_hash = $1
        FOR UPDATE OF token, family, session
-       FOR SHARE OF oauth_authorization, client, resource, human, legacy_grant`,
+       FOR SHARE OF oauth_authorization, client, resource, human`,
       [tokenHash]
     );
     const row = result.rows[0];
@@ -467,14 +474,12 @@ export class OAuthTokenRepository {
       clientStatus: String(row.client_status), clientGrantTypes: stringArray(row.client_grant_types),
       oauthResourceId: String(row.oauth_resource_id), resourceId: String(row.resource_id),
       resourceStatus: String(row.resource_status), audiencePolicy: String(row.audience_policy),
+      resourceEntitlementMode: row.entitlement_mode as OAuthEntitlementMode,
+      entitlementSource: row.entitlement_source as OAuthEntitlementMode,
       userId: String(row.user_id), googleSub: String(row.google_sub), userStatus: String(row.user_status),
       userEmailNormalized: String(row.user_email_normalized),
-      legacyAuthorizationGrantId: String(row.legacy_authorization_grant_id), grantToolId: String(row.grant_tool_id),
-      grantUserId: row.grant_user_id === null ? null : String(row.grant_user_id),
-      grantEmailNormalized: row.grant_email_normalized === null ? null : String(row.grant_email_normalized),
-      grantStatus: String(row.grant_status), grantValidFrom: row.grant_valid_from as Date,
-      grantValidUntil: (row.grant_valid_until as Date | null) ?? null,
-      grantPermissions: stringArray(row.grant_permissions), correlationId: String(row.correlation_id)
+      legacyAuthorizationGrantId: row.legacy_authorization_grant_id === null ? null : String(row.legacy_authorization_grant_id),
+      correlationId: String(row.correlation_id)
     } : null;
   }
 
@@ -621,14 +626,14 @@ export class OAuthTokenRepository {
   }): Promise<boolean> {
     const result = await this.db.query<Record<string, unknown>>(
       `SELECT session.oauth_authorization_id, session.oauth_client_id, session.oauth_resource_id,
+              session.user_id, resource.entitlement_mode, oauth_authorization.entitlement_source,
               oauth_authorization.legacy_authorization_grant_id,
-              legacy_grant.tool_id AS grant_tool_id, legacy_grant.permissions AS grant_permissions
+              human.email_normalized AS user_email_normalized
        FROM oauth_sessions session
        JOIN oauth_authorizations oauth_authorization ON oauth_authorization.id = session.oauth_authorization_id
        JOIN oauth_clients client ON client.id = session.oauth_client_id
        JOIN oauth_resources resource ON resource.id = session.oauth_resource_id
        JOIN users human ON human.id = session.user_id
-       JOIN authorization_grants legacy_grant ON legacy_grant.id = oauth_authorization.legacy_authorization_grant_id
        WHERE session.id = $1 AND session.status = 'active' AND session.idle_expires_at > $6
          AND oauth_authorization.oauth_client_id = session.oauth_client_id
          AND oauth_authorization.oauth_resource_id = session.oauth_resource_id
@@ -636,26 +641,37 @@ export class OAuthTokenRepository {
          AND $7::text[] <@ oauth_authorization.granted_scopes
          AND oauth_authorization.status = 'active' AND client.status = 'active' AND client.client_id = $2
          AND resource.status = 'active' AND resource.resource_id = $3
+         AND oauth_authorization.entitlement_source = resource.entitlement_mode
          AND human.status = 'active' AND human.google_sub = $4
-         AND legacy_grant.status = 'active' AND legacy_grant.valid_from <= $6
-         AND (legacy_grant.valid_until IS NULL OR legacy_grant.valid_until > $6)
-         AND (legacy_grant.user_id = human.id OR legacy_grant.email_normalized = human.email_normalized)
          AND NOT EXISTS (
            SELECT 1 FROM oauth_revocations revocation
-           WHERE revocation.target_type = 'access_token_jti' AND revocation.target_id = $5
-             AND revocation.expires_at > $6
-         )`,
+            WHERE revocation.target_type = 'access_token_jti' AND revocation.target_id = $5
+              AND revocation.expires_at > $6
+          )
+        FOR SHARE OF session, oauth_authorization, client, resource, human`,
       [input.sessionId, input.clientId, input.resourceId, input.subject, input.jti, input.now, input.scopes]
     );
     const row = result.rows[0];
     if (!row) return false;
+    if (row.entitlement_mode === "native") {
+      if (row.legacy_authorization_grant_id !== null) return false;
+      return this.hasCurrentNativeEntitlement({
+        userId: String(row.user_id), oauthClientId: String(row.oauth_client_id),
+        oauthResourceId: String(row.oauth_resource_id), scopes: input.scopes, now: input.now
+      });
+    }
+    if (row.entitlement_mode !== "legacy_bridge" || row.legacy_authorization_grant_id === null) return false;
+    const grant = await this.lockCurrentLegacyGrant(String(row.legacy_authorization_grant_id));
+    if (!grant || grant.status !== "active" || grant.validFrom.getTime() > input.now.getTime() ||
+        (grant.validUntil !== null && grant.validUntil.getTime() <= input.now.getTime()) ||
+        !(grant.userId === row.user_id || grant.emailNormalized === row.user_email_normalized)) return false;
     const mappings = await this.lockCurrentEntitlementMappings(
-      String(row.oauth_client_id), String(row.oauth_resource_id), String(row.grant_tool_id), input.scopes
+      String(row.oauth_client_id), String(row.oauth_resource_id), grant.toolId, input.scopes
     );
     if (mappings.length !== input.scopes.length || new Set(mappings.map((mapping) => mapping.scope)).size !== input.scopes.length) {
       return false;
     }
-    const permissions = new Set(stringArray(row.grant_permissions));
+    const permissions = new Set(grant.permissions);
     return mappings.every((mapping) => permissions.has(mapping.legacyPermissionKey));
   }
 

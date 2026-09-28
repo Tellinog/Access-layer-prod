@@ -66,13 +66,16 @@ function Start-Step4BPostgres([string]$ContainerName, [string]$DatabaseName) {
 }
 
 try {
+  if ($env:DOCKER_HOST) { throw "Remote Docker host is forbidden" }
   if ($sourceName -eq $restoreName -or $sourceDatabase -eq $restoreDatabase) {
     throw "Source and restore targets must be distinct"
   }
   $dockerContext = (& docker context show).Trim()
-  if ($dockerContext -ne "desktop-linux") {
-    throw "Step4B requires the local Docker Desktop Linux context"
-  }
+  if ($LASTEXITCODE -ne 0) { throw "Docker context unavailable" }
+  $endpoint = (& docker context inspect $dockerContext --format '{{.Endpoints.docker.Host}}').Trim()
+  if ($LASTEXITCODE -ne 0 -or $endpoint -notmatch '^npipe:') { throw "Step4B requires a local Windows Docker daemon" }
+  $serverType = (& docker info --format '{{.OSType}}').Trim()
+  if ($LASTEXITCODE -ne 0 -or $serverType -ne 'linux') { throw "Linux Docker engine required" }
 
   $sourcePort = Start-Step4BPostgres $sourceName $sourceDatabase
   $restorePort = Start-Step4BPostgres $restoreName $restoreDatabase
@@ -108,6 +111,10 @@ try {
     $env:STEP4B_SOURCE_DATABASE_URL = $sourceUrl
     $env:STEP4B_RESTORE_DATABASE_URL = $restoreUrl
     $env:STEP4B_EXPECTED_COMMIT = $qualifiedCommit
+    $env:OAUTH_NATIVE_DISPOSABLE_PG_URL = $sourceUrl
+    $env:OAUTH_NATIVE_DISPOSABLE_PG_CONFIRM = 'yes'
+    & npm.cmd test -- tests/oauth-native-postgres.test.ts
+    if ($LASTEXITCODE -ne 0) { throw "Native foundation PostgreSQL assertions failed" }
     & (Join-Path $repoRoot "node_modules\.bin\tsx.cmd") (Join-Path $repoRoot "scripts\step4b\qualify.ts")
     if ($LASTEXITCODE -ne 0) { throw "Step4B qualification harness failed" }
   }
@@ -120,6 +127,8 @@ finally {
   Remove-Item Env:STEP4B_SOURCE_DATABASE_URL -ErrorAction SilentlyContinue
   Remove-Item Env:STEP4B_RESTORE_DATABASE_URL -ErrorAction SilentlyContinue
   Remove-Item Env:STEP4B_EXPECTED_COMMIT -ErrorAction SilentlyContinue
+  Remove-Item Env:OAUTH_NATIVE_DISPOSABLE_PG_URL -ErrorAction SilentlyContinue
+  Remove-Item Env:OAUTH_NATIVE_DISPOSABLE_PG_CONFIRM -ErrorAction SilentlyContinue
   foreach ($containerName in $started) {
     Assert-SyntheticTarget $containerName ($(if ($containerName -eq $sourceName) { $sourceDatabase } else { $restoreDatabase }))
     & docker rm --force $containerName 2>$null | Out-Null

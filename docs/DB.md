@@ -1,5 +1,9 @@
 # DB.md
 
+## Phase 9A.2 runtime qualification
+
+Migration 006 is unchanged and sufficient for native protocol issuance. The runtime writes native authorization source and exact historical grant links in the same transaction as the code and transaction completion. Current native entitlement is re-evaluated at exchange, refresh and introspection; persisted provenance cannot revive a revoked or expired grant. SHARE locks on registration/grants are held through code or refresh issuance, with PostgreSQL time sampled after grant locking; code/refresh UPDATE locks retain the Step 4B replay order. Encrypted full backup includes native mode, grants, source and provenance, and restore preserves native session/refresh lineage. Direct mode UPDATE remains blocked pending the controlled transition contract.
+
 ## Phase 9A.1 database extension
 
 Migration 006 adds dark OAuth native entitlement storage. Existing resources and authorizations receive `legacy_bridge` defaults without rewriting rows. The `oauth_native_human_grants` composite FK references a registered `oauth_resource_scopes` pair and restricts deletion; linked principal and actor FKs restrict `users` deletion. `oauth_authorization_native_grants` records durable many-to-many grant provenance with restrictive parent FKs. Authorization source must match resource mode at INSERT, while historical source remains immutable. Mode guards preserve legacy permission mappings and prohibit legacy bindings on native resources. See `OAUTH_NATIVE_ENTITLEMENTS.md` for grant lifecycle, backup, controlled transition target and rollback. Do not contract migration 006 while older binaries or rows may exist.

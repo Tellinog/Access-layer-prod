@@ -27,6 +27,7 @@ import {
   type OAuthAuthorizationCodeContext,
   type OAuthClientAuthenticationRecord,
   type OAuthEntitlementMapping,
+  type OAuthLegacyGrantSnapshot,
   type OAuthRefreshContext,
   type OAuthResourceAuthenticationRecord
 } from "../src/oauth/token-repository.js";
@@ -284,24 +285,29 @@ function codeContext(): OAuthAuthorizationCodeContext {
     codeId: "code-id", oauthAuthorizationId: authorizationId, oauthClientId, clientId,
     clientStatus: "active", clientGrantTypes: ["authorization_code", "refresh_token"],
     oauthResourceId, resourceId, resourceStatus: "active", audiencePolicy: "exact_single_resource",
+    resourceEntitlementMode: "legacy_bridge", entitlementSource: "legacy_bridge",
     userId, googleSub: "google-subject", userStatus: "active", redirectUri,
     grantedScopes: [...scopes], authorizationGrantedScopes: [...scopes],
     codeChallenge: challenge, codeChallengeMethod: "S256",
     correlationId: "correlation-code", issuedAt: fixedNow,
     expiresAt: new Date(fixedNow.getTime() + 60_000), consumedAt: null,
-    authorizationStatus: "active", legacyAuthorizationGrantId: grantId, grantToolId: toolId,
-    grantUserId: userId, grantEmailNormalized: "person@example.test", userEmailNormalized: "person@example.test",
-    grantStatus: "active", grantValidFrom: new Date(fixedNow.getTime() - 1_000), grantValidUntil: null,
-    grantPermissions: [...permissions]
+    authorizationStatus: "active", legacyAuthorizationGrantId: grantId,
+    userEmailNormalized: "person@example.test"
   };
 }
 
 class MemoryOAuthTokenRepository extends OAuthTokenRepository {
   private tail = Promise.resolve();
+  legacyGrant: OAuthLegacyGrantSnapshot = {
+    toolId, userId, emailNormalized: "person@example.test", status: "active",
+    validFrom: new Date(fixedNow.getTime() - 1_000), validUntil: null, permissions: [...permissions]
+  };
   clientCredentialHash = "";
   resourceCredentialHash = "";
   code = codeContext();
   mappings: OAuthEntitlementMapping[] = scopes.map((scope, index) => ({ scope, legacyPermissionKey: permissions[index] }));
+  nativeEntitled = true;
+  legacyMappingCalls = 0;
   refreshByHash = new Map<string, OAuthRefreshContext>();
   lastInitial: Record<string, unknown> | null = null;
   lastRotation: Record<string, unknown> | null = null;
@@ -346,13 +352,21 @@ class MemoryOAuthTokenRepository extends OAuthTokenRepository {
       authorizationGrantedScopes: [...this.code.authorizationGrantedScopes]
     } : null;
   }
+  override async lockCurrentLegacyGrant(value: string): Promise<OAuthLegacyGrantSnapshot | null> {
+    return value === grantId ? this.legacyGrant : null;
+  }
   override async lockCurrentEntitlementMappings(
     _oauthClientId: string,
     _oauthResourceId: string,
     _grantToolId: string,
     requestedScopes: string[]
   ): Promise<OAuthEntitlementMapping[]> {
+    this.legacyMappingCalls += 1;
     return this.mappings.filter((mapping) => requestedScopes.includes(mapping.scope));
+  }
+  override async hasCurrentNativeEntitlement(input: Parameters<OAuthTokenRepository["hasCurrentNativeEntitlement"]>[0]): Promise<boolean> {
+    return this.nativeEntitled && input.userId === userId && input.oauthResourceId === oauthResourceId &&
+      input.scopes.every((scope) => scopes.includes(scope));
   }
   override async listSignableKeysForUpdate(): Promise<OAuthSigningKeyRecord[]> { return [signingKey]; }
   override async listVerificationKeys(): Promise<OAuthSigningKeyPublicMetadata[]> { return [signingKey]; }
@@ -369,11 +383,11 @@ class MemoryOAuthTokenRepository extends OAuthTokenRepository {
       authorizationGrantedScopes: [...scopes],
       clientStatus: "active", clientGrantTypes: ["authorization_code", "refresh_token"], oauthResourceId,
       resourceId, resourceStatus: "active", audiencePolicy: "exact_single_resource", userId,
+      resourceEntitlementMode: input.context.resourceEntitlementMode,
+      entitlementSource: input.context.entitlementSource,
       googleSub: "google-subject", userStatus: "active", userEmailNormalized: "person@example.test",
-      legacyAuthorizationGrantId: grantId, grantToolId: toolId, grantUserId: userId,
-      grantEmailNormalized: "person@example.test", grantStatus: "active",
-      grantValidFrom: new Date(fixedNow.getTime() - 1_000), grantValidUntil: null,
-      grantPermissions: [...permissions], correlationId: "correlation-code"
+      legacyAuthorizationGrantId: input.context.legacyAuthorizationGrantId,
+      correlationId: "correlation-code"
     });
   }
   override async lockRefreshByHash(value: string): Promise<OAuthRefreshContext | null> {
@@ -597,6 +611,35 @@ describe("OAuth token-lifecycle service", () => {
     ]);
     expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
     expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+  });
+
+  it("exchanges and refreshes native authorizations only from current native grants", async () => {
+    const { repository, service } = await serviceFixture();
+    repository.code.entitlementSource = "native";
+    repository.code.resourceEntitlementMode = "native";
+    repository.code.legacyAuthorizationGrantId = null;
+    const issued = await service.exchangeAuthorizationCode({
+      code: "raw-code", clientId, clientSecret, redirectUri, resource: resourceId, codeVerifier: verifier
+    });
+    expect(repository.legacyMappingCalls).toBe(0);
+    const refreshed = await service.refresh({
+      refreshToken: issued.refreshToken, clientId, clientSecret, resource: resourceId, scope: scopes[0]
+    });
+    expect(refreshed.scope).toBe(scopes[0]);
+    expect(repository.legacyMappingCalls).toBe(0);
+    repository.nativeEntitled = false;
+    await expect(service.refresh({
+      refreshToken: refreshed.refreshToken, clientId, clientSecret, resource: resourceId
+    })).rejects.toMatchObject({ code: "invalid_grant" });
+  });
+
+  it("fails closed on native source and resource-mode disagreement", async () => {
+    const { repository, service } = await serviceFixture();
+    repository.code.entitlementSource = "native";
+    await expect(service.exchangeAuthorizationCode({
+      code: "raw-code", clientId, clientSecret, redirectUri, resource: resourceId, codeVerifier: verifier
+    })).rejects.toMatchObject({ code: "invalid_grant" });
+    expect(repository.legacyMappingCalls).toBe(0);
   });
 
   it("rotates with exact lineage, monotonic scope narrowing and an exact 28,800-second idle slide", async () => {
@@ -877,8 +920,9 @@ describe("OAuth token-lifecycle service", () => {
 describe("repository race and secrecy SQL", () => {
   it("uses row locks, compare-and-set consumption, atomic audit and OAuth-only tables", () => {
     const source = readFileSync(resolve("src/oauth/token-repository.ts"), "utf8");
-    expect(source).toContain("FOR UPDATE OF code\n       FOR SHARE OF oauth_authorization, client, resource, human, legacy_grant");
-    expect(source).toContain("FOR UPDATE OF token, family, session\n       FOR SHARE OF oauth_authorization, client, resource, human, legacy_grant");
+    expect(source).toContain("FOR UPDATE OF code\n       FOR SHARE OF oauth_authorization, client, resource, human");
+    expect(source).toContain("FOR UPDATE OF token, family, session\n       FOR SHARE OF oauth_authorization, client, resource, human");
+    expect(source).toContain("FROM authorization_grants WHERE id = $1 FOR SHARE");
     expect(source).not.toContain("FOR UPDATE OF code, oauth_authorization");
     expect(source).not.toContain("FOR UPDATE OF token, family, session, oauth_authorization");
     expect(source).toContain("consumed_at IS NULL AND expires_at > $2");

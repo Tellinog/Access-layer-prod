@@ -90,11 +90,12 @@ export class OAuthFoundationRepository {
       resource_id: string;
       display_name: string;
       status: OAuthResourceRecord["status"];
+      entitlement_mode: OAuthResourceRecord["entitlementMode"];
       owner_team: string;
       owner_contact: string | null;
       audience_policy: OAuthResourceRecord["audiencePolicy"];
       protected_resource_metadata_url: string;
-    }>(`SELECT id, resource_id, display_name, status, owner_team, owner_contact,
+    }>(`SELECT id, resource_id, display_name, status, entitlement_mode, owner_team, owner_contact,
                audience_policy, protected_resource_metadata_url
         FROM oauth_resources
         WHERE resource_id = $1`, [resourceId]);
@@ -104,6 +105,7 @@ export class OAuthFoundationRepository {
       resourceId: row.resource_id,
       displayName: row.display_name,
       status: row.status,
+      entitlementMode: row.entitlement_mode,
       ownerTeam: row.owner_team,
       ownerContact: row.owner_contact,
       audiencePolicy: row.audience_policy,
@@ -117,11 +119,12 @@ export class OAuthFoundationRepository {
       resource_id: string;
       display_name: string;
       status: OAuthResourceRecord["status"];
+      entitlement_mode: OAuthResourceRecord["entitlementMode"];
       owner_team: string;
       owner_contact: string | null;
       audience_policy: OAuthResourceRecord["audiencePolicy"];
       protected_resource_metadata_url: string;
-    }>(`SELECT id, resource_id, display_name, status, owner_team, owner_contact,
+    }>(`SELECT id, resource_id, display_name, status, entitlement_mode, owner_team, owner_contact,
                audience_policy, protected_resource_metadata_url
         FROM oauth_resources
         WHERE id = $1`, [id]);
@@ -131,6 +134,7 @@ export class OAuthFoundationRepository {
       resourceId: row.resource_id,
       displayName: row.display_name,
       status: row.status,
+      entitlementMode: row.entitlement_mode,
       ownerTeam: row.owner_team,
       ownerContact: row.owner_contact,
       audiencePolicy: row.audience_policy,
@@ -164,7 +168,7 @@ export class OAuthFoundationRepository {
     const result = await this.db.query<{
       resource_id: string;
       scope: string;
-      legacy_permission_key: string;
+      legacy_permission_key: string | null;
     }>(`SELECT r.resource_id, s.scope, rs.legacy_permission_key
         FROM oauth_resource_scopes rs
         JOIN oauth_resources r ON r.id = rs.oauth_resource_id

@@ -6,9 +6,10 @@ import { randomToken, sha256 } from "../security.js";
 import type { Config, GoogleIdentity, User } from "../types.js";
 import { normalizeEmail } from "../validation.js";
 import type { OAuthUpstreamGoogleClient } from "./google.js";
-import type { OAuthAuthorizationFlowRepository } from "./flow-repository.js";
+import { NativeEntitlementUnavailable, type OAuthAuthorizationFlowRepository } from "./flow-repository.js";
 import type { OAuthFoundationRepository } from "./repository.js";
 import type { OAuthAuthorizationTransactionRecord } from "./types.js";
+import { evaluateNativeEntitlement } from "./native-entitlement.js";
 import {
   protectOAuthDownstreamState,
   unprotectOAuthDownstreamState
@@ -19,6 +20,10 @@ export const OAUTH_AUTHORIZATION_TRANSACTION_TTL_MS = 600_000;
 export const OAUTH_AUTHORIZATION_CODE_TTL_MS = 60_000;
 const PKCE_S256_CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
 const SCOPE_LIST = /^[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}(?: [a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62}:[a-z][a-z0-9-]{1,62})*$/;
+
+class NativeAuthorizationDenied extends Error {
+  constructor(readonly code: "invalid_scope" | "access_denied") { super(code); }
+}
 
 export type OAuthAuthorizationError =
   | "invalid_request"
@@ -111,7 +116,7 @@ async function auditDenied(
   });
 }
 
-async function upsertAndLinkVerifiedIdentity(repositories: Repositories, identity: GoogleIdentity): Promise<User> {
+async function upsertAndLinkVerifiedIdentity(repositories: Repositories, identity: GoogleIdentity, linkLegacyPending = true): Promise<User> {
   return repositories.db.transaction(async (db) => {
     const tx = repositories.withDb(db);
     const user = await tx.upsertUser({
@@ -123,7 +128,7 @@ async function upsertAndLinkVerifiedIdentity(repositories: Repositories, identit
       displayName: identity.displayName,
       pictureUrl: identity.pictureUrl
     });
-    await tx.linkPendingEmailGrants(user);
+    if (linkLegacyPending) await tx.linkPendingEmailGrants(user);
     return user;
   });
 }
@@ -351,9 +356,19 @@ export class OAuthAuthorizationService {
       return denyRedirect("access_denied");
     }
 
+    let resourceAtIdentity;
+    try {
+      resourceAtIdentity = await this.deps.foundation.resolveResourceById(transaction.oauthResourceId);
+    } catch {
+      return denyRedirect("temporarily_unavailable");
+    }
+    if (!resourceAtIdentity || !["legacy_bridge", "native"].includes(resourceAtIdentity.entitlementMode)) {
+      return denyRedirect("invalid_target");
+    }
     let user: User;
     try {
-      user = await upsertAndLinkVerifiedIdentity(this.deps.legacy, identity);
+      user = await upsertAndLinkVerifiedIdentity(this.deps.legacy, identity,
+        resourceAtIdentity.entitlementMode === "legacy_bridge");
     } catch {
       return denyRedirect("server_error");
     }
@@ -390,39 +405,44 @@ export class OAuthAuthorizationService {
     } catch {
       return denyRedirect("temporarily_unavailable", identifiers);
     }
-    let entitlement;
-    let mappings;
-    try {
-      [entitlement, mappings] = await Promise.all([
-        this.deps.foundation.resolveActiveLegacyEntitlement(resource.id),
-        this.deps.foundation.resolveResourceScopeMappings(resource.id)
-      ]);
-    } catch {
-      return denyRedirect("temporarily_unavailable", identifiers);
-    }
-    if (!entitlement) return denyRedirect("invalid_scope", identifiers);
-    const mappingsByScope = new Map(mappings.map((mapping) => [mapping.scope, mapping]));
-    if (mappingsByScope.size !== mappings.length) return denyRedirect("invalid_scope", identifiers);
-    const registeredPermissions = new Set(entitlement.registeredPermissionKeys);
-    const requiredPermissions: string[] = [];
-    for (const scope of transaction.requestedScopes) {
-      const mapping = mappingsByScope.get(scope);
-      if (!mapping || mapping.resourceId !== resource.resourceId || !registeredPermissions.has(mapping.legacyPermissionKey)) {
-        return denyRedirect("invalid_scope", identifiers);
+    let legacyGrantId: string | null = null;
+    if (resource.entitlementMode === "legacy_bridge") {
+      let entitlement;
+      let mappings;
+      try {
+        [entitlement, mappings] = await Promise.all([
+          this.deps.foundation.resolveActiveLegacyEntitlement(resource.id),
+          this.deps.foundation.resolveResourceScopeMappings(resource.id)
+        ]);
+      } catch {
+        return denyRedirect("temporarily_unavailable", identifiers);
       }
-      requiredPermissions.push(mapping.legacyPermissionKey);
-    }
-    let grant;
-    try {
-      grant = await this.deps.legacy.findActiveGrant(
-        entitlement.legacyToolId,
-        user.id,
-        user.email_normalized
-      );
-    } catch {
-      return denyRedirect("temporarily_unavailable", identifiers);
-    }
-    if (!grant || requiredPermissions.some((permission) => !grant.permissions.includes(permission))) {
+      if (!entitlement) return denyRedirect("invalid_scope", identifiers);
+      const mappingsByScope = new Map(mappings.map((mapping) => [mapping.scope, mapping]));
+      if (mappingsByScope.size !== mappings.length) return denyRedirect("invalid_scope", identifiers);
+      const registeredPermissions = new Set(entitlement.registeredPermissionKeys);
+      const requiredPermissions: string[] = [];
+      for (const scope of transaction.requestedScopes) {
+        const mapping = mappingsByScope.get(scope);
+        if (!mapping || mapping.resourceId !== resource.resourceId ||
+            !mapping.legacyPermissionKey || !registeredPermissions.has(mapping.legacyPermissionKey)) {
+          return denyRedirect("invalid_scope", identifiers);
+        }
+        requiredPermissions.push(mapping.legacyPermissionKey);
+      }
+      let grant;
+      try {
+        grant = await this.deps.legacy.findActiveGrant(
+          entitlement.legacyToolId, user.id, user.email_normalized
+        );
+      } catch {
+        return denyRedirect("temporarily_unavailable", identifiers);
+      }
+      if (!grant || requiredPermissions.some((permission) => !grant.permissions.includes(permission))) {
+        return denyRedirect("access_denied", identifiers);
+      }
+      legacyGrantId = grant.id;
+    } else if (resource.entitlementMode !== "native") {
       return denyRedirect("access_denied", identifiers);
     }
 
@@ -430,12 +450,22 @@ export class OAuthAuthorizationService {
     const issuedAt = (this.deps.now ?? (() => new Date()))();
     try {
       await this.deps.legacy.db.transaction(async (db) => {
+        const nativeDecision = resource.entitlementMode === "native"
+          ? await evaluateNativeEntitlement(db, {
+            userId: user.id, oauthClientId: client.id, oauthResourceId: resource.id,
+            scopes: transaction.requestedScopes, now: issuedAt
+          }) : null;
+        if (nativeDecision && nativeDecision.kind !== "allowed") {
+          throw new NativeAuthorizationDenied(nativeDecision.kind === "invalid_scope" ? "invalid_scope" : "access_denied");
+        }
         await this.deps.flow.withDb(db).issueAuthorizationCode({
           transactionId: transaction.id,
           userId: user.id,
           oauthClientId: client.id,
           oauthResourceId: resource.id,
-          legacyAuthorizationGrantId: grant.id,
+          ...(nativeDecision?.kind === "allowed"
+            ? { entitlementSource: "native" as const, legacyAuthorizationGrantId: null, nativeGrants: nativeDecision.grants }
+            : { entitlementSource: "legacy_bridge" as const, legacyAuthorizationGrantId: legacyGrantId! }),
           grantedScopes: transaction.requestedScopes,
           redirectUri: transaction.redirectUri,
           codeChallenge: transaction.codeChallenge,
@@ -462,8 +492,10 @@ export class OAuthAuthorizationService {
           metadata: safeAuditMetadata(client.clientId, resource.resourceId, transaction.requestedScopes)
         });
       });
-    } catch {
-      return denyRedirect("temporarily_unavailable", identifiers);
+    } catch (error) {
+      const nativeReason = error instanceof NativeEntitlementUnavailable
+        ? (error.kind === "invalid_scope" ? "invalid_scope" : "access_denied") : null;
+      return denyRedirect(error instanceof NativeAuthorizationDenied ? error.code : nativeReason ?? "temporarily_unavailable", identifiers);
     }
     return {
       kind: "redirect",

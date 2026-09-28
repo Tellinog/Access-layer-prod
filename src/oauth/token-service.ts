@@ -91,13 +91,6 @@ function isScopeSubset(subset: readonly string[], superset: readonly string[]): 
   return validScopeSet(subset) && validScopeSet(superset) && subset.every((scope) => superset.includes(scope));
 }
 
-function grantCurrentlyMatches(context: OAuthAuthorizationCodeContext | OAuthRefreshContext, now: Date): boolean {
-  const userMatches = context.grantUserId === context.userId || context.grantEmailNormalized === context.userEmailNormalized;
-  return context.grantStatus === "active" && userMatches &&
-    context.grantValidFrom.getTime() <= now.getTime() &&
-    (context.grantValidUntil === null || context.grantValidUntil.getTime() > now.getTime());
-}
-
 async function exactCurrentEntitlement(
   repository: OAuthTokenRepository,
   context: OAuthAuthorizationCodeContext | OAuthRefreshContext,
@@ -107,17 +100,31 @@ async function exactCurrentEntitlement(
   if (
     context.clientStatus !== "active" || context.resourceStatus !== "active" ||
     context.audiencePolicy !== "exact_single_resource" || context.userStatus !== "active" ||
-    context.authorizationStatus !== "active" || !grantCurrentlyMatches(context, now) ||
+    context.authorizationStatus !== "active" ||
+    context.entitlementSource !== context.resourceEntitlementMode ||
     scopes.length === 0 || new Set(scopes).size !== scopes.length ||
     scopes.some((scope) => !isCanonicalOAuthScope(scope))
   ) return false;
+  if (context.entitlementSource === "native") {
+    if (context.legacyAuthorizationGrantId !== null) return false;
+    return repository.hasCurrentNativeEntitlement({
+      userId: context.userId, oauthClientId: context.oauthClientId,
+      oauthResourceId: context.oauthResourceId, scopes, now
+    });
+  }
+  if (context.entitlementSource !== "legacy_bridge" || !context.legacyAuthorizationGrantId) return false;
+  const grant = await repository.lockCurrentLegacyGrant(context.legacyAuthorizationGrantId);
+  if (!grant || grant.status !== "active" ||
+      !(grant.userId === context.userId || grant.emailNormalized === context.userEmailNormalized) ||
+      grant.validFrom.getTime() > now.getTime() ||
+      (grant.validUntil !== null && grant.validUntil.getTime() <= now.getTime())) return false;
   const mappings = await repository.lockCurrentEntitlementMappings(
-    context.oauthClientId, context.oauthResourceId, context.grantToolId, scopes
+    context.oauthClientId, context.oauthResourceId, grant.toolId, scopes
   );
   if (mappings.length !== scopes.length || new Set(mappings.map((mapping) => mapping.scope)).size !== scopes.length) {
     return false;
   }
-  const permissions = new Set(context.grantPermissions);
+  const permissions = new Set(grant.permissions);
   return mappings.every((mapping) => permissions.has(mapping.legacyPermissionKey));
 }
 

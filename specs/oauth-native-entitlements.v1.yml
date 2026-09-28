@@ -1,8 +1,8 @@
 schema_version: 1
-phase: 9A.1
-status: dark_data_foundation
+phase: 9A.2
+status: native_runtime_implemented_admin_writer_deferred
 p0_profile: frozen_legacy_bridge_compatibility
-runtime_evaluation: disabled
+runtime_evaluation: mode_selected_exact_current_entitlement
 upstream_identity_provider: google_only
 resource_entitlement_modes: [legacy_bridge, native]
 existing_resource_default: legacy_bridge
@@ -30,6 +30,13 @@ native:
   pending_email_target: allowed_without_user_link
   automatic_cross_provider_email_linking: forbidden
   effective_grant_requires: [active_status, linked_user_id, active_user_resource_and_scope, valid_from_reached, valid_until_not_reached, unrevoked]
+  pending_email_runtime_effective: false
+  evaluation_points: [google_callback, authorization_code_exchange, refresh, online_introspection]
+  client_resource_scope_allowance_active: required
+  all_requested_scopes: required_no_reduction
+  legacy_fallback: forbidden
+  entitlement_read_lock: share_through_issuance_or_rotation_transaction
+  authorization_provenance_links: exact_one_grant_per_granted_scope_same_transaction_as_code
   duplicate_active_linked_grant: forbidden
   duplicate_pending_email_target: forbidden
   resource_scope_and_linked_principal_mutability: immutable
@@ -49,8 +56,13 @@ authorization_provenance:
   future_writer_must_verify_current_grant_before_linking: true
   linked_grant_delete_policy: restrict
   historical_links_replace_current_entitlement_evaluation: false
+  lifecycle_source_must_match_current_resource_mode: true
+  code_exchange_and_refresh_current_grant_failure: invalid_grant
+  introspection_current_grant_failure: active_false
+  disabled_native_resource_introspection: authenticated_resource_credential_receives_active_false
 backup:
   encrypted_export_and_import_includes_native_grants_and_provenance: true
   pre_9A_1_complete_oauth_backup_import: supported_with_empty_native_sections
-  native_runtime_writer: absent
-deferred: [native_grant_evaluation, native_grant_admin_api_ui, multi_provider_oauth, entra_oauth, automatic_provider_account_linking]
+  native_authorization_writer: implemented
+  native_admin_grant_writer: absent
+deferred: [native_grant_admin_api_ui, pending_email_link_operation, resource_mode_transition, multi_provider_oauth, entra_oauth, automatic_provider_account_linking]

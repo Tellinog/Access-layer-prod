@@ -1,5 +1,11 @@
 # DEVLOG.md
 
+## 2026-09-28 — Phase 9A.2 native OAuth entitlement runtime
+
+Implemented resource-mode dispatch for Google callback, code exchange, refresh and online introspection. Native decisions use exact active linked `users.id` grants and current client/resource/scope allowance with no legacy-tool or authorization-grant fallback. Authorization source and exact per-scope grant-ID provenance are persisted atomically with the code; lifecycle decisions re-evaluate current grants. The legacy P0 branch and external OAuth token/response shapes remain supported. Native Admin/API, pending-email linking, Microsoft OAuth and resource-mode transitions remain deferred.
+
+Extended the guarded Step 4B PostgreSQL 16 qualifier to migration 006 and synthetic native HTTP/backup/restore checks while retaining the established eight refresh replay races and legacy flow. No migration, production access, deployment, Nancy onboarding or feature-flag change was made. Final clean-commit check results are reported in the task handoff.
+
 ## 2026-09-28 — Phase 9A.1 native OAuth entitlement dark foundation
 
 Added migration 006 for resource entitlement mode, canonical scopes without a legacy mapping on native resources, native per-human resource/scope grants, authorization source/resource-mode insertion integrity, and normalized historical authorization-to-grant provenance. Existing resource/authorization rows default to `legacy_bridge`; no OAuth handler, Admin writer, Google adapter, legacy bridge, or production state changed. Expanded encrypted backup export/import and documented the controlled in-place transition target.

@@ -1,5 +1,9 @@
 # Proposed additive OAuth data model
 
+## Phase 9A.2 runtime use of migration 006
+
+No new migration is needed. The resource's current `entitlement_mode` selects the P0 bridge or the native evaluator. Native authorization issuance writes `entitlement_source='native'`, null legacy grant FK and exact `oauth_authorization_native_grants` links in the code transaction. Exchange, refresh and online introspection use current linked native grants and active resource/scope/client allowance, never historical provenance as current truth. The P0 bridge remains supported; the detailed 9A.1 schema below remains its historical foundation description. Native Admin writes remain deferred to 9A.3.
+
 Status: Step 3A foundation, Step 3C authorization issuance, Step 3D token lifecycle, Step 3E strict default-off HTTP mounting and D-047 controlled administration implemented. Phase 9A.1 adds dark migration 006.
 
 ## Phase 9A.1 additive extension

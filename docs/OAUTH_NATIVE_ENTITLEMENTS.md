@@ -1,6 +1,18 @@
-# Phase 9A.1 OAuth native entitlements
+# OAuth native entitlements after Phase 9A.2
 
-Status: **dark data foundation**. The frozen OAuth P0 contract in `OAUTH_P0_CONTRACT.md` and `specs/oauth-p0.v1.yml` still defines current authorization and token behavior. No native grant is evaluated, created through Admin/runtime, or issued into an authorization in this phase.
+Status: **native protocol runtime implemented; native Admin writer/UI deferred**. Phase 9A.1 supplied migration 006. Phase 9A.2 uses it without a new migration. The frozen OAuth P0 contract in `OAUTH_P0_CONTRACT.md` and `specs/oauth-p0.v1.yml` remains the supported `legacy_bridge` compatibility profile. Native resources are available to controlled SQL fixtures; `/admin/oauth` still creates legacy-bridge resources only.
+
+## Phase 9A.2 runtime decision
+
+The current resource `entitlement_mode` selects exactly one evaluator. `legacy_bridge` retains the P0 binding, explicit legacy permission mapping and legacy grant logic. `native` requires an active internal `users.id`, active resource/client, active canonical scope registration and exact client/resource/scope allowance for **every** requested scope. Each scope must have one linked, active, unrevoked `oauth_native_human_grants` row within `[valid_from, valid_until)`. Pending-email rows do not authorize and are never linked by the OAuth native callback. Unknown source/mode state fails closed; no branch falls back to the other.
+
+The native callback rechecks registration and linked grants in the code issuance transaction. It writes `entitlement_source='native'`, a null legacy grant ID, one exact historical grant link per granted scope, the code row and transaction completion atomically. The writer independently repeats the current grant check and rejects duplicate/missing/mismatched provenance. P0 writes remain `legacy_bridge` with no native links.
+
+Code exchange and refresh compare the authorization source with the current resource mode and re-evaluate current entitlement for the resulting scopes. A revoked, expired, pending, wrong-user or disabled grant yields `invalid_grant`; malformed/disallowed refresh narrowing retains `invalid_scope`. Online introspection also re-evaluates current entitlement and reports only `{"active":false}` on failure. Historical native provenance is audit evidence, never ongoing authorization truth. The local JWT still follows the frozen Google `sub` contract and may remain cryptographically valid until expiry; online introspection is the current-entitlement check.
+
+Native evaluation takes PostgreSQL `FOR SHARE` locks on active client/resource/user, registration/allowance/scope and linked grant rows in canonical scope order. Code exchange and refresh retain their existing `FOR UPDATE` locks only on code or refresh family/session rows. Grant mutation waits for a transaction that has selected an effective grant; a mutation committed first is observed by the evaluator. Time is sampled after the grant locks using the later of the request clock and PostgreSQL clock. This defines the entitlement decision instant without broad table locks. Refresh replay retains the Step 4B atomic family/session revocation path.
+
+Resource credentials for disabled native resources remain usable only to obtain inactive introspection; legacy disabled-resource credential behavior stays as P0. Native resource creation, grant mutation, explicit pending-email linking and controlled in-place resource transition remain deferred. Google is the only OAuth vNext upstream provider; the legacy Microsoft bridge is unchanged.
 
 ## Model
 

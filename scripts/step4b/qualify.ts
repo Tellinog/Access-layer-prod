@@ -12,6 +12,7 @@ import type { GoogleOidcClient } from "../../src/google.js";
 import { OAuthAuthorizationFlowRepository } from "../../src/oauth/flow-repository.js";
 import type { OAuthUpstreamGoogleClient } from "../../src/oauth/google.js";
 import { OAuthFoundationRepository } from "../../src/oauth/repository.js";
+import { evaluateNativeEntitlement } from "../../src/oauth/native-entitlement.js";
 import { OAuthTokenRepository } from "../../src/oauth/token-repository.js";
 import { OAuthTokenLifecycleService } from "../../src/oauth/token-service.js";
 import {
@@ -37,7 +38,8 @@ const EXPECTED_MIGRATIONS = [
   ["002_audit_tool_delete_fk.sql", "ab33b34abb01fa606eeafc9eab3d7dcfdafbc9429bd67bee6a64c35851638b22"],
   ["003_oauth_dark_foundation.sql", "96b3993fcfdb930597cbdeca37e86d51df486fd9e951970d156a21c454f18efe"],
   ["004_oauth_authorization_code_flow.sql", "407b0fe9b3c9e053e22fac7e9640e0b4d02fe341ea6b3e7f05bb32eeaa8efede"],
-  ["005_oauth_token_lifecycle.sql", "aaffcb469000f62e680b5d391360fdacc4414e4280ba230e90e7fd4eee4dafbe"]
+  ["005_oauth_token_lifecycle.sql", "aaffcb469000f62e680b5d391360fdacc4414e4280ba230e90e7fd4eee4dafbe"],
+  ["006_oauth_native_entitlements_dark.sql", "6ceef335031a02ca1f74e7bae187f0eeb790afa62a28db0972ab9a762d9d19ed"]
 ] as const;
 
 const IDS = {
@@ -68,6 +70,13 @@ const RESOURCE_SECRET = `step4b_resource_${randomBytes(24).toString("base64url")
 const REDIRECT_URI = "https://step4b-client.invalid/callback";
 const LEGACY_RETURN_URI = "https://step4b-legacy.invalid/callback";
 const SCOPE = "step4b:records:read";
+const NATIVE_RESOURCE_ID = "https://step4b-native.invalid/v1";
+const NATIVE_RESOURCE_CREDENTIAL_ID = "step4b-native-resource";
+const NATIVE_RESOURCE_SECRET = `step4b_native_resource_${randomBytes(24).toString("base64url")}`;
+const NATIVE_SCOPES = ["step4b:native:read", "step4b:native:write"];
+const NATIVE_RESOURCE_UUID = "10000000-0000-4000-8000-000000000020";
+const NATIVE_SCOPE_IDS = ["10000000-0000-4000-8000-000000000021", "10000000-0000-4000-8000-000000000022"];
+const NATIVE_GRANT_IDS = ["10000000-0000-4000-8000-000000000023", "10000000-0000-4000-8000-000000000024"];
 const PERMISSION = "step4b:records:read";
 const BACKUP_API_TOKEN = `step4b_backup_api_${randomBytes(32).toString("base64url")}`;
 const BACKUP_KEY = `step4b_backup_key_${randomBytes(32).toString("base64url")}`;
@@ -384,7 +393,7 @@ async function migrationEvidence(db: PostgresDb) {
   );
   assert(Number(version.rows[0].version_num) >= 160000 && Number(version.rows[0].version_num) < 170000, "server must be PostgreSQL 16");
   const applied = await db.query<{ filename: string }>("SELECT filename FROM schema_migrations ORDER BY filename");
-  assert(stable(applied.rows.map((row) => row.filename)) === stable(EXPECTED_MIGRATIONS.map(([name]) => name)), "migrations 001-005 must be the only applied migrations");
+  assert(stable(applied.rows.map((row) => row.filename)) === stable(EXPECTED_MIGRATIONS.map(([name]) => name)), "migrations 001-006 must be the only applied migrations");
   return { serverVersion: version.rows[0].server_version, applied: applied.rows.map((row) => row.filename) };
 }
 
@@ -398,6 +407,7 @@ async function verifyMigrationFiles() {
 async function seedSource(db: PostgresDb, privateKeyRef: string, publicJwk: Record<string, unknown>, publicFingerprint: string) {
   const clientHash = await hashOAuthCredentialSecret(CLIENT_SECRET, OAUTH_PEPPER);
   const resourceHash = await hashOAuthCredentialSecret(RESOURCE_SECRET, OAUTH_PEPPER);
+  const nativeResourceHash = await hashOAuthCredentialSecret(NATIVE_RESOURCE_SECRET, OAUTH_PEPPER);
   const toolHash = await hashToolSecret(LEGACY_TOOL_CLIENT_SECRET, TOOL_PEPPER);
   await db.transaction(async (tx) => {
     await tx.query(`INSERT INTO users (id, google_sub, email, email_normalized, email_verified, hd, display_name, status)
@@ -430,6 +440,29 @@ async function seedSource(db: PostgresDb, privateKeyRef: string, publicJwk: Reco
         status, published_at, activates_at
       ) VALUES ($1,'step4b-oauth-key',$2::jsonb,$3,$4,'active',now() - interval '10 minutes',now() - interval '5 minutes')`,
       [IDS.oauthSigningKey, JSON.stringify(publicJwk), publicFingerprint, privateKeyRef]);
+    await tx.query(`INSERT INTO oauth_resources
+      (id, resource_id, display_name, status, owner_team, protected_resource_metadata_url, entitlement_mode)
+      VALUES ($1,$2,'Synthetic native resource','active','step4b',
+        'https://step4b-native.invalid/.well-known/oauth-protected-resource','native')`,
+      [NATIVE_RESOURCE_UUID, NATIVE_RESOURCE_ID]);
+    await tx.query(`INSERT INTO oauth_resource_credentials
+      (oauth_resource_id, credential_id, secret_hash, status, activated_at)
+      VALUES ($1,$2,$3,'active',now())`,
+      [NATIVE_RESOURCE_UUID, NATIVE_RESOURCE_CREDENTIAL_ID, nativeResourceHash]);
+    for (let index = 0; index < NATIVE_SCOPES.length; index += 1) {
+      await tx.query(`INSERT INTO oauth_scopes (id, scope, description, status)
+        VALUES ($1,$2,'Synthetic native scope','active')`, [NATIVE_SCOPE_IDS[index], NATIVE_SCOPES[index]]);
+      await tx.query(`INSERT INTO oauth_resource_scopes
+        (oauth_resource_id, oauth_scope_id, legacy_permission_key, status)
+        VALUES ($1,$2,NULL,'active')`, [NATIVE_RESOURCE_UUID, NATIVE_SCOPE_IDS[index]]);
+      await tx.query(`INSERT INTO oauth_client_resource_scopes
+        (oauth_client_id, oauth_resource_id, oauth_scope_id, status)
+        VALUES ($1,$2,$3,'active')`, [IDS.oauthClient, NATIVE_RESOURCE_UUID, NATIVE_SCOPE_IDS[index]]);
+      await tx.query(`INSERT INTO oauth_native_human_grants
+        (id, oauth_resource_id, oauth_scope_id, user_id, status, valid_from)
+        VALUES ($1,$2,$3,$4,'active',now() - interval '1 minute')`,
+        [NATIVE_GRANT_IDS[index], NATIVE_RESOURCE_UUID, NATIVE_SCOPE_IDS[index], IDS.user]);
+    }
   });
 }
 
@@ -486,6 +519,75 @@ async function refresh(app: Awaited<ReturnType<typeof buildApplication>>, refres
     headers: { "content-type": "application/x-www-form-urlencoded", authorization: basic(CLIENT_ID, CLIENT_SECRET) },
     payload: form({ grant_type: "refresh_token", refresh_token: refreshToken, client_id: CLIENT_ID, resource: RESOURCE_ID })
   });
+}
+
+async function nativeAuthorization(
+  app: Awaited<ReturnType<typeof buildApplication>>, google: FakeGoogle, state: string,
+  requestedScopes = NATIVE_SCOPES
+) {
+  const verifier = randomBytes(48).toString("base64url");
+  const authorize = new URL("https://step4b-issuer.invalid/oauth/authorize");
+  for (const [key, value] of Object.entries({
+    response_type: "code", client_id: CLIENT_ID, redirect_uri: REDIRECT_URI,
+    scope: requestedScopes.join(" "), state, code_challenge: sha256(verifier),
+    code_challenge_method: "S256", resource: NATIVE_RESOURCE_ID
+  })) authorize.searchParams.set(key, value);
+  const start = await app.inject({ method: "GET", url: `${authorize.pathname}${authorize.search}` });
+  assert(start.statusCode === 302, "native authorize must redirect to Google adapter");
+  const upstream = new URL(String(start.headers.location));
+  if (upstream.origin + upstream.pathname === REDIRECT_URI) {
+    return { code: null, error: upstream.searchParams.get("error"), verifier };
+  }
+  assert(upstream.hostname === "accounts.google.invalid", "native authorization must use Google adapter");
+  const callback = await app.inject({ method: "GET",
+    url: `/oauth/upstream/google/callback?state=${encodeURIComponent(upstream.searchParams.get("state") ?? "")}&code=${encodeURIComponent(GOOGLE_AUTHORIZATION_CODE)}` });
+  assert(callback.statusCode === 302, "native callback must redirect downstream");
+  const downstream = new URL(String(callback.headers.location));
+  assert(downstream.origin + downstream.pathname === REDIRECT_URI, "native redirect must remain exact");
+  assert(downstream.searchParams.get("state") === state, "native state must round-trip");
+  assert(downstream.searchParams.get("iss") === "https://step4b-issuer.invalid", "native response must include issuer");
+  return { code: downstream.searchParams.get("code"), error: downstream.searchParams.get("error"), verifier };
+}
+
+async function nativeExchange(app: Awaited<ReturnType<typeof buildApplication>>, code: string, verifier: string) {
+  return app.inject({ method: "POST", url: "/oauth/token",
+    headers: { "content-type": "application/x-www-form-urlencoded", authorization: basic(CLIENT_ID, CLIENT_SECRET) },
+    payload: form({ grant_type: "authorization_code", code, redirect_uri: REDIRECT_URI,
+      client_id: CLIENT_ID, code_verifier: verifier, resource: NATIVE_RESOURCE_ID }) });
+}
+
+async function nativeIntrospection(app: Awaited<ReturnType<typeof buildApplication>>, token: string) {
+  return app.inject({ method: "POST", url: "/oauth/introspect",
+    headers: { "content-type": "application/x-www-form-urlencoded",
+      authorization: basic(NATIVE_RESOURCE_CREDENTIAL_ID, NATIVE_RESOURCE_SECRET) },
+    payload: form({ token }) });
+}
+
+async function nativeRefresh(app: Awaited<ReturnType<typeof buildApplication>>, token: string, scope?: string) {
+  return app.inject({ method: "POST", url: "/oauth/token",
+    headers: { "content-type": "application/x-www-form-urlencoded", authorization: basic(CLIENT_ID, CLIENT_SECRET) },
+    payload: form({ grant_type: "refresh_token", refresh_token: token, client_id: CLIENT_ID,
+      resource: NATIVE_RESOURCE_ID, ...(scope ? { scope } : {}) }) });
+}
+
+async function retireAndReplaceNativeGrant(db: PostgresDb, index: number, status: "revoked" | "expired") {
+  const current = await db.query<{ id: string }>(`SELECT id FROM oauth_native_human_grants
+    WHERE user_id = $1 AND oauth_resource_id = $2 AND oauth_scope_id = $3 AND status = 'active'`,
+    [IDS.user, NATIVE_RESOURCE_UUID, NATIVE_SCOPE_IDS[index]]);
+  assert(current.rows.length === 1, "native fixture must have one active linked grant");
+  if (status === "revoked") {
+    await db.query(`UPDATE oauth_native_human_grants SET status = 'revoked', revoked_at = now(),
+      revoked_by_user_id = $2, updated_at = now() WHERE id = $1`, [current.rows[0].id, IDS.user]);
+  } else {
+    await db.query(`UPDATE oauth_native_human_grants SET status = 'expired', updated_at = now()
+      WHERE id = $1`, [current.rows[0].id]);
+  }
+  const replacement = randomUUID();
+  await db.query(`INSERT INTO oauth_native_human_grants
+    (id, oauth_resource_id, oauth_scope_id, user_id, status, valid_from)
+    VALUES ($1,$2,$3,$4,'active',now() - interval '1 minute')`,
+    [replacement, NATIVE_RESOURCE_UUID, NATIVE_SCOPE_IDS[index], IDS.user]);
+  return replacement;
 }
 
 async function exerciseConcurrentRefreshReplay(input: {
@@ -739,6 +841,215 @@ async function main() {
     assert((await introspect(source.app, normalRefresh.json().access_token)).json().active === false, "revoked family access token must introspect inactive");
     assert((await refresh(source.app, normalRefresh.json().refresh_token)).statusCode === 400, "revoked refresh token must be invalid_grant");
 
+    const nativeStart = await nativeAuthorization(source.app, source.google, "step4b-native-happy");
+    assert(nativeStart.code && !nativeStart.error,
+      `native two-scope authorization must issue a code (error=${nativeStart.error}, db=${stable(observedSourceDb.state.errors)})`);
+    const nativeAuth = await sourceDb.query<{ id: string; entitlement_source: string; legacy_authorization_grant_id: string | null }>(
+      `SELECT id, entitlement_source, legacy_authorization_grant_id FROM oauth_authorizations
+       WHERE oauth_resource_id = $1 ORDER BY created_at DESC LIMIT 1`, [NATIVE_RESOURCE_UUID]);
+    assert(nativeAuth.rows[0]?.entitlement_source === "native" &&
+      nativeAuth.rows[0]?.legacy_authorization_grant_id === null, "native authorization source must be native without a legacy grant");
+    const nativeProvenance = await sourceDb.query<{ oauth_native_human_grant_id: string }>(
+      `SELECT oauth_native_human_grant_id FROM oauth_authorization_native_grants
+       WHERE oauth_authorization_id = $1 ORDER BY oauth_native_human_grant_id`, [nativeAuth.rows[0].id]);
+    assert(stable(nativeProvenance.rows.map((row) => row.oauth_native_human_grant_id)) === stable([...NATIVE_GRANT_IDS].sort()),
+      "native authorization must persist one exact grant per scope");
+    const noLegacyBinding = await sourceDb.query<{ count: number }>(
+      `SELECT count(*)::int AS count FROM oauth_resource_entitlement_bindings WHERE oauth_resource_id = $1`,
+      [NATIVE_RESOURCE_UUID]);
+    assert(noLegacyBinding.rows[0].count === 0, "native resource must have no legacy tool binding");
+    const nativeFirstResponse = await nativeExchange(source.app, nativeStart.code, nativeStart.verifier);
+    assert(nativeFirstResponse.statusCode === 200, "native authorization code must exchange without a legacy grant");
+    const nativeFirst = nativeFirstResponse.json() as { access_token: string; refresh_token: string; scope: string };
+    assert(nativeFirst.scope === NATIVE_SCOPES.join(" "), "native token scope set must not be reduced");
+    assert((await nativeIntrospection(source.app, nativeFirst.access_token)).json().active === true,
+      "native access token must introspect active");
+    const nativeNarrow = await nativeRefresh(source.app, nativeFirst.refresh_token, NATIVE_SCOPES[0]);
+    assert(nativeNarrow.statusCode === 200 && nativeNarrow.json().scope === NATIVE_SCOPES[0],
+      "native refresh may narrow to currently entitled scope");
+
+    const beforeExchange = await nativeAuthorization(source.app, source.google, "step4b-native-revoke-before-exchange");
+    assert(beforeExchange.code, "native pre-revocation authorization must issue a code");
+    await retireAndReplaceNativeGrant(sourceDb, 0, "revoked");
+    // Revoke the active replacement as well: historical provenance cannot authorize exchange.
+    const liveRead = await sourceDb.query<{ id: string }>(`SELECT id FROM oauth_native_human_grants
+      WHERE user_id = $1 AND oauth_resource_id = $2 AND oauth_scope_id = $3 AND status = 'active'`,
+      [IDS.user, NATIVE_RESOURCE_UUID, NATIVE_SCOPE_IDS[0]]);
+    await sourceDb.query(`UPDATE oauth_native_human_grants SET status = 'revoked', revoked_at = now(),
+      revoked_by_user_id = $2 WHERE id = $1`, [liveRead.rows[0].id, IDS.user]);
+    const deniedExchange = await nativeExchange(source.app, beforeExchange.code, beforeExchange.verifier);
+    assert(deniedExchange.statusCode === 400 && deniedExchange.json().error === "invalid_grant",
+      "native exchange must reject revocation after authorization");
+    assert((await nativeIntrospection(source.app, nativeFirst.access_token)).json().active === false,
+      "native introspection must become inactive when one grant is revoked");
+    const deniedRefresh = await nativeRefresh(source.app, nativeNarrow.json().refresh_token);
+    assert(deniedRefresh.statusCode === 400 && deniedRefresh.json().error === "invalid_grant",
+      "native refresh must reject revoked current entitlement");
+    await sourceDb.query(`INSERT INTO oauth_native_human_grants
+      (oauth_resource_id, oauth_scope_id, user_id, status, valid_from)
+      VALUES ($1,$2,$3,'active',now() - interval '1 minute')`,
+      [NATIVE_RESOURCE_UUID, NATIVE_SCOPE_IDS[0], IDS.user]);
+
+    const nativeRetainedStart = await nativeAuthorization(source.app, source.google, "step4b-native-backup");
+    assert(nativeRetainedStart.code, "native retained authorization must issue a code");
+    const nativeRetainedResponse = await nativeExchange(source.app, nativeRetainedStart.code, nativeRetainedStart.verifier);
+    assert(nativeRetainedResponse.statusCode === 200, "native retained code must exchange");
+    const nativeRetained = nativeRetainedResponse.json() as { access_token: string; refresh_token: string };
+
+    const activeNativeGrants = await sourceDb.query<{ id: string; scope: string }>(
+      `SELECT native_grant.id, scope.scope FROM oauth_native_human_grants native_grant
+       JOIN oauth_scopes scope ON scope.id = native_grant.oauth_scope_id
+       WHERE native_grant.user_id = $1 AND native_grant.oauth_resource_id = $2
+         AND native_grant.status = 'active' ORDER BY scope.scope`, [IDS.user, NATIVE_RESOURCE_UUID]);
+    assert(activeNativeGrants.rows.length === 2, "native writer fixture must have two active grants");
+    for (const [label, supplied] of [
+      ["missing", activeNativeGrants.rows.slice(0, 1)],
+      ["duplicate", [activeNativeGrants.rows[0], activeNativeGrants.rows[0]]]
+    ] as const) {
+      const transactionId = randomUUID();
+      const stateHash = sha256(`step4b-native-provenance-${label}`);
+      const now = new Date();
+      const flow = new OAuthAuthorizationFlowRepository(sourceDb);
+      await flow.createAuthorizationTransaction({ id: transactionId, oauthClientId: IDS.oauthClient,
+        oauthResourceId: NATIVE_RESOURCE_UUID, redirectUri: REDIRECT_URI, requestedScopes: NATIVE_SCOPES,
+        codeChallenge: sha256(randomBytes(48).toString("base64url")),
+        protectedDownstreamState: { synthetic: true }, upstreamStateHash: stateHash,
+        upstreamNonceHash: sha256(`step4b-native-nonce-${label}`), correlationId: randomUUID(),
+        createdAt: now, expiresAt: new Date(now.getTime() + 600_000) });
+      assert(await flow.claimAuthorizationTransaction(stateHash, now), "synthetic native writer transaction must claim");
+      let denied = false;
+      try {
+        await flow.issueAuthorizationCode({ transactionId, userId: IDS.user,
+          oauthClientId: IDS.oauthClient, oauthResourceId: NATIVE_RESOURCE_UUID,
+          entitlementSource: "native", legacyAuthorizationGrantId: null,
+          nativeGrants: supplied.map((grant) => ({ scope: grant.scope, grantId: grant.id })),
+          grantedScopes: NATIVE_SCOPES, redirectUri: REDIRECT_URI, codeChallenge: sha256(randomBytes(48).toString("base64url")),
+          codeHash: sha256(`step4b-native-invalid-${label}`), correlationId: randomUUID(),
+          issuedAt: now, expiresAt: new Date(now.getTime() + 60_000) });
+      } catch { denied = true; }
+      assert(denied, `native writer must reject ${label} provenance`);
+      const partial = await sourceDb.query<{ count: number }>(`SELECT count(*)::int AS count FROM oauth_authorizations
+        WHERE oauth_authorization_transaction_id = $1`, [transactionId]);
+      assert(partial.rows[0].count === 0, "rejected provenance must not leave an authorization row");
+    }
+
+    const activeReadGrant = async () => {
+      const result = await sourceDb.query<{ id: string }>(`SELECT id FROM oauth_native_human_grants
+        WHERE user_id = $1 AND oauth_resource_id = $2 AND oauth_scope_id = $3 AND status = 'active'`,
+        [IDS.user, NATIVE_RESOURCE_UUID, NATIVE_SCOPE_IDS[0]]);
+      assert(result.rows.length === 1, "native read grant must be unique");
+      return result.rows[0].id;
+    };
+    let readGrantId = await activeReadGrant();
+    await sourceDb.query(`UPDATE oauth_native_human_grants SET valid_from = now() + interval '1 hour'
+      WHERE id = $1`, [readGrantId]);
+    assert((await nativeAuthorization(source.app, source.google, "step4b-native-future-grant")).error === "access_denied",
+      "future native grant must not authorize");
+    await sourceDb.query(`UPDATE oauth_native_human_grants SET valid_from = now() - interval '1 minute'
+      WHERE id = $1`, [readGrantId]);
+    await sourceDb.query(`UPDATE oauth_native_human_grants SET valid_until = now() - interval '1 second'
+      WHERE id = $1`, [readGrantId]);
+    assert((await nativeAuthorization(source.app, source.google, "step4b-native-elapsed-grant")).error === "access_denied",
+      "elapsed native grant must not authorize while status is active");
+    assert((await nativeIntrospection(source.app, nativeRetained.access_token)).json().active === false,
+      "elapsed native grant must make introspection inactive");
+    const elapsedRefresh = await nativeRefresh(source.app, nativeRetained.refresh_token);
+    assert(elapsedRefresh.statusCode === 400 && elapsedRefresh.json().error === "invalid_grant",
+      "elapsed native grant must deny refresh");
+    await sourceDb.query(`UPDATE oauth_native_human_grants SET valid_until = NULL WHERE id = $1`, [readGrantId]);
+
+    await sourceDb.query(`UPDATE oauth_native_human_grants SET status = 'expired' WHERE id = $1`, [readGrantId]);
+    await sourceDb.query(`INSERT INTO oauth_native_human_grants
+      (oauth_resource_id, oauth_scope_id, email_normalized, status)
+      VALUES ($1,$2,'step4b-person@example.invalid','pending_user_link')`,
+      [NATIVE_RESOURCE_UUID, NATIVE_SCOPE_IDS[0]]);
+    assert((await nativeAuthorization(source.app, source.google, "step4b-native-pending")).error === "access_denied",
+      "pending email grant must not link or authorize");
+    const pendingStillUnlinked = await sourceDb.query<{ count: number }>(`SELECT count(*)::int AS count
+      FROM oauth_native_human_grants WHERE oauth_resource_id = $1 AND oauth_scope_id = $2
+        AND status = 'pending_user_link' AND user_id IS NULL`, [NATIVE_RESOURCE_UUID, NATIVE_SCOPE_IDS[0]]);
+    assert(pendingStillUnlinked.rows[0].count === 1, "Google callback must leave native pending email unlinked");
+    const wrongUserId = randomUUID();
+    await sourceDb.query(`INSERT INTO users (id, google_sub, email, email_normalized, email_verified, hd, status)
+      VALUES ($1,'step4b-other-subject','other@example.invalid','other@example.invalid',true,'example.invalid','active')`,
+      [wrongUserId]);
+    await sourceDb.query(`INSERT INTO oauth_native_human_grants
+      (oauth_resource_id, oauth_scope_id, user_id, status, valid_from)
+      VALUES ($1,$2,$3,'active',now() - interval '1 minute')`,
+      [NATIVE_RESOURCE_UUID, NATIVE_SCOPE_IDS[0], wrongUserId]);
+    assert((await nativeAuthorization(source.app, source.google, "step4b-native-wrong-user")).error === "access_denied",
+      "another user's native grant must not authorize");
+    await sourceDb.query(`INSERT INTO oauth_native_human_grants
+      (oauth_resource_id, oauth_scope_id, user_id, status, valid_from)
+      VALUES ($1,$2,$3,'active',now() - interval '1 minute')`,
+      [NATIVE_RESOURCE_UUID, NATIVE_SCOPE_IDS[0], IDS.user]);
+    readGrantId = await activeReadGrant();
+
+    for (const [table, column, id, label] of [
+      ["oauth_resource_scopes", "oauth_resource_id", NATIVE_RESOURCE_UUID, "resource scope"],
+      ["oauth_scopes", "id", NATIVE_SCOPE_IDS[0], "canonical scope"],
+      ["oauth_client_resource_scopes", "oauth_resource_id", NATIVE_RESOURCE_UUID, "client allowance"]
+    ]) {
+      const extra = table === "oauth_scopes" ? "" : " AND oauth_scope_id = $2";
+      await sourceDb.query(`UPDATE ${table} SET status = 'disabled' WHERE ${column} = $1${extra}`,
+        table === "oauth_scopes" ? [id] : [id, NATIVE_SCOPE_IDS[0]]);
+      assert((await nativeAuthorization(source.app, source.google, `step4b-native-${label.replace(" ", "-")}-disabled`)).error === "invalid_scope",
+        `disabled ${label} must reject all-or-nothing native authorization`);
+      assert((await nativeIntrospection(source.app, nativeRetained.access_token)).json().active === false,
+        `disabled ${label} must make native introspection inactive`);
+      await sourceDb.query(`UPDATE ${table} SET status = 'active' WHERE ${column} = $1${extra}`,
+        table === "oauth_scopes" ? [id] : [id, NATIVE_SCOPE_IDS[0]]);
+    }
+    const allowanceCode = await nativeAuthorization(source.app, source.google, "step4b-native-allowance-before-exchange");
+    assert(allowanceCode.code, "native allowance test must issue a code");
+    await sourceDb.query(`UPDATE oauth_client_resource_scopes SET status = 'disabled'
+      WHERE oauth_resource_id = $1 AND oauth_scope_id = $2`, [NATIVE_RESOURCE_UUID, NATIVE_SCOPE_IDS[0]]);
+    const allowanceExchange = await nativeExchange(source.app, allowanceCode.code, allowanceCode.verifier);
+    assert(allowanceExchange.statusCode === 400 && allowanceExchange.json().error === "invalid_grant",
+      "native exchange must reject disabled current allowance");
+    await sourceDb.query(`UPDATE oauth_client_resource_scopes SET status = 'active'
+      WHERE oauth_resource_id = $1 AND oauth_scope_id = $2`, [NATIVE_RESOURCE_UUID, NATIVE_SCOPE_IDS[0]]);
+    await sourceDb.query(`UPDATE users SET status = 'disabled' WHERE id = $1`, [IDS.user]);
+    assert((await nativeIntrospection(source.app, nativeRetained.access_token)).json().active === false,
+      "disabled native user must make introspection inactive");
+    await sourceDb.query(`UPDATE users SET status = 'active' WHERE id = $1`, [IDS.user]);
+    await sourceDb.query(`UPDATE oauth_resources SET status = 'disabled' WHERE id = $1`, [NATIVE_RESOURCE_UUID]);
+    assert((await nativeIntrospection(source.app, nativeRetained.access_token)).json().active === false,
+      "disabled native resource must make introspection inactive");
+    await sourceDb.query(`UPDATE oauth_resources SET status = 'active' WHERE id = $1`, [NATIVE_RESOURCE_UUID]);
+    assert((await nativeIntrospection(source.app, nativeRetained.access_token)).json().active === true,
+      "native entitlement must recover after synthetic fixture states are restored");
+
+    const evaluationHeld = deferred();
+    const releaseEvaluation = deferred();
+    const heldEvaluation = sourceDb.transaction(async (tx) => {
+      const result = await evaluateNativeEntitlement(tx, { userId: IDS.user,
+        oauthClientId: IDS.oauthClient, oauthResourceId: NATIVE_RESOURCE_UUID,
+        scopes: NATIVE_SCOPES, now: new Date() });
+      assert(result.kind === "allowed", "held native evaluation must have full scope coverage");
+      evaluationHeld.resolve();
+      await releaseEvaluation.promise;
+    });
+    await withTimeout(evaluationHeld.promise, "native grant lock acquisition");
+    let mutationCompleted = false;
+    const revokedUnderLock = sourceDb.query(`UPDATE oauth_native_human_grants
+      SET status = 'revoked', revoked_at = now(), revoked_by_user_id = $2
+      WHERE id = $1`, [readGrantId, IDS.user]).then(() => { mutationCompleted = true; });
+    let lockHeld = false;
+    try {
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, 100));
+      lockHeld = !mutationCompleted;
+    } finally { releaseEvaluation.resolve(); }
+    await withTimeout(heldEvaluation, "native evaluation commit");
+    await withTimeout(revokedUnderLock, "native grant revocation after evaluation");
+    assert(lockHeld, "native grant revocation must wait behind issuance SHARE lock");
+    assert((await nativeIntrospection(source.app, nativeRetained.access_token)).json().active === false,
+      "committed native revocation must be seen by the next decision");
+    await sourceDb.query(`INSERT INTO oauth_native_human_grants
+      (oauth_resource_id, oauth_scope_id, user_id, status, valid_from)
+      VALUES ($1,$2,$3,'active',now() - interval '1 minute')`,
+      [NATIVE_RESOURCE_UUID, NATIVE_SCOPE_IDS[0], IDS.user]);
+
     const concurrencyEvidence = [];
     for (let iteration = 1; iteration <= 8; iteration += 1) {
       concurrencyEvidence.push(await exerciseConcurrentRefreshReplay({
@@ -770,6 +1081,21 @@ async function main() {
     const decrypted = decryptJsonPayload(encryptedBackup, BACKUP_KEY);
     const backupData = decrypted.data as Record<string, unknown>;
     assert(backupData && typeof backupData === "object", "decrypted backup must contain data");
+    const nativeBackupResource = (backupData.oauth_resources as Array<Record<string, unknown>>)
+      .find((row) => row.id === NATIVE_RESOURCE_UUID);
+    assert(nativeBackupResource?.entitlement_mode === "native", "backup must preserve native resource mode");
+    const nativeBackupGrants = (backupData.oauth_native_human_grants as Array<Record<string, unknown>>)
+      .filter((row) => row.oauth_resource_id === NATIVE_RESOURCE_UUID);
+    assert(nativeBackupGrants.length >= 3, "backup must preserve native grant lifecycle rows");
+    const nativeBackupAuthorizations = (backupData.oauth_authorizations as Array<Record<string, unknown>>)
+      .filter((row) => row.oauth_resource_id === NATIVE_RESOURCE_UUID);
+    assert(nativeBackupAuthorizations.length >= 2 && nativeBackupAuthorizations.every((row) =>
+      row.entitlement_source === "native" && row.legacy_authorization_grant_id === null),
+    "backup must preserve native authorization source and null legacy grant");
+    const nativeAuthorizationIds = new Set(nativeBackupAuthorizations.map((row) => row.id));
+    const nativeBackupProvenance = (backupData.oauth_authorization_native_grants as Array<Record<string, unknown>>)
+      .filter((row) => nativeAuthorizationIds.has(row.oauth_authorization_id));
+    assert(nativeBackupProvenance.length >= 4, "backup must preserve exact native authorization provenance");
     const snapshotFamily = (backupData.oauth_refresh_token_families as Array<Record<string, unknown>>).find((row) => row.oauth_session_id === retainedClaims.sid);
     const snapshotTokens = (backupData.oauth_refresh_tokens as Array<Record<string, unknown>>).filter((row) => row.oauth_refresh_token_family_id === snapshotFamily?.id);
     assert(snapshotFamily?.current_generation === 0 && snapshotFamily.status === "active", "backup snapshot must preserve the pre-commit family state");
@@ -790,6 +1116,16 @@ async function main() {
     const invalidConstraints = await restoreDb.query<{ count: number }>("SELECT count(*)::int AS count FROM pg_constraint WHERE connamespace = 'public'::regnamespace AND NOT convalidated");
     assert(Number(invalidConstraints.rows[0].count) === 0, "all restored constraints must be validated");
     assert((await introspect(restore.app, retained.access_token)).json().active === true, "pre-backup access token must remain active after restore");
+    assert((await nativeIntrospection(restore.app, nativeRetained.access_token)).json().active === true,
+      "restored native access token must remain active");
+    const nativePostRestoreRefresh = await nativeRefresh(restore.app, nativeRetained.refresh_token);
+    assert(nativePostRestoreRefresh.statusCode === 200, "restored native refresh lineage must rotate");
+    const nativeRevocation = await restore.app.inject({ method: "POST", url: "/oauth/revoke",
+      headers: { "content-type": "application/x-www-form-urlencoded", authorization: basic(CLIENT_ID, CLIENT_SECRET) },
+      payload: form({ token: nativePostRestoreRefresh.json().refresh_token, token_type_hint: "refresh_token" }) });
+    assert(nativeRevocation.statusCode === 200, "native refresh family revocation endpoint must succeed");
+    assert((await nativeIntrospection(restore.app, nativePostRestoreRefresh.json().access_token)).json().active === false,
+      "revoked native family must introspect inactive");
     const postRestoreRotation = await refresh(restore.app, retained.refresh_token);
     assert(postRestoreRotation.statusCode === 200, "retained in-memory refresh token must rotate once after restore");
     const postRestoreReplay = await refresh(restore.app, retained.refresh_token);
@@ -811,6 +1147,11 @@ async function main() {
         repeatable_read_snapshot_coordination: "PASS",
         encrypted_replace_restore: "PASS",
         post_restore_access_and_refresh_continuity: "PASS",
+        native_two_scope_http_lifecycle_and_provenance: "PASS",
+        native_revocation_exchange_refresh_introspection: "PASS",
+        native_encrypted_backup_restore_continuity: "PASS",
+        native_grant_mutation_lock_order: "PASS",
+        native_refresh_family_revocation: "PASS",
         legacy_baseline_expanded_schema_smoke: "PASS"
       },
       backup: {

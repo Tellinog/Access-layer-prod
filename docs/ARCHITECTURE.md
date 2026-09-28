@@ -1,5 +1,9 @@
 # ARCHITECTURE.md
 
+## Phase 9A.2 OAuth entitlement runtime
+
+The OAuth resource's current `entitlement_mode` dispatches to the unchanged P0 legacy bridge or to `src/oauth/native-entitlement.ts`. The native evaluator uses internal `users.id`, exact resource/scope registration, client allowance and linked active in-window grants under transaction-duration SHARE locks. Callback issuance records exact native grant provenance with the authorization and code; exchange, refresh and introspection re-evaluate current grants. Source/mode disagreement denies live token use. Native Admin creation and controlled mode transition remain deferred; Google remains the only OAuth vNext upstream provider.
+
 ## Phase 9A.1 post-P0 direction
 
 The P0 legacy-tool bridge remains the active runtime path. Migration 006 adds a dark native resource/scope entitlement model owned by `users.id`; no handler queries it yet. Authorization creation must record the source matching the resource mode, and the normalized native-grant links preserve issuance evidence without replacing later entitlement checks. New SDK-native consumers will eventually use native grants. Existing resources may later transition in place from `legacy_bridge` to `native` on the same audience through a privileged, audited operation; direct mode UPDATE is blocked now. Google remains the OAuth upstream provider and the temporary Microsoft legacy bridge is unchanged. See `OAUTH_NATIVE_ENTITLEMENTS.md`.

@@ -1,0 +1,56 @@
+schema_version: 1
+phase: 9A.1
+status: dark_data_foundation
+p0_profile: frozen_legacy_bridge_compatibility
+runtime_evaluation: disabled
+upstream_identity_provider: google_only
+resource_entitlement_modes: [legacy_bridge, native]
+existing_resource_default: legacy_bridge
+resource_mode_phase_9A_1: direct_update_forbidden
+resource_mode_target_transition:
+  direction: legacy_bridge_to_native
+  same_resource_id_and_audience: required
+  operation: explicit_privileged_audited_later_phase
+  prerequisites: [no_unsafe_mixed_transition, legacy_sessions_and_authorizations_safely_terminated, native_scopes_valid, native_grants_provisioned, legacy_bindings_and_mappings_retired, historical_provenance_retained]
+resource_scope_registration: oauth_resource_scopes
+legacy_bridge:
+  binding_type: legacy_tool
+  active_binding_and_exact_registered_legacy_permission_required_at_runtime: true
+  legacy_permission_key_required_per_resource_scope: true
+native:
+  legacy_tool_binding: forbidden
+  legacy_permission_key: forbidden
+  grant_table: oauth_native_human_grants
+  linked_principal: users.id
+  google_sub_as_grant_key: forbidden
+  granularity: one_user_resource_scope
+  scope_match: exact_canonical_only
+  wildcard_or_prefix_grants: forbidden
+  registered_resource_scope_foreign_key: required_restrict_delete
+  pending_email_target: allowed_without_user_link
+  automatic_cross_provider_email_linking: forbidden
+  effective_grant_requires: [active_status, linked_user_id, active_user_resource_and_scope, valid_from_reached, valid_until_not_reached, unrevoked]
+  duplicate_active_linked_grant: forbidden
+  duplicate_pending_email_target: forbidden
+  resource_scope_and_linked_principal_mutability: immutable
+  revoked_and_expired_status: terminal
+  user_delete_policy: restrict
+authorization_provenance:
+  column: entitlement_source
+  values: [legacy_bridge, native]
+  default: legacy_bridge
+  legacy_bridge_requires_legacy_authorization_grant_id: true
+  native_requires_null_legacy_authorization_grant_id: true
+  source_must_match_resource_mode_at_insert: true
+  historical_source_immutable_after_insert: true
+  native_grant_link_table: oauth_authorization_native_grants
+  native_grant_link_cardinality: many_to_many_unique_pair
+  linked_grant_must_match_authorization_user_resource_and_granted_scope: true
+  future_writer_must_verify_current_grant_before_linking: true
+  linked_grant_delete_policy: restrict
+  historical_links_replace_current_entitlement_evaluation: false
+backup:
+  encrypted_export_and_import_includes_native_grants_and_provenance: true
+  pre_9A_1_complete_oauth_backup_import: supported_with_empty_native_sections
+  native_runtime_writer: absent
+deferred: [native_grant_evaluation, native_grant_admin_api_ui, multi_provider_oauth, entra_oauth, automatic_provider_account_linking]

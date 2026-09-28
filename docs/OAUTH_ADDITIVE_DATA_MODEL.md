@@ -1,6 +1,10 @@
 # Proposed additive OAuth data model
 
-Status: Step 3A foundation, Step 3C authorization issuance, Step 3D token lifecycle, Step 3E strict default-off HTTP mounting and D-047 controlled administration implemented; no further migration is added.
+Status: Step 3A foundation, Step 3C authorization issuance, Step 3D token lifecycle, Step 3E strict default-off HTTP mounting and D-047 controlled administration implemented. Phase 9A.1 adds dark migration 006.
+
+## Phase 9A.1 additive extension
+
+Migration `006_oauth_native_entitlements_dark.sql` adds `oauth_resources.entitlement_mode` (`legacy_bridge` default, or `native`), makes `oauth_resource_scopes.legacy_permission_key` nullable only for native resources, adds `oauth_native_human_grants` and `oauth_authorization_native_grants`, and adds `oauth_authorizations.entitlement_source` (`legacy_bridge` default, or `native`) with creation-time resource-mode integrity. The exact schema and safety rules are in `OAUTH_NATIVE_ENTITLEMENTS.md` and `../specs/oauth-native-entitlements.v1.yml`. This extension does not alter the historical Step 3A–4A/P0 descriptions below.
 
 ## Administration write ownership
 

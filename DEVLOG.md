@@ -1,5 +1,13 @@
 # DEVLOG.md
 
+## 2026-09-28 — Phase 9A.1 native OAuth entitlement dark foundation
+
+Added migration 006 for resource entitlement mode, canonical scopes without a legacy mapping on native resources, native per-human resource/scope grants, authorization source/resource-mode insertion integrity, and normalized historical authorization-to-grant provenance. Existing resource/authorization rows default to `legacy_bridge`; no OAuth handler, Admin writer, Google adapter, legacy bridge, or production state changed. Expanded encrypted backup export/import and documented the controlled in-place transition target.
+
+Disposable PostgreSQL 16 qualification passed on three fresh loopback-only targets: migrations 001–006, focused SQL invariants, encrypted full replace restore retaining two native grants and two historical links, complete pre-9A.1 backup import, and actual previous-binary legacy issuance/native fail-closed smoke. Full repository validation results are recorded in `operations/phase9a1-qualification.evidence.json`.
+
+Final repository checks: `npm ci`, lint/build, 372 default Vitest tests with the opt-in PostgreSQL test passing separately, 66 Python tests (two expected skips), 26 OAuth P0 contract groups, native spec/schema validation, non-strict platform validation (27 passes and seven known warnings), and `git diff --check`.
+
 ## 2026-09-25 - D-048 platform-admin grant validation correction
 
 Changed by: Codex

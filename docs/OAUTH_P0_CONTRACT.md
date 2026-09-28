@@ -1,5 +1,7 @@
 # OAuth vNext P0 contract
 
+Post-P0 note (Phase 9A.1): this frozen profile remains valid and its runtime still uses the exact legacy-tool entitlement bridge described below. The additive dark native data model is specified separately in `OAUTH_NATIVE_ENTITLEMENTS.md` and `../specs/oauth-native-entitlements.v1.yml`; it does not revise P0 history or current OAuth behavior.
+
 Status: frozen protocol contract; Step 3E dark runtime plus controlled P0 administration candidate, protocol default-disabled
 Machine source: `../specs/oauth-p0.v1.yml`
 Target OpenAPI: `../schemas/access-layer-oauth-v1.openapi.yaml`

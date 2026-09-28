@@ -1,5 +1,9 @@
 # ARCHITECTURE.md
 
+## Phase 9A.1 post-P0 direction
+
+The P0 legacy-tool bridge remains the active runtime path. Migration 006 adds a dark native resource/scope entitlement model owned by `users.id`; no handler queries it yet. Authorization creation must record the source matching the resource mode, and the normalized native-grant links preserve issuance evidence without replacing later entitlement checks. New SDK-native consumers will eventually use native grants. Existing resources may later transition in place from `legacy_bridge` to `native` on the same audience through a privileged, audited operation; direct mode UPDATE is blocked now. Google remains the OAuth upstream provider and the temporary Microsoft legacy bridge is unchanged. See `OAUTH_NATIVE_ENTITLEMENTS.md`.
+
 ## Overview
 
 Access Layer is a centralized web service used by internal tools for authentication, authorization and access audit.
@@ -96,7 +100,7 @@ A request is allowed only if all checks pass:
 
 ## Additive OAuth vNext target and Step 3B boundary
 
-P0 adds a future authorization-server adapter beside, not inside, the legacy flow. OAuth clients and resources are separate identities. Every P0 resource requires exactly one existing legacy tool/grant entitlement-only binding; each canonical resource scope maps explicitly one-to-one to an exact permission registered for that tool, with no inferred conversion. The bound tool never becomes the OAuth client or resource, and native OAuth entitlement domains are deferred. Introspection uses separate resource-owned credentials and discloses active state only for an exact matching token audience; it never reuses OAuth client or legacy tool credentials. The future Google return path is the separate internal `/oauth/upstream/google/callback`, never the frozen `/v1/auth/google/callback`, and is not advertised as a protocol endpoint. Exact downstream client state uses short-lived reversible protected storage; upstream Google state/nonce remain separately hashed.
+P0 adds a future authorization-server adapter beside, not inside, the legacy flow. OAuth clients and resources are separate identities. Every P0 resource requires exactly one existing legacy tool/grant entitlement-only binding; each canonical resource scope maps explicitly one-to-one to an exact permission registered for that tool, with no inferred conversion. The bound tool never becomes the OAuth client or resource. Native OAuth entitlement runtime was deferred in P0; Phase 9A.1 later added its dark schema only. Introspection uses separate resource-owned credentials and discloses active state only for an exact matching token audience; it never reuses OAuth client or legacy tool credentials. The future Google return path is the separate internal `/oauth/upstream/google/callback`, never the frozen `/v1/auth/google/callback`, and is not advertised as a protocol endpoint. Exact downstream client state uses short-lived reversible protected storage; upstream Google state/nonce remain separately hashed.
 
 Step 3A implements only the dark foundation below:
 

@@ -1,5 +1,9 @@
 # DB.md
 
+## Phase 9A.1 database extension
+
+Migration 006 adds dark OAuth native entitlement storage. Existing resources and authorizations receive `legacy_bridge` defaults without rewriting rows. The `oauth_native_human_grants` composite FK references a registered `oauth_resource_scopes` pair and restricts deletion; linked principal and actor FKs restrict `users` deletion. `oauth_authorization_native_grants` records durable many-to-many grant provenance with restrictive parent FKs. Authorization source must match resource mode at INSERT, while historical source remains immutable. Mode guards preserve legacy permission mappings and prohibit legacy bindings on native resources. See `OAUTH_NATIVE_ENTITLEMENTS.md` for grant lifecycle, backup, controlled transition target and rollback. Do not contract migration 006 while older binaries or rows may exist.
+
 ## Production continuity metadata
 
 Step 1.5 permits only read-only database/schema evidence without application row contents. `scripts/continuity/collect-postgres-metadata.mjs` uses a read-only transaction and emits PostgreSQL version, database name, a deterministic schema fingerprint, migration identifiers from `schema_migrations`, and metadata counts. It does not emit connection details or driver messages on failure.

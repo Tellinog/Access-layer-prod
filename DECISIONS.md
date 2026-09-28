@@ -1,5 +1,13 @@
 # DECISIONS.md
 
+## D-049 - Native OAuth entitlement foundation after P0
+
+Status: accepted for Phase 9A.1 dark storage only
+
+Decision: OAuth P0 remains a valid frozen compatibility profile. New SDK-native OAuth resources use direct user/resource/canonical-scope grants. Legacy-tool bindings remain a compatibility strategy, not the target model. A linked native grant uses internal `users.id`, never `users.google_sub`, as its principal. Google remains the only OAuth upstream provider in this phase; multi-provider OAuth and Entra are deferred. No email-based automatic account linking across identity providers is introduced. Direct resource-mode UPDATE is blocked in 9A.1, while the target is an explicit privileged, audited **in-place** `legacy_bridge -> native` transition preserving the same `resource_id`/audience after live legacy state and mappings are safely reconciled. Authorization source must match resource mode at creation and then remains historical. A native authorization's grant IDs are recorded in a normalized historical link table; refresh/introspection must still re-evaluate current grants. Current OAuth runtime continues to evaluate only `legacy_bridge` until a later mode-aware implementation is approved and tested.
+
+Rationale: this separates OAuth authorization from legacy tool permissions while preserving every existing P0 registration and historical authorization.
+
 ## D-001 - Central Access Layer instead of per-tool Google login
 
 Status: accepted

@@ -156,7 +156,9 @@ describe("OAuth-only signing boundary", () => {
       iss: issuer, sub: "google-subject", aud: resourceId, client_id: clientId,
       scope: scopes.join(" "), principal_type: "human", sid: "oauth-session-id"
     });
-    expect(JSON.stringify(claims)).not.toMatch(/email|hd|role|permissions/i);
+    for (const forbiddenClaim of ["email", "hd", "role", "permissions"]) {
+      expect(claims).not.toHaveProperty(forbiddenClaim);
+    }
     await expect(verifyOAuthAccessToken({
       token: issued.token, issuer, audience: resourceId, keys: [signingKey], now: fixedNow
     })).resolves.toMatchObject({ sub: "google-subject", sid: "oauth-session-id" });

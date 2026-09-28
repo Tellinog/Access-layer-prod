@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://access-layer.unguess-internal.net/schemas/oauth-native-human-grant.v1.schema.json",
+  "title": "OAuth native human grant persisted record (Phase 9A.1; no API)",
+  "type": "object",
+  "required": ["id", "oauth_resource_id", "oauth_scope_id", "user_id", "email_normalized", "status", "valid_from", "valid_until", "created_by_user_id", "revoked_by_user_id", "revoked_at", "created_at", "updated_at"],
+  "properties": {
+    "id": {"type": "string", "format": "uuid"},
+    "oauth_resource_id": {"type": "string", "format": "uuid"},
+    "oauth_scope_id": {"type": "string", "format": "uuid"},
+    "user_id": {"type": ["string", "null"], "format": "uuid"},
+    "email_normalized": {"type": ["string", "null"]},
+    "status": {"enum": ["active", "pending_user_link", "expired", "revoked"]},
+    "valid_from": {"type": "string", "format": "date-time"},
+    "valid_until": {"type": ["string", "null"], "format": "date-time"},
+    "created_by_user_id": {"type": ["string", "null"], "format": "uuid"},
+    "revoked_by_user_id": {"type": ["string", "null"], "format": "uuid"},
+    "revoked_at": {"type": ["string", "null"], "format": "date-time"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "updated_at": {"type": "string", "format": "date-time"}
+  },
+  "allOf": [
+    {"if": {"properties": {"status": {"const": "active"}}}, "then": {"properties": {"user_id": {"type": "string"}, "revoked_at": {"type": "null"}}}},
+    {"if": {"properties": {"status": {"const": "pending_user_link"}}}, "then": {"properties": {"user_id": {"type": "null"}, "email_normalized": {"type": "string"}}}},
+    {"if": {"properties": {"status": {"const": "revoked"}}}, "then": {"properties": {"revoked_at": {"type": "string"}, "revoked_by_user_id": {"type": "string"}}}}
+  ],
+  "additionalProperties": false
+}

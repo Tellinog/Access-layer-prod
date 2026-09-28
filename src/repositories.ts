@@ -64,10 +64,12 @@ const OAUTH_BACKUP_SECTIONS = [
   "oauth_resource_entitlement_bindings",
   "oauth_scopes",
   "oauth_resource_scopes",
+  "oauth_native_human_grants",
   "oauth_client_resource_scopes",
   "oauth_signing_keys",
   "oauth_authorization_transactions",
   "oauth_authorizations",
+  "oauth_authorization_native_grants",
   "oauth_authorization_codes",
   "oauth_sessions",
   "oauth_refresh_token_families",
@@ -99,10 +101,18 @@ function oauthBackupRows(data: Record<string, unknown>): Record<OAuthBackupSecti
   if (present.length === 0) {
     return null;
   }
-  if (present.length !== OAUTH_BACKUP_SECTIONS.length) {
+  // The pre-9A.1 complete OAuth backup has 17 sections. Its absence of both
+  // native sections is explicit; partial expanded sets still fail.
+  const nativeSections = ["oauth_native_human_grants", "oauth_authorization_native_grants"] as const;
+  const previousSections = OAUTH_BACKUP_SECTIONS.filter((key) => !nativeSections.includes(key as typeof nativeSections[number]));
+  const isPreviousComplete = previousSections.every((key) => present.includes(key)) &&
+    nativeSections.every((key) => !present.includes(key));
+  if (present.length !== OAUTH_BACKUP_SECTIONS.length && !isPreviousComplete) {
     throw new BackupValidationError();
   }
-  return Object.fromEntries(OAUTH_BACKUP_SECTIONS.map((key) => [key, backupRows(data, key)])) as Record<
+  return Object.fromEntries(OAUTH_BACKUP_SECTIONS.map((key) => [key,
+    nativeSections.includes(key as typeof nativeSections[number]) && isPreviousComplete ? [] : backupRows(data, key)
+  ])) as Record<
     OAuthBackupSection,
     BackupRow[]
   >;
@@ -1169,7 +1179,7 @@ export class Repositories {
       const oauthClientRedirectUris = await tx.query(`SELECT id, oauth_client_id, redirect_uri, created_at
         FROM oauth_client_redirect_uris ORDER BY created_at ASC, id ASC`);
       const oauthResources = await tx.query(`SELECT id, resource_id, display_name, status, owner_team, owner_contact, audience_policy,
-          protected_resource_metadata_url, created_at, updated_at
+          protected_resource_metadata_url, entitlement_mode, created_at, updated_at
         FROM oauth_resources ORDER BY created_at ASC, id ASC`);
       const oauthResourceCredentials = await tx.query(`SELECT id, oauth_resource_id, credential_id, secret_hash, authentication_method, status, created_at,
           activated_at, rotated_at, expires_at, retired_at, rotation_parent_id
@@ -1180,6 +1190,10 @@ export class Repositories {
         FROM oauth_scopes ORDER BY created_at ASC, id ASC`);
       const oauthResourceScopes = await tx.query(`SELECT id, oauth_resource_id, oauth_scope_id, legacy_permission_key, status, created_at, updated_at
         FROM oauth_resource_scopes ORDER BY created_at ASC, id ASC`);
+      const oauthNativeHumanGrants = await tx.query(`SELECT id, oauth_resource_id, oauth_scope_id, user_id,
+          email_normalized::text AS email_normalized, status, valid_from, valid_until, created_by_user_id,
+          revoked_by_user_id, revoked_at, created_at, updated_at
+        FROM oauth_native_human_grants ORDER BY created_at ASC, id ASC`);
       const oauthClientResourceScopes = await tx.query(`SELECT id, oauth_client_id, oauth_resource_id, oauth_scope_id, status, created_at
         FROM oauth_client_resource_scopes ORDER BY created_at ASC, id ASC`);
       const oauthSigningKeys = await tx.query(`SELECT id, key_namespace, kid, algorithm, public_jwk, public_key_fingerprint_sha256,
@@ -1190,8 +1204,11 @@ export class Repositories {
           status, expires_at, claimed_at, completed_at, created_at
         FROM oauth_authorization_transactions ORDER BY created_at ASC, id ASC`);
       const oauthAuthorizations = await tx.query(`SELECT id, oauth_authorization_transaction_id, user_id, oauth_client_id, oauth_resource_id,
-          granted_scopes, legacy_authorization_grant_id, correlation_id, status, created_at, updated_at
+          granted_scopes, legacy_authorization_grant_id, entitlement_source, correlation_id, status, created_at, updated_at
         FROM oauth_authorizations ORDER BY created_at ASC, id ASC`);
+      const oauthAuthorizationNativeGrants = await tx.query(`SELECT id, oauth_authorization_id,
+          oauth_native_human_grant_id, created_at
+        FROM oauth_authorization_native_grants ORDER BY created_at ASC, id ASC`);
       const oauthAuthorizationCodes = await tx.query(`SELECT id, code_hash, oauth_authorization_transaction_id, oauth_authorization_id, oauth_client_id,
           oauth_resource_id, user_id, redirect_uri, granted_scopes, code_challenge, code_challenge_method, correlation_id,
           issued_at, expires_at, consumed_at
@@ -1223,10 +1240,12 @@ export class Repositories {
       oauth_resource_entitlement_bindings: oauthResourceEntitlementBindings.rows,
       oauth_scopes: oauthScopes.rows,
       oauth_resource_scopes: oauthResourceScopes.rows,
+      oauth_native_human_grants: oauthNativeHumanGrants.rows,
       oauth_client_resource_scopes: oauthClientResourceScopes.rows,
       oauth_signing_keys: oauthSigningKeys.rows,
       oauth_authorization_transactions: oauthAuthorizationTransactions.rows,
       oauth_authorizations: oauthAuthorizations.rows,
+      oauth_authorization_native_grants: oauthAuthorizationNativeGrants.rows,
       oauth_authorization_codes: oauthAuthorizationCodes.rows,
       oauth_sessions: oauthSessions.rows,
       oauth_refresh_token_families: oauthRefreshTokenFamilies.rows,
@@ -1273,7 +1292,9 @@ export class Repositories {
         const sql = `INSERT INTO ${table} (${names.join(", ")}) VALUES (${placeholders.join(", ")}) ON CONFLICT (id) DO UPDATE SET ${updates.join(", ")}`;
         for (const row of sectionRows) {
           const params = columns.map((column) => {
-            const value = row[column.name];
+            const value = row[column.name] ?? (
+              column.name === "entitlement_mode" || column.name === "entitlement_source" ? "legacy_bridge" : undefined
+            );
             return column.cast === "jsonb" && value !== null && value !== undefined ? JSON.stringify(value) : value ?? null;
           });
           await query(sql, params);
@@ -1286,9 +1307,11 @@ export class Repositories {
         await query("DELETE FROM oauth_refresh_token_families");
         await query("DELETE FROM oauth_sessions");
         await query("DELETE FROM oauth_authorization_codes");
+        await query("DELETE FROM oauth_authorization_native_grants");
         await query("DELETE FROM oauth_authorizations");
         await query("DELETE FROM oauth_authorization_transactions");
         await query("DELETE FROM oauth_client_resource_scopes");
+        await query("DELETE FROM oauth_native_human_grants");
         await query("DELETE FROM oauth_resource_scopes");
         await query("DELETE FROM oauth_resource_entitlement_bindings");
         await query("DELETE FROM oauth_resource_credentials");
@@ -1358,6 +1381,7 @@ export class Repositories {
       await upsert("oauth_resources", oauthRows.oauth_resources, [
         { name: "id" }, { name: "resource_id" }, { name: "display_name" }, { name: "status" }, { name: "owner_team" },
         { name: "owner_contact" }, { name: "audience_policy" }, { name: "protected_resource_metadata_url" },
+        { name: "entitlement_mode" },
         { name: "created_at" }, { name: "updated_at" }
       ]);
       await upsert("oauth_scopes", oauthRows.oauth_scopes, [
@@ -1395,6 +1419,12 @@ export class Repositories {
         { name: "id" }, { name: "oauth_resource_id" }, { name: "oauth_scope_id" }, { name: "legacy_permission_key" },
         { name: "status" }, { name: "created_at" }, { name: "updated_at" }
       ]);
+      await upsert("oauth_native_human_grants", oauthRows.oauth_native_human_grants, [
+        { name: "id" }, { name: "oauth_resource_id" }, { name: "oauth_scope_id" }, { name: "user_id" },
+        { name: "email_normalized" }, { name: "status" }, { name: "valid_from" }, { name: "valid_until" },
+        { name: "created_by_user_id" }, { name: "revoked_by_user_id" }, { name: "revoked_at" },
+        { name: "created_at" }, { name: "updated_at" }
+      ]);
       await upsert("oauth_client_resource_scopes", oauthRows.oauth_client_resource_scopes, [
         { name: "id" }, { name: "oauth_client_id" }, { name: "oauth_resource_id" }, { name: "oauth_scope_id" },
         { name: "status" }, { name: "created_at" }
@@ -1409,7 +1439,12 @@ export class Repositories {
       await upsert("oauth_authorizations", oauthRows.oauth_authorizations, [
         { name: "id" }, { name: "oauth_authorization_transaction_id" }, { name: "user_id" }, { name: "oauth_client_id" },
         { name: "oauth_resource_id" }, { name: "granted_scopes" }, { name: "legacy_authorization_grant_id" },
+        { name: "entitlement_source" },
         { name: "correlation_id" }, { name: "status" }, { name: "created_at" }, { name: "updated_at" }
+      ]);
+      await upsert("oauth_authorization_native_grants", oauthRows.oauth_authorization_native_grants, [
+        { name: "id" }, { name: "oauth_authorization_id" }, { name: "oauth_native_human_grant_id" },
+        { name: "created_at" }
       ]);
       await upsert("oauth_authorization_codes", oauthRows.oauth_authorization_codes, [
         { name: "id" }, { name: "code_hash" }, { name: "oauth_authorization_transaction_id" },

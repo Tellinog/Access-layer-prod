@@ -1,0 +1,44 @@
+{
+  "phase": "9A.1",
+  "executed_at_utc": "2026-09-28T11:17:39Z",
+  "environment": "local Docker daemon; three disposable loopback-only PostgreSQL containers; synthetic data only",
+  "postgresql_server_version_num": 160015,
+  "postgres_image_id": "sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94",
+  "previous_binary_commit": "691f248339c445bbf7207c7af91c63e42472347b",
+  "migration_006_sha256": "6ceef335031a02ca1f74e7bae187f0eeb790afa62a28db0972ab9a762d9d19ed",
+  "migrations_applied_from_empty_database_on_each_target": [
+    "001_initial.sql",
+    "002_audit_tool_delete_fk.sql",
+    "003_oauth_dark_foundation.sql",
+    "004_oauth_authorization_code_flow.sql",
+    "005_oauth_token_lifecycle.sql",
+    "006_oauth_native_entitlements_dark.sql"
+  ],
+  "targets": 3,
+  "checks": {
+    "postgresql_native_foundation_constraints": "PASS",
+    "matching_legacy_and_native_authorization_sources": "PASS",
+    "both_mismatched_authorization_sources_rejected": "PASS",
+    "native_provenance_many_to_many_uniqueness_and_fk_guards": "PASS",
+    "encrypted_full_replace_restore": "PASS",
+    "native_grant_rows_survived_exactly": 2,
+    "native_authorization_provenance_rows_survived_exactly": 2,
+    "complete_pre_9A_1_oauth_backup_import": "PASS",
+    "previous_binary_legacy_authorization_issuance": "PASS",
+    "previous_binary_native_authorization_fail_closed": "PASS"
+  },
+  "repository_checks": {
+    "npm_ci": "PASS",
+    "typescript_lint": "PASS",
+    "typescript_build": "PASS",
+    "vitest_default_suite": "372 passed, 1 opt-in PostgreSQL test skipped",
+    "vitest_disposable_postgresql": "1 passed on PostgreSQL 16.15",
+    "python_unittest": "66 run, 2 expected skips, 0 failures",
+    "oauth_p0_contract_validator": "26 groups passed",
+    "native_spec_and_json_schemas": "validated by tests/test_oauth_native_contract.py",
+    "platform_validator": "27 passed, 7 documented warnings, 0 errors",
+    "git_diff_check": "PASS"
+  },
+  "production_or_coolify_contact": false,
+  "scope_limit": "This qualifies the local 9A.1 schema, backup and previous-binary compatibility smoke. It is not full N-to-N+1 production session/refresh survival evidence."
+}

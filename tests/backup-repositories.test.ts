@@ -24,10 +24,12 @@ const oauthSections = [
   "oauth_resource_entitlement_bindings",
   "oauth_scopes",
   "oauth_resource_scopes",
+  "oauth_native_human_grants",
   "oauth_client_resource_scopes",
   "oauth_signing_keys",
   "oauth_authorization_transactions",
   "oauth_authorizations",
+  "oauth_authorization_native_grants",
   "oauth_authorization_codes",
   "oauth_sessions",
   "oauth_refresh_token_families",
@@ -113,18 +115,19 @@ function fullBackup(): Record<string, unknown> {
 }
 
 describe("OAuth backup repository coverage", () => {
-  it("exports the seven legacy and exact seventeen OAuth sections with explicit deterministic queries", async () => {
+  it("exports the seven legacy and exact nineteen OAuth sections with explicit deterministic queries", async () => {
     const db = new RecordingDb();
     const exported = await new Repositories(db).exportBackup();
 
     expect(Object.keys(exported)).toEqual([...legacySections, ...oauthSections]);
-    expect(oauthSections).toHaveLength(17);
+    expect(oauthSections).toHaveLength(19);
     const migrationTables = [
       "migrations/003_oauth_dark_foundation.sql",
       "migrations/004_oauth_authorization_code_flow.sql",
-      "migrations/005_oauth_token_lifecycle.sql"
-    ].flatMap((path) => [...readFileSync(resolve(import.meta.dirname, "..", path), "utf8").matchAll(/CREATE TABLE IF NOT EXISTS (oauth_[a-z_]+)/g)].map((match) => match[1]));
-    expect(migrationTables).toEqual([...oauthSections]);
+      "migrations/005_oauth_token_lifecycle.sql",
+      "migrations/006_oauth_native_entitlements_dark.sql"
+    ].flatMap((path) => [...readFileSync(resolve(import.meta.dirname, "..", path), "utf8").matchAll(/CREATE TABLE(?: IF NOT EXISTS)? (oauth_[a-z_]+)/g)].map((match) => match[1]));
+    expect(new Set(migrationTables)).toEqual(new Set(oauthSections));
     expect(db.transactionCalls).toBe(1);
     expect(db.queries[0]).toEqual({
       sql: "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY",
@@ -132,7 +135,7 @@ describe("OAuth backup repository coverage", () => {
       transactional: true
     });
     const tableReads = db.queries.slice(1);
-    expect(tableReads).toHaveLength(24);
+    expect(tableReads).toHaveLength(26);
     expect(db.maxConcurrentQueries).toBe(1);
     expect(tableReads.every((query) => query.transactional)).toBe(true);
     expect(db.queries.some((query) => !query.transactional)).toBe(false);
@@ -149,6 +152,10 @@ describe("OAuth backup repository coverage", () => {
     expect(oauthSql).toContain("protected_downstream_state");
     expect(oauthSql).toContain("public_jwk");
     expect(oauthSql).toContain("protected_private_key_ref");
+    expect(oauthSql).toContain("entitlement_mode");
+    expect(oauthSql).toContain("entitlement_source");
+    expect(oauthSql).toContain("FROM oauth_native_human_grants");
+    expect(oauthSql).toContain("FROM oauth_authorization_native_grants");
     expect(oauthSql).not.toMatch(/\bclient_secret\b|\bresource_secret\b|\bauthorization_code\b|\baccess_token\b|\brefresh_token\b|\bprivate_key\b|\benv_secret\b/i);
   });
 
@@ -165,12 +172,36 @@ describe("OAuth backup repository coverage", () => {
       .rejects.toMatchObject({ name: "BackupValidationError", message: "Invalid backup data", statusCode: 400 });
     expect(partialDb.transactionCalls).toBe(0);
 
+    const incompleteNativeDb = new RecordingDb();
+    const incompleteNative = fullBackup();
+    delete incompleteNative.oauth_authorization_native_grants;
+    await expect(new Repositories(incompleteNativeDb).importBackup(incompleteNative, { replaceExisting: true }))
+      .rejects.toMatchObject({ name: "BackupValidationError", statusCode: 400 });
+    expect(incompleteNativeDb.transactionCalls).toBe(0);
+
     const wrongTypeDb = new RecordingDb();
     const wrongType = fullBackup();
     wrongType.oauth_revocations = {};
     await expect(new Repositories(wrongTypeDb).importBackup(wrongType, { replaceExisting: true }))
       .rejects.toMatchObject({ name: "BackupValidationError", message: "Invalid backup data", statusCode: 400 });
     expect(wrongTypeDb.transactionCalls).toBe(0);
+  });
+
+  it("imports a complete pre-9A.1 OAuth snapshot with explicit legacy defaults and no native grants", async () => {
+    const db = new RecordingDb();
+    const backup = fullBackup();
+    delete backup.oauth_native_human_grants;
+    delete backup.oauth_authorization_native_grants;
+    backup.oauth_resources = [{ id: "old-resource" }];
+    backup.oauth_authorizations = [{ id: "old-authorization" }];
+    const counts = await new Repositories(db).importBackup(backup, { replaceExisting: false });
+    expect(counts.oauth_native_human_grants).toBe(0);
+    expect(counts.oauth_authorization_native_grants).toBe(0);
+    const resourceInsert = db.queries.find((query) => /^INSERT INTO oauth_resources\b/i.test(query.sql));
+    const authorizationInsert = db.queries.find((query) => /^INSERT INTO oauth_authorizations\b/i.test(query.sql));
+    expect(resourceInsert?.params).toContain("legacy_bridge");
+    expect(authorizationInsert?.params).toContain("legacy_bridge");
+    expect(db.queries.some((query) => /^INSERT INTO oauth_native_human_grants\b/i.test(query.sql))).toBe(false);
   });
 
   it("keeps OAuth state untouched for a legacy-only merge and preserves the legacy count response", async () => {
@@ -187,15 +218,17 @@ describe("OAuth backup repository coverage", () => {
     await new Repositories(db).importBackup(legacyBackup(), { replaceExisting: true });
 
     const deletes = db.queries.filter((query) => /^DELETE FROM/i.test(query.sql)).map((query) => query.sql);
-    expect(deletes.slice(0, 17)).toEqual([
+    expect(deletes.slice(0, 19)).toEqual([
       "DELETE FROM oauth_revocations",
       "DELETE FROM oauth_refresh_tokens",
       "DELETE FROM oauth_refresh_token_families",
       "DELETE FROM oauth_sessions",
       "DELETE FROM oauth_authorization_codes",
+      "DELETE FROM oauth_authorization_native_grants",
       "DELETE FROM oauth_authorizations",
       "DELETE FROM oauth_authorization_transactions",
       "DELETE FROM oauth_client_resource_scopes",
+      "DELETE FROM oauth_native_human_grants",
       "DELETE FROM oauth_resource_scopes",
       "DELETE FROM oauth_resource_entitlement_bindings",
       "DELETE FROM oauth_resource_credentials",
@@ -206,7 +239,7 @@ describe("OAuth backup repository coverage", () => {
       "DELETE FROM oauth_resources",
       "DELETE FROM oauth_clients"
     ]);
-    expect(deletes[17]).toBe("DELETE FROM audit_logs");
+    expect(deletes[19]).toBe("DELETE FROM audit_logs");
     expect(deletes.indexOf("DELETE FROM oauth_resource_entitlement_bindings")).toBeLessThan(deletes.indexOf("DELETE FROM tools"));
     expect(db.queries.some((query) => /^INSERT INTO oauth_/i.test(query.sql))).toBe(false);
   });
@@ -224,9 +257,11 @@ describe("OAuth backup repository coverage", () => {
     backup.oauth_client_redirect_uris = [{ id: "redirect" }];
     backup.oauth_resource_entitlement_bindings = [{ id: "binding" }];
     backup.oauth_resource_scopes = [{ id: "resource-scope" }];
+    backup.oauth_native_human_grants = [{ id: "native-grant" }];
     backup.oauth_client_resource_scopes = [{ id: "client-resource-scope" }];
     backup.oauth_authorization_transactions = [{ id: "transaction" }];
     backup.oauth_authorizations = [{ id: "authorization" }];
+    backup.oauth_authorization_native_grants = [{ id: "authorization-native-grant" }];
     backup.oauth_authorization_codes = [{ id: "authorization-code" }];
     backup.oauth_sessions = [{ id: "session" }];
     backup.oauth_revocations = [{ id: "revocation" }];
@@ -265,9 +300,11 @@ describe("OAuth backup repository coverage", () => {
       "oauth_client_redirect_uris",
       "oauth_resource_entitlement_bindings",
       "oauth_resource_scopes",
+      "oauth_native_human_grants",
       "oauth_client_resource_scopes",
       "oauth_authorization_transactions",
       "oauth_authorizations",
+      "oauth_authorization_native_grants",
       "oauth_authorization_codes",
       "oauth_sessions",
       "oauth_refresh_token_families",

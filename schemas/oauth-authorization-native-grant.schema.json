@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://access-layer.unguess-internal.net/schemas/oauth-authorization-native-grant.v1.schema.json",
+  "title": "Historical OAuth native authorization grant provenance (Phase 9A.1; no API)",
+  "type": "object",
+  "required": ["id", "oauth_authorization_id", "oauth_native_human_grant_id", "created_at"],
+  "properties": {
+    "id": {"type": "string", "format": "uuid"},
+    "oauth_authorization_id": {"type": "string", "format": "uuid"},
+    "oauth_native_human_grant_id": {"type": "string", "format": "uuid"},
+    "created_at": {"type": "string", "format": "date-time"}
+  },
+  "additionalProperties": false
+}

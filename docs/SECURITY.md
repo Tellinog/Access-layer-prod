@@ -1,5 +1,9 @@
 # SECURITY.md
 
+## Phase 9A.1 native entitlement security boundary
+
+Native grants are database-only in this phase and cannot authorize current traffic. Linked grants reference internal `users.id`; pending email is never proof of a cross-provider identity link. No wildcard/prefix scope matching or legacy permission conversion is allowed. Authorization source is checked against resource mode at insertion, and historical grant links cannot authorize future refresh/introspection without current re-evaluation. A future evaluator must reject pending, expired, revoked, outside-window and unlinked rows. Resource/scope, grant-provenance and user deletion are restricted to preserve history. The temporary Microsoft bridge remains legacy-only. No new secret or log field is introduced; see `OAUTH_NATIVE_ENTITLEMENTS.md`.
+
 ## Temporary legacy Microsoft Entra security boundary
 
 The legacy bridge is disabled by default and available only to explicitly allowlisted tool slugs. It uses the tenant-specific Entra v2 authorization, token and JWKS endpoints; `common`, `organizations`, personal-account and Graph endpoints are not used. Validation requires an RS256 signature from that tenant's JWKS, exact tenant issuer, configured client audience, unexpired token, exact `tid`, non-empty `oid`, exact nonce, a syntactically valid email (or `preferred_username` fallback) and an allowlisted normalized email domain. Domain matching alone never replaces issuer/tenant/signature checks.

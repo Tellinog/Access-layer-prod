@@ -1,5 +1,13 @@
 # BACKLOG.md
 
+## Phase 9A.1 follow-up
+
+- **RESOLVED (2026-09-28):** Phase 9A.1 disposable PostgreSQL 16 qualification applied migrations 001–006 from three fresh databases, checked native grant/provenance constraints, encrypted full replace restore, complete pre-9A.1 backup import, and actual previous-binary legacy issuance/native fail-closed behavior. See `operations/phase9a1-qualification.evidence.json`. Native persisted rows still have no supported runtime/Admin writer; requalify after adding one.
+- **DEFERRED_SCOPE:** Phase 9A.2 must implement mode-aware native grant evaluation for authorize, exchange, refresh and introspection, including exact scope and validity/revocation checks, and decide how pending-email grants are explicitly linked to `users.id` without cross-provider email inference.
+- **DEFERRED_SCOPE:** Phase 9A.3 must provide native resource/grant Admin API and UI plus its audit/permission contract. The legacy-tool dropdown improvement remains in 9A.3.
+- **QUESTION:** Before native rollout, settle native grant expiry transition and retention. Phase 9A.1 now stores historical grant-ID provenance, but no runtime writer/evaluator exists and the links cannot replace current entitlement checks.
+- **DEFERRED_SCOPE:** Specify and implement the privileged, audited in-place `legacy_bridge -> native` transition on the same resource audience. It must prevent unsafe mixed serving, terminate or safely revoke legacy-derived OAuth sessions/authorizations, validate native scopes and grants, retire legacy bindings/mappings, and retain historical provenance. Arbitrary direct mode UPDATE remains blocked.
+
 - **QUESTION (2026-09-25, production Admin OAuth access):** D-048 fixes the reproduced all-15-key validation failure in source. After deploying this correction, edit the existing active `access-admin` grant, verify `/v1/me` reports `platform_admin` with `admin:oauth:read/write`, and verify `/admin/oauth` returns 200. The supplied request-completion log and browser console omit 400 response bodies; inspect any remaining 400 with its response `error.details` and correlation ID. No production grant was changed by this task.
 - **ASSUMPTION_TO_VALIDATE (2026-09-25, delegated Admin keys):** Other documented `tool_admin` keys containing `_assigned` are outside D-048's exact platform-admin exception. Validate their registered-key and grant-edit workflows separately before changing the frozen permission contract again.
 

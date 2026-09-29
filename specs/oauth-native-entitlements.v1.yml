@@ -60,6 +60,11 @@ authorization_provenance:
   code_exchange_and_refresh_current_grant_failure: invalid_grant
   introspection_current_grant_failure: active_false
   disabled_native_resource_introspection: authenticated_resource_credential_receives_active_false
+  resource_credential_introspection_status_policy:
+    legacy_bridge: [active]
+    native: [active, disabled]
+    draft: rejected_in_both_modes
+    other_credential_uses: forbidden
 backup:
   encrypted_export_and_import_includes_native_grants_and_provenance: true
   pre_9A_1_complete_oauth_backup_import: supported_with_empty_native_sections

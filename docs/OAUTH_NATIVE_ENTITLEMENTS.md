@@ -12,7 +12,7 @@ Code exchange and refresh compare the authorization source with the current reso
 
 Native evaluation takes PostgreSQL `FOR SHARE` locks on active client/resource/user, registration/allowance/scope and linked grant rows in canonical scope order. Code exchange and refresh retain their existing `FOR UPDATE` locks only on code or refresh family/session rows. Grant mutation waits for a transaction that has selected an effective grant; a mutation committed first is observed by the evaluator. Time is sampled after the grant locks using the later of the request clock and PostgreSQL clock. This defines the entitlement decision instant without broad table locks. Refresh replay retains the Step 4B atomic family/session revocation path.
 
-Resource credentials for disabled native resources remain usable only to obtain inactive introspection; legacy disabled-resource credential behavior stays as P0. Native resource creation, grant mutation, explicit pending-email linking and controlled in-place resource transition remain deferred. Google is the only OAuth vNext upstream provider; the legacy Microsoft bridge is unchanged.
+Resource credentials authenticate only for introspection. Active resources in either mode are accepted. A disabled native resource may authenticate only to obtain `{"active":false}`; a disabled legacy-bridge resource is rejected. Draft resources in either mode are rejected. Native resource creation, grant mutation, explicit pending-email linking and controlled in-place resource transition remain deferred. Google is the only OAuth vNext upstream provider; the legacy Microsoft bridge is unchanged.
 
 ## Model
 

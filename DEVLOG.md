@@ -1,5 +1,9 @@
 # DEVLOG.md
 
+## 2026-09-28 — Phase 9A.2 final credential and callback hardening
+
+Restricted introspection resource credential authentication to active legacy-bridge resources and active or disabled native resources. Draft resources in either mode and disabled legacy resources are rejected; disabled native resources still receive inactive introspection. Added default-suite native callback/evaluator tests for exact linked scopes, two-scope provenance, missing/pending/wrong-user/invalid-window grants, no legacy fallback and P0 issuance. Extended the disposable PostgreSQL 16 HTTP qualifier with the six-case credential matrix. D-050 wording and native security/contract/testing documentation now state that boundary explicitly. No migration, Admin native writer, production or deployment change was made. Final clean-commit checks are recorded in the external Phase 9A.2 summary.
+
 ## 2026-09-28 — Phase 9A.2 native OAuth entitlement runtime
 
 Implemented resource-mode dispatch for Google callback, code exchange, refresh and online introspection. Native decisions use exact active linked `users.id` grants and current client/resource/scope allowance with no legacy-tool or authorization-grant fallback. Authorization source and exact per-scope grant-ID provenance are persisted atomically with the code; lifecycle decisions re-evaluate current grants. The legacy P0 branch and external OAuth token/response shapes remain supported. Native Admin/API, pending-email linking, Microsoft OAuth and resource-mode transitions remain deferred.

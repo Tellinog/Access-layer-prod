@@ -830,6 +830,13 @@ async function main() {
     assert(jwks.statusCode === 200 && jwks.json().keys.length === 1, "JWKS must publish the dedicated signing key");
     assert(!stable(jwks.json()).includes("private"), "JWKS must not disclose private material");
     assert((await introspect(source.app, first.access_token)).json().active === true, "resource-owned introspection must be active");
+    for (const status of ["draft", "disabled"] as const) {
+      await sourceDb.query(`UPDATE oauth_resources SET status = $2 WHERE id = $1`, [IDS.oauthResource, status]);
+      const denied = await introspect(source.app, first.access_token);
+      assert(denied.statusCode === 401 && denied.json().error === "invalid_client",
+        `legacy_bridge ${status} resource credential must be rejected`);
+    }
+    await sourceDb.query(`UPDATE oauth_resources SET status = 'active' WHERE id = $1`, [IDS.oauthResource]);
     const normalRefresh = await refresh(source.app, first.refresh_token);
     assert(normalRefresh.statusCode === 200 && normalRefresh.json().refresh_token !== first.refresh_token, "normal refresh must rotate once");
     const revoke = await source.app.inject({
@@ -1016,6 +1023,10 @@ async function main() {
     await sourceDb.query(`UPDATE oauth_resources SET status = 'disabled' WHERE id = $1`, [NATIVE_RESOURCE_UUID]);
     assert((await nativeIntrospection(source.app, nativeRetained.access_token)).json().active === false,
       "disabled native resource must make introspection inactive");
+    await sourceDb.query(`UPDATE oauth_resources SET status = 'draft' WHERE id = $1`, [NATIVE_RESOURCE_UUID]);
+    const nativeDraftIntrospection = await nativeIntrospection(source.app, nativeRetained.access_token);
+    assert(nativeDraftIntrospection.statusCode === 401 && nativeDraftIntrospection.json().error === "invalid_client",
+      "draft native resource credential must be rejected");
     await sourceDb.query(`UPDATE oauth_resources SET status = 'active' WHERE id = $1`, [NATIVE_RESOURCE_UUID]);
     assert((await nativeIntrospection(source.app, nativeRetained.access_token)).json().active === true,
       "native entitlement must recover after synthetic fixture states are restored");
@@ -1143,6 +1154,7 @@ async function main() {
         real_oauth_http_e2e: "PASS",
         exact_issuer_pkce_rs256_ttl_jwks_claims: "PASS",
         resource_owned_introspection_and_revocation: "PASS",
+        resource_credential_mode_status_matrix: "PASS",
         real_refresh_concurrency_replay: { status: "PASS", iterations: concurrencyEvidence.length },
         repeatable_read_snapshot_coordination: "PASS",
         encrypted_replace_restore: "PASS",

@@ -136,6 +136,15 @@ interface HarnessOverrides {
   permissions?: string[];
   grant?: boolean;
   userStatus?: User["status"];
+  nativeGrants?: Array<{
+    scope: string;
+    id: string;
+    userId?: string | null;
+    status?: "active" | "pending_user_link" | "revoked";
+    validFrom?: Date;
+    validUntil?: Date | null;
+  }>;
+  registeredScopes?: string[];
 }
 
 function harness(overrides: HarnessOverrides = {}) {
@@ -144,6 +153,9 @@ function harness(overrides: HarnessOverrides = {}) {
   let upstreamNonce = "";
   let claimed = false;
   let linkCalls = 0;
+  let legacyBindingCalls = 0;
+  let legacyMappingCalls = 0;
+  let legacyGrantCalls = 0;
   let transactionDepth = 0;
   const auditEvents: AuditEventInput[] = [];
   const issuances: OAuthAuthorizationCodeIssuance[] = [];
@@ -157,15 +169,21 @@ function harness(overrides: HarnessOverrides = {}) {
     isClientResourceScopeAllowed: async () => overrides.allowed !== false,
     resolveClientById: async () => Object.hasOwn(overrides, "callbackClient") ? overrides.callbackClient! : selectedClient,
     resolveResourceById: async () => Object.hasOwn(overrides, "callbackResource") ? overrides.callbackResource! : selectedResource,
-    resolveActiveLegacyEntitlement: async () => overrides.entitlement === false ? null : ({
+    resolveActiveLegacyEntitlement: async () => {
+      legacyBindingCalls += 1;
+      return overrides.entitlement === false ? null : ({
       legacyToolId: "00000000-0000-4000-8000-000000000104",
       legacyToolSlug: "nancy-entitlement",
       registeredPermissionKeys: ["nancy:survey:read", "nancy:survey:write"]
-    }),
-    resolveResourceScopeMappings: async () => [
+      });
+    },
+    resolveResourceScopeMappings: async () => {
+      legacyMappingCalls += 1;
+      return [
       { resourceId: resource.resourceId, scope: "nancy:survey:read", legacyPermissionKey: "nancy:survey:read" },
       { resourceId: resource.resourceId, scope: "nancy:survey:write", legacyPermissionKey: "nancy:survey:write" }
-    ]
+      ];
+    }
   } as unknown as OAuthFoundationRepository;
   const flow = {
     withDb: () => flow,
@@ -251,13 +269,37 @@ function harness(overrides: HarnessOverrides = {}) {
     db: { transaction: async <T>(fn: (db: Db) => Promise<T>) => {
       transactionDepth += 1;
       try {
-        return await fn({} as Db);
+        const db = {
+          query: async (sql: string, params: unknown[] = []) => {
+            if (sql.includes("FROM oauth_client_resource_scopes allowance")) {
+              const scopes = params[3] as string[];
+              return { rows: scopes.filter((scope) =>
+                (overrides.registeredScopes ?? scopes).includes(scope)
+              ).map((scope) => ({ scope, scope_id: `scope-${scope}` })) };
+            }
+            if (sql.includes("FROM oauth_native_human_grants native_grant")) {
+              const scopes = params[2] as string[];
+              return { rows: (overrides.nativeGrants ?? []).filter((grant) =>
+                grant.userId === params[0] && grant.status === "active" && scopes.includes(grant.scope)
+              ).map((grant) => ({
+                scope: grant.scope, grant_id: grant.id,
+                valid_from: grant.validFrom ?? new Date(fixedNow.getTime() - 1),
+                valid_until: grant.validUntil ?? null
+              })) };
+            }
+            if (sql === "SELECT clock_timestamp() AS evaluated_at") return { rows: [{ evaluated_at: fixedNow }] };
+            throw new Error("Unexpected native evaluator query");
+          }
+        } as unknown as Db;
+        return await fn(db);
       } finally {
         transactionDepth -= 1;
       }
     } },
     withDb: () => txRepositories,
-    findActiveGrant: async () => overrides.grant === false ? null : ({
+    findActiveGrant: async () => {
+      legacyGrantCalls += 1;
+      return overrides.grant === false ? null : ({
       id: "00000000-0000-4000-8000-000000000106",
       tool_id: "00000000-0000-4000-8000-000000000104",
       user_id: user.id,
@@ -268,7 +310,8 @@ function harness(overrides: HarnessOverrides = {}) {
       valid_from: fixedNow,
       valid_until: null,
       created_by_user_id: null
-    })
+      });
+    }
   } as unknown as Repositories;
   const audit = {
     write: async (event: AuditEventInput) => { auditEvents.push(event); }
@@ -302,6 +345,7 @@ function harness(overrides: HarnessOverrides = {}) {
     upstreamState: () => upstreamState,
     upstreamNonce: () => upstreamNonce,
     linkCalls: () => linkCalls,
+    legacyCalls: () => ({ binding: legacyBindingCalls, mapping: legacyMappingCalls, grant: legacyGrantCalls }),
     expire: () => {
       if (transaction) transaction.expiresAt = new Date(fixedNow.getTime() - 1);
     }
@@ -455,6 +499,12 @@ describe("Step 3C callback, entitlement and issuance", () => {
     expect(h.linkCalls()).toBe(1);
     expect(h.issuances).toHaveLength(1);
     expect(h.issuances[0].codeHash).toBe(sha256(rawCode));
+    expect(h.issuances[0]).toMatchObject({
+      entitlementSource: "legacy_bridge",
+      legacyAuthorizationGrantId: "00000000-0000-4000-8000-000000000106"
+    });
+    expect(h.issuances[0]).not.toHaveProperty("nativeGrants");
+    expect(h.legacyCalls()).toEqual({ binding: 1, mapping: 1, grant: 1 });
     expect(h.issuances[0]).not.toHaveProperty("code");
     expect(h.issuances[0].expiresAt.getTime() - h.issuances[0].issuedAt.getTime()).toBe(OAUTH_AUTHORIZATION_CODE_TTL_MS);
     expect(h.transaction()).toMatchObject({ status: "completed", protectedDownstreamState: null });
@@ -462,6 +512,63 @@ describe("Step 3C callback, entitlement and issuance", () => {
     const replay = await h.service.callback(callbackQuery, requestContext);
     expect(replay).toMatchObject({ kind: "local_error", error: "invalid_request" });
     expect(h.issuances).toHaveLength(1);
+  });
+
+  it("dispatches native callback to exact linked grants and records two-scope provenance without legacy calls", async () => {
+    const nativeResource = { ...resource, entitlementMode: "native" as const };
+    const grants = [
+      { scope: "nancy:survey:read", id: "00000000-0000-4000-8000-000000000201", userId: user.id, status: "active" as const },
+      { scope: "nancy:survey:write", id: "00000000-0000-4000-8000-000000000202", userId: user.id, status: "active" as const }
+    ];
+    const h = harness({ resource: nativeResource, nativeGrants: grants });
+    const callbackQuery = await begin(h);
+    const result = await h.service.callback(callbackQuery, requestContext);
+    expect(new URL((result as { location: string }).location).searchParams.has("code")).toBe(true);
+    expect(h.issuances).toHaveLength(1);
+    expect(h.issuances[0]).toMatchObject({
+      entitlementSource: "native", legacyAuthorizationGrantId: null,
+      grantedScopes: ["nancy:survey:read", "nancy:survey:write"],
+      nativeGrants: grants.map((grant) => ({ scope: grant.scope, grantId: grant.id }))
+    });
+    expect(h.linkCalls()).toBe(0);
+    expect(h.legacyCalls()).toEqual({ binding: 0, mapping: 0, grant: 0 });
+  });
+
+  it("requires every native scope and never promotes pending-email, wrong-user or out-of-window grants", async () => {
+    const nativeResource = { ...resource, entitlementMode: "native" as const };
+    const read = { scope: "nancy:survey:read", id: "00000000-0000-4000-8000-000000000201", userId: user.id, status: "active" as const };
+    const wrongUser = "00000000-0000-4000-8000-000000000299";
+    const ineffective = [
+      [read],
+      [read, { scope: "nancy:survey:write", id: "pending", userId: null, status: "pending_user_link" as const }],
+      [read, { scope: "nancy:survey:write", id: "other", userId: wrongUser, status: "active" as const }],
+      [read, { scope: "nancy:survey:write", id: "future", userId: user.id, status: "active" as const, validFrom: new Date(fixedNow.getTime() + 1) }],
+      [read, { scope: "nancy:survey:write", id: "elapsed", userId: user.id, status: "active" as const, validUntil: fixedNow }],
+      [read, { scope: "nancy:survey:write", id: "revoked", userId: user.id, status: "revoked" as const }]
+    ];
+    for (const nativeGrants of ineffective) {
+      const h = harness({ resource: nativeResource, nativeGrants });
+      const result = await h.service.callback(await begin(h), requestContext);
+      expect(new URL((result as { location: string }).location).searchParams.get("error")).toBe("access_denied");
+      expect(h.issuances).toHaveLength(0);
+      expect(h.linkCalls()).toBe(0);
+      expect(h.legacyCalls()).toEqual({ binding: 0, mapping: 0, grant: 0 });
+    }
+  });
+
+  it("rejects an inactive native registration as invalid_scope before grant evaluation", async () => {
+    const h = harness({
+      resource: { ...resource, entitlementMode: "native" },
+      registeredScopes: ["nancy:survey:read"],
+      nativeGrants: [
+        { scope: "nancy:survey:read", id: "grant-read", userId: user.id, status: "active" },
+        { scope: "nancy:survey:write", id: "grant-write", userId: user.id, status: "active" }
+      ]
+    });
+    const result = await h.service.callback(await begin(h), requestContext);
+    expect(new URL((result as { location: string }).location).searchParams.get("error")).toBe("invalid_scope");
+    expect(h.issuances).toHaveLength(0);
+    expect(h.legacyCalls()).toEqual({ binding: 0, mapping: 0, grant: 0 });
   });
 
   it("denies an expired callback before Google exchange", async () => {

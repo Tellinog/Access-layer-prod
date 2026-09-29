@@ -34,6 +34,12 @@ export interface OAuthResourceAuthenticationRecord {
   secretHash: string;
 }
 
+/** Resource credentials are accepted only at the introspection boundary. */
+export function isResourceCredentialEligible(mode: string, status: string): boolean {
+  return (mode === "legacy_bridge" && status === "active") ||
+    (mode === "native" && (status === "active" || status === "disabled"));
+}
+
 export interface OAuthAuthorizationCodeContext {
   codeId: string;
   oauthAuthorizationId: string;
@@ -189,8 +195,11 @@ export class OAuthTokenRepository {
       oauth_resource_id: string;
       resource_id: string;
       secret_hash: string;
+      entitlement_mode: string;
+      resource_status: string;
     }>(`SELECT credential.credential_id, credential.oauth_resource_id,
-               resource.resource_id, credential.secret_hash
+               resource.resource_id, credential.secret_hash,
+               resource.entitlement_mode, resource.status AS resource_status
         FROM oauth_resource_credentials credential
         JOIN oauth_resources resource ON resource.id = credential.oauth_resource_id
         WHERE credential.credential_id = $1
@@ -199,10 +208,11 @@ export class OAuthTokenRepository {
           AND (credential.activated_at IS NULL OR credential.activated_at <= $2)
           AND (credential.expires_at IS NULL OR credential.expires_at > $2)
           AND credential.retired_at IS NULL
-          AND (resource.status = 'active' OR resource.entitlement_mode = 'native')
+          AND ((resource.entitlement_mode = 'legacy_bridge' AND resource.status = 'active')
+            OR (resource.entitlement_mode = 'native' AND resource.status IN ('active', 'disabled')))
         ORDER BY credential.created_at DESC, credential.id
         FOR SHARE OF credential, resource`, [credentialId, now]);
-    return result.rows.map((row) => ({
+    return result.rows.filter((row) => isResourceCredentialEligible(row.entitlement_mode, row.resource_status)).map((row) => ({
       credentialId: row.credential_id,
       oauthResourceId: row.oauth_resource_id,
       resourceId: row.resource_id,

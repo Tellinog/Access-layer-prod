@@ -10,6 +10,8 @@ import { buildApplication } from "../../src/application.js";
 import { PostgresDb, type Db } from "../../src/db.js";
 import type { GoogleOidcClient } from "../../src/google.js";
 import { OAuthAuthorizationFlowRepository } from "../../src/oauth/flow-repository.js";
+import { OAuthAdminRepository } from "../../src/oauth/admin-repository.js";
+import { OAuthAdminService } from "../../src/oauth/admin-service.js";
 import type { OAuthUpstreamGoogleClient } from "../../src/oauth/google.js";
 import { OAuthFoundationRepository } from "../../src/oauth/repository.js";
 import { evaluateNativeEntitlement } from "../../src/oauth/native-entitlement.js";
@@ -71,12 +73,15 @@ const REDIRECT_URI = "https://step4b-client.invalid/callback";
 const LEGACY_RETURN_URI = "https://step4b-legacy.invalid/callback";
 const SCOPE = "step4b:records:read";
 const NATIVE_RESOURCE_ID = "https://step4b-native.invalid/v1";
-const NATIVE_RESOURCE_CREDENTIAL_ID = "step4b-native-resource";
-const NATIVE_RESOURCE_SECRET = `step4b_native_resource_${randomBytes(24).toString("base64url")}`;
+const NATIVE_CLIENT_ID = "step4b-native-admin-client";
+const NATIVE_REDIRECT_URI = "https://step4b-native-client.invalid/callback";
+let NATIVE_CLIENT_SECRET = "";
+let NATIVE_RESOURCE_CREDENTIAL_ID = "";
+let NATIVE_RESOURCE_SECRET = "";
 const NATIVE_SCOPES = ["step4b:native:read", "step4b:native:write"];
-const NATIVE_RESOURCE_UUID = "10000000-0000-4000-8000-000000000020";
-const NATIVE_SCOPE_IDS = ["10000000-0000-4000-8000-000000000021", "10000000-0000-4000-8000-000000000022"];
-const NATIVE_GRANT_IDS = ["10000000-0000-4000-8000-000000000023", "10000000-0000-4000-8000-000000000024"];
+let NATIVE_RESOURCE_UUID = "";
+const NATIVE_SCOPE_IDS: string[] = [];
+const NATIVE_GRANT_IDS: string[] = [];
 const PERMISSION = "step4b:records:read";
 const BACKUP_API_TOKEN = `step4b_backup_api_${randomBytes(32).toString("base64url")}`;
 const BACKUP_KEY = `step4b_backup_key_${randomBytes(32).toString("base64url")}`;
@@ -366,7 +371,7 @@ function config(databaseUrl: string, signingRoot: string): Config {
   };
 }
 
-async function buildRealApp(db: Db, appConfig: Config, google = new FakeGoogle()) {
+async function buildRealApp(db: Db, appConfig: Config, google = new FakeGoogle(), adminNow?: () => Date) {
   const repositories = new Repositories(db);
   const tokenService = new TokenService(appConfig);
   await tokenService.init();
@@ -380,6 +385,7 @@ async function buildRealApp(db: Db, appConfig: Config, google = new FakeGoogle()
       config: appConfig,
       repository: new OAuthTokenRepository(db)
     }),
+    oauthAdminService: new OAuthAdminService({ config: appConfig, repository: new OAuthAdminRepository(db), now: adminNow }),
     audit: new AuditLogger(repositories),
     google,
     tokenService
@@ -407,7 +413,6 @@ async function verifyMigrationFiles() {
 async function seedSource(db: PostgresDb, privateKeyRef: string, publicJwk: Record<string, unknown>, publicFingerprint: string) {
   const clientHash = await hashOAuthCredentialSecret(CLIENT_SECRET, OAUTH_PEPPER);
   const resourceHash = await hashOAuthCredentialSecret(RESOURCE_SECRET, OAUTH_PEPPER);
-  const nativeResourceHash = await hashOAuthCredentialSecret(NATIVE_RESOURCE_SECRET, OAUTH_PEPPER);
   const toolHash = await hashToolSecret(LEGACY_TOOL_CLIENT_SECRET, TOOL_PEPPER);
   await db.transaction(async (tx) => {
     await tx.query(`INSERT INTO users (id, google_sub, email, email_normalized, email_verified, hd, display_name, status)
@@ -440,29 +445,6 @@ async function seedSource(db: PostgresDb, privateKeyRef: string, publicJwk: Reco
         status, published_at, activates_at
       ) VALUES ($1,'step4b-oauth-key',$2::jsonb,$3,$4,'active',now() - interval '10 minutes',now() - interval '5 minutes')`,
       [IDS.oauthSigningKey, JSON.stringify(publicJwk), publicFingerprint, privateKeyRef]);
-    await tx.query(`INSERT INTO oauth_resources
-      (id, resource_id, display_name, status, owner_team, protected_resource_metadata_url, entitlement_mode)
-      VALUES ($1,$2,'Synthetic native resource','active','step4b',
-        'https://step4b-native.invalid/.well-known/oauth-protected-resource','native')`,
-      [NATIVE_RESOURCE_UUID, NATIVE_RESOURCE_ID]);
-    await tx.query(`INSERT INTO oauth_resource_credentials
-      (oauth_resource_id, credential_id, secret_hash, status, activated_at)
-      VALUES ($1,$2,$3,'active',now())`,
-      [NATIVE_RESOURCE_UUID, NATIVE_RESOURCE_CREDENTIAL_ID, nativeResourceHash]);
-    for (let index = 0; index < NATIVE_SCOPES.length; index += 1) {
-      await tx.query(`INSERT INTO oauth_scopes (id, scope, description, status)
-        VALUES ($1,$2,'Synthetic native scope','active')`, [NATIVE_SCOPE_IDS[index], NATIVE_SCOPES[index]]);
-      await tx.query(`INSERT INTO oauth_resource_scopes
-        (oauth_resource_id, oauth_scope_id, legacy_permission_key, status)
-        VALUES ($1,$2,NULL,'active')`, [NATIVE_RESOURCE_UUID, NATIVE_SCOPE_IDS[index]]);
-      await tx.query(`INSERT INTO oauth_client_resource_scopes
-        (oauth_client_id, oauth_resource_id, oauth_scope_id, status)
-        VALUES ($1,$2,$3,'active')`, [IDS.oauthClient, NATIVE_RESOURCE_UUID, NATIVE_SCOPE_IDS[index]]);
-      await tx.query(`INSERT INTO oauth_native_human_grants
-        (id, oauth_resource_id, oauth_scope_id, user_id, status, valid_from)
-        VALUES ($1,$2,$3,$4,'active',now() - interval '1 minute')`,
-        [NATIVE_GRANT_IDS[index], NATIVE_RESOURCE_UUID, NATIVE_SCOPE_IDS[index], IDS.user]);
-    }
   });
 }
 
@@ -528,14 +510,14 @@ async function nativeAuthorization(
   const verifier = randomBytes(48).toString("base64url");
   const authorize = new URL("https://step4b-issuer.invalid/oauth/authorize");
   for (const [key, value] of Object.entries({
-    response_type: "code", client_id: CLIENT_ID, redirect_uri: REDIRECT_URI,
+    response_type: "code", client_id: NATIVE_CLIENT_ID, redirect_uri: NATIVE_REDIRECT_URI,
     scope: requestedScopes.join(" "), state, code_challenge: sha256(verifier),
     code_challenge_method: "S256", resource: NATIVE_RESOURCE_ID
   })) authorize.searchParams.set(key, value);
   const start = await app.inject({ method: "GET", url: `${authorize.pathname}${authorize.search}` });
   assert(start.statusCode === 302, "native authorize must redirect to Google adapter");
   const upstream = new URL(String(start.headers.location));
-  if (upstream.origin + upstream.pathname === REDIRECT_URI) {
+  if (upstream.origin + upstream.pathname === NATIVE_REDIRECT_URI) {
     return { code: null, error: upstream.searchParams.get("error"), verifier };
   }
   assert(upstream.hostname === "accounts.google.invalid", "native authorization must use Google adapter");
@@ -543,7 +525,7 @@ async function nativeAuthorization(
     url: `/oauth/upstream/google/callback?state=${encodeURIComponent(upstream.searchParams.get("state") ?? "")}&code=${encodeURIComponent(GOOGLE_AUTHORIZATION_CODE)}` });
   assert(callback.statusCode === 302, "native callback must redirect downstream");
   const downstream = new URL(String(callback.headers.location));
-  assert(downstream.origin + downstream.pathname === REDIRECT_URI, "native redirect must remain exact");
+  assert(downstream.origin + downstream.pathname === NATIVE_REDIRECT_URI, "native redirect must remain exact");
   assert(downstream.searchParams.get("state") === state, "native state must round-trip");
   assert(downstream.searchParams.get("iss") === "https://step4b-issuer.invalid", "native response must include issuer");
   return { code: downstream.searchParams.get("code"), error: downstream.searchParams.get("error"), verifier };
@@ -551,9 +533,9 @@ async function nativeAuthorization(
 
 async function nativeExchange(app: Awaited<ReturnType<typeof buildApplication>>, code: string, verifier: string) {
   return app.inject({ method: "POST", url: "/oauth/token",
-    headers: { "content-type": "application/x-www-form-urlencoded", authorization: basic(CLIENT_ID, CLIENT_SECRET) },
-    payload: form({ grant_type: "authorization_code", code, redirect_uri: REDIRECT_URI,
-      client_id: CLIENT_ID, code_verifier: verifier, resource: NATIVE_RESOURCE_ID }) });
+    headers: { "content-type": "application/x-www-form-urlencoded", authorization: basic(NATIVE_CLIENT_ID, NATIVE_CLIENT_SECRET) },
+    payload: form({ grant_type: "authorization_code", code, redirect_uri: NATIVE_REDIRECT_URI,
+      client_id: NATIVE_CLIENT_ID, code_verifier: verifier, resource: NATIVE_RESOURCE_ID }) });
 }
 
 async function nativeIntrospection(app: Awaited<ReturnType<typeof buildApplication>>, token: string) {
@@ -565,29 +547,9 @@ async function nativeIntrospection(app: Awaited<ReturnType<typeof buildApplicati
 
 async function nativeRefresh(app: Awaited<ReturnType<typeof buildApplication>>, token: string, scope?: string) {
   return app.inject({ method: "POST", url: "/oauth/token",
-    headers: { "content-type": "application/x-www-form-urlencoded", authorization: basic(CLIENT_ID, CLIENT_SECRET) },
-    payload: form({ grant_type: "refresh_token", refresh_token: token, client_id: CLIENT_ID,
+    headers: { "content-type": "application/x-www-form-urlencoded", authorization: basic(NATIVE_CLIENT_ID, NATIVE_CLIENT_SECRET) },
+    payload: form({ grant_type: "refresh_token", refresh_token: token, client_id: NATIVE_CLIENT_ID,
       resource: NATIVE_RESOURCE_ID, ...(scope ? { scope } : {}) }) });
-}
-
-async function retireAndReplaceNativeGrant(db: PostgresDb, index: number, status: "revoked" | "expired") {
-  const current = await db.query<{ id: string }>(`SELECT id FROM oauth_native_human_grants
-    WHERE user_id = $1 AND oauth_resource_id = $2 AND oauth_scope_id = $3 AND status = 'active'`,
-    [IDS.user, NATIVE_RESOURCE_UUID, NATIVE_SCOPE_IDS[index]]);
-  assert(current.rows.length === 1, "native fixture must have one active linked grant");
-  if (status === "revoked") {
-    await db.query(`UPDATE oauth_native_human_grants SET status = 'revoked', revoked_at = now(),
-      revoked_by_user_id = $2, updated_at = now() WHERE id = $1`, [current.rows[0].id, IDS.user]);
-  } else {
-    await db.query(`UPDATE oauth_native_human_grants SET status = 'expired', updated_at = now()
-      WHERE id = $1`, [current.rows[0].id]);
-  }
-  const replacement = randomUUID();
-  await db.query(`INSERT INTO oauth_native_human_grants
-    (id, oauth_resource_id, oauth_scope_id, user_id, status, valid_from)
-    VALUES ($1,$2,$3,$4,'active',now() - interval '1 minute')`,
-    [replacement, NATIVE_RESOURCE_UUID, NATIVE_SCOPE_IDS[index], IDS.user]);
-  return replacement;
 }
 
 async function exerciseConcurrentRefreshReplay(input: {
@@ -681,7 +643,8 @@ async function exerciseConcurrentRefreshReplay(input: {
   return diagnostic;
 }
 
-async function seedRestoreAdmin(db: PostgresDb, appConfig: Config, tokenService: TokenService) {
+async function seedRestoreAdmin(db: PostgresDb, appConfig: Config, tokenService: TokenService,
+  permissions = ["admin:backup:write"]) {
   const userId = "20000000-0000-4000-8000-000000000001";
   const toolId = "20000000-0000-4000-8000-000000000002";
   const grantId = "20000000-0000-4000-8000-000000000003";
@@ -691,7 +654,7 @@ async function seedRestoreAdmin(db: PostgresDb, appConfig: Config, tokenService:
       VALUES ($1,'step4b-restore-admin-sub','step4b-admin@example.invalid','step4b-admin@example.invalid',true,'example.invalid','active')`, [userId]);
     await tx.query(`INSERT INTO tools (id, slug, display_name, status, allowed_return_urls) VALUES ($1,'access-admin','Synthetic Restore Admin','active','[]'::jsonb)`, [toolId]);
     await tx.query(`INSERT INTO authorization_grants (id, tool_id, user_id, role, permissions, status)
-      VALUES ($1,$2,$3,'platform_admin','["admin:backup:write"]'::jsonb,'active')`, [grantId, toolId, userId]);
+      VALUES ($1,$2,$3,'platform_admin',$4::jsonb,'active')`, [grantId, toolId, userId, JSON.stringify(permissions)]);
     await tx.query(`INSERT INTO sessions (id,user_id,tool_id,grant_id,status,issued_at,expires_at)
       VALUES ($1,$2,$3,$4,'active',now(),now() + interval '15 minutes')`, [sessionId, userId, toolId, grantId]);
   });
@@ -699,9 +662,69 @@ async function seedRestoreAdmin(db: PostgresDb, appConfig: Config, tokenService:
   return tokenService.issueAccessToken({
     user: { id: userId, google_sub: "step4b-restore-admin-sub", email: "step4b-admin@example.invalid", email_normalized: "step4b-admin@example.invalid", email_verified: true, hd: "example.invalid", display_name: null, picture_url: null, status: "active", first_seen_at: now, last_seen_at: now },
     tool: { id: toolId, slug: "access-admin", display_name: "Synthetic Restore Admin", description: null, status: "active", allowed_return_urls: [], owner_email: null, created_at: now, updated_at: now },
-    grant: { id: grantId, tool_id: toolId, user_id: userId, email_normalized: null, role: "platform_admin", permissions: ["admin:backup:write"], status: "active", valid_from: now, valid_until: null, created_by_user_id: null },
+    grant: { id: grantId, tool_id: toolId, user_id: userId, email_normalized: null, role: "platform_admin", permissions, status: "active", valid_from: now, valid_until: null, created_by_user_id: null },
     session: { id: sessionId, user_id: userId, tool_id: toolId, grant_id: grantId, status: "active", issued_at: now, expires_at: new Date(now.getTime() + 900_000), revoked_at: null, last_seen_at: null }
   });
+}
+
+async function createNativeGraphThroughAdmin(app: Awaited<ReturnType<typeof buildApplication>>, adminToken: string,
+  advanceAdminClock: () => void) {
+  const headers = { authorization: `Bearer ${adminToken}`, "content-type": "application/json" };
+  const post = async (path: string, payload: Record<string, unknown>) => {
+    const response = await app.inject({ method: "POST", url: `/v1/admin/oauth${path}`, headers, payload });
+    assert(response.statusCode === 200, `Admin ${path} must succeed (HTTP ${response.statusCode})`);
+    return response.json() as Record<string, unknown>;
+  };
+  for (const scope of NATIVE_SCOPES) {
+    const created = await post("/scopes", { scope, description: `Synthetic ${scope} scope` });
+    NATIVE_SCOPE_IDS.push(String(created.id));
+  }
+  const users = await app.inject({ method: "GET", url: "/v1/admin/oauth/users?q=step4b-person", headers });
+  assert(users.statusCode === 200, "Admin existing-user lookup must succeed");
+  const found = users.json() as Array<Record<string, unknown>>;
+  assert(found.length === 1 && found[0].id === IDS.user && !Object.hasOwn(found[0], "google_sub"),
+    "Admin user lookup must select internal user ID without provider subject");
+  const resource = await post("/resources", {
+    resource_id: NATIVE_RESOURCE_ID, display_name: "Synthetic native resource", owner_team: "step4b",
+    owner_contact: null, status: "active", entitlement_mode: "native", scopes: NATIVE_SCOPES,
+    protected_resource_metadata_url: "https://step4b-native.invalid/.well-known/oauth-protected-resource"
+  });
+  NATIVE_RESOURCE_UUID = String((resource.resource as Record<string, unknown>).id);
+  NATIVE_RESOURCE_CREDENTIAL_ID = String(resource.resource_credential_id);
+  NATIVE_RESOURCE_SECRET = String(resource.resource_credential_secret);
+  const grants = await post("/native-grants", { resource_id: NATIVE_RESOURCE_UUID, user_id: IDS.user, scopes: NATIVE_SCOPES });
+  const rows = grants.grants as Array<{ id: string; scope: string }>;
+  assert(rows.length === 2, "Admin must create two normalized native grants");
+  for (const scope of NATIVE_SCOPES) NATIVE_GRANT_IDS.push(rows.find((row) => row.scope === scope)!.id);
+  const client = await post("/clients", {
+    client_id: NATIVE_CLIENT_ID, client_name: "Synthetic Admin-created native client", owner_team: "step4b",
+    owner_contact: null, status: "active", grant_types: ["authorization_code", "refresh_token"],
+    redirect_uris: [NATIVE_REDIRECT_URI],
+    allowances: NATIVE_SCOPES.map((scope) => ({ resource_id: NATIVE_RESOURCE_ID, scope }))
+  });
+  NATIVE_CLIENT_SECRET = String(client.client_secret);
+  assert(NATIVE_CLIENT_SECRET.startsWith("ocs_"), "Admin client must disclose a one-time secret");
+  const compatibilityAllowances = await app.inject({ method: "PUT", url: `/v1/admin/oauth/clients/${IDS.oauthClient}/allowances`,
+    headers, payload: { allowances: [{ resource_id: RESOURCE_ID, scope: SCOPE },
+      ...NATIVE_SCOPES.map((scope) => ({ resource_id: NATIVE_RESOURCE_ID, scope }))] } });
+  assert(compatibilityAllowances.statusCode === 200, "existing client allowances must accept native resource scopes");
+  const stagedKey = await post("/signing-keys", {});
+  const keyId = String(stagedKey.id);
+  await post(`/signing-keys/${keyId}/publish`, {});
+  advanceAdminClock();
+  const activatedKey = await post(`/signing-keys/${keyId}/activate`, {});
+  assert(activatedKey.status === "active", "Admin-published key must activate after the required lead");
+  const legacyResource = await post("/resources", {
+    resource_id: "https://step4b-admin-legacy.invalid/v1", display_name: "Synthetic Admin legacy bridge",
+    owner_team: "step4b", owner_contact: null, status: "active", entitlement_mode: "legacy_bridge",
+    protected_resource_metadata_url: "https://step4b-admin-legacy.invalid/.well-known/oauth-protected-resource",
+    legacy_tool_slug: "step4b-tool", scope_mappings: [{ scope: SCOPE, legacy_permission_key: PERMISSION }]
+  });
+  const legacyId = String((legacyResource.resource as Record<string, unknown>).id);
+  const status = await app.inject({ method: "PATCH", url: `/v1/admin/oauth/resources/${legacyId}/status`,
+    headers, payload: { status: "disabled" } });
+  assert(status.statusCode === 200, "Admin legacy-bridge lifecycle must update status");
+  return { legacyId };
 }
 
 async function legacyBaselineSmoke(databaseUrl: string, appConfig: Config, tempRoot: string) {
@@ -816,8 +839,15 @@ async function main() {
     });
     assert(signingPreflight.claims.exp - signingPreflight.claims.iat === 900, "dedicated OAuth signing key preflight must succeed");
     const observedSourceDb = new ObservedDb(sourceDb);
-    const source = await buildRealApp(observedSourceDb, sourceConfig);
+    let adminClock = new Date(Date.now() - 301_000);
+    const source = await buildRealApp(observedSourceDb, sourceConfig, new FakeGoogle(), () => adminClock);
     apps.push(source.app);
+    const adminToken = await seedRestoreAdmin(sourceDb, sourceConfig, source.tokenService,
+      ["admin:oauth:read", "admin:oauth:write"]);
+    const adminGraph = await createNativeGraphThroughAdmin(source.app, adminToken.token, () => { adminClock = new Date(); });
+    const legacyAdminBinding = await sourceDb.query<{ count: number }>(
+      `SELECT count(*)::int AS count FROM oauth_resource_entitlement_bindings WHERE oauth_resource_id = $1`, [adminGraph.legacyId]);
+    assert(legacyAdminBinding.rows[0].count === 1, "Admin-created legacy resource must retain exact entitlement binding");
 
     const first = await loginAndExchange(source.app, source.google, "step4b-normal-state", () => stable(observedSourceDb.state.errors));
     assert(first.token_type === "Bearer" && first.expires_in === 900 && first.scope === SCOPE, "token response must be exact");
@@ -848,6 +878,11 @@ async function main() {
     assert((await introspect(source.app, normalRefresh.json().access_token)).json().active === false, "revoked family access token must introspect inactive");
     assert((await refresh(source.app, normalRefresh.json().refresh_token)).statusCode === 400, "revoked refresh token must be invalid_grant");
 
+    await sourceDb.query(`UPDATE authorization_grants SET status = 'revoked' WHERE id = $1`, [IDS.grant]);
+    const noActiveLegacyGrant = await sourceDb.query<{ count: number }>(
+      `SELECT count(*)::int AS count FROM authorization_grants WHERE user_id = $1 AND status = 'active'`, [IDS.user]);
+    assert(noActiveLegacyGrant.rows[0].count === 0, "native flow must run without an active legacy authorization grant");
+
     const nativeStart = await nativeAuthorization(source.app, source.google, "step4b-native-happy");
     assert(nativeStart.code && !nativeStart.error,
       `native two-scope authorization must issue a code (error=${nativeStart.error}, db=${stable(observedSourceDb.state.errors)})`);
@@ -874,16 +909,15 @@ async function main() {
     const nativeNarrow = await nativeRefresh(source.app, nativeFirst.refresh_token, NATIVE_SCOPES[0]);
     assert(nativeNarrow.statusCode === 200 && nativeNarrow.json().scope === NATIVE_SCOPES[0],
       "native refresh may narrow to currently entitled scope");
+    await sourceDb.query(`UPDATE authorization_grants SET status = 'active' WHERE id = $1`, [IDS.grant]);
 
     const beforeExchange = await nativeAuthorization(source.app, source.google, "step4b-native-revoke-before-exchange");
     assert(beforeExchange.code, "native pre-revocation authorization must issue a code");
-    await retireAndReplaceNativeGrant(sourceDb, 0, "revoked");
-    // Revoke the active replacement as well: historical provenance cannot authorize exchange.
-    const liveRead = await sourceDb.query<{ id: string }>(`SELECT id FROM oauth_native_human_grants
-      WHERE user_id = $1 AND oauth_resource_id = $2 AND oauth_scope_id = $3 AND status = 'active'`,
-      [IDS.user, NATIVE_RESOURCE_UUID, NATIVE_SCOPE_IDS[0]]);
-    await sourceDb.query(`UPDATE oauth_native_human_grants SET status = 'revoked', revoked_at = now(),
-      revoked_by_user_id = $2 WHERE id = $1`, [liveRead.rows[0].id, IDS.user]);
+    const revokeNative = await source.app.inject({ method: "POST",
+      url: `/v1/admin/oauth/native-grants/${NATIVE_GRANT_IDS[0]}/revoke`,
+      headers: { authorization: `Bearer ${adminToken.token}`, "content-type": "application/json" }, payload: {} });
+    assert(revokeNative.statusCode === 200 && revokeNative.json().status === "revoked",
+      "Admin must explicitly revoke one native scope grant");
     const deniedExchange = await nativeExchange(source.app, beforeExchange.code, beforeExchange.verifier);
     assert(deniedExchange.statusCode === 400 && deniedExchange.json().error === "invalid_grant",
       "native exchange must reject revocation after authorization");
@@ -892,10 +926,11 @@ async function main() {
     const deniedRefresh = await nativeRefresh(source.app, nativeNarrow.json().refresh_token);
     assert(deniedRefresh.statusCode === 400 && deniedRefresh.json().error === "invalid_grant",
       "native refresh must reject revoked current entitlement");
-    await sourceDb.query(`INSERT INTO oauth_native_human_grants
-      (oauth_resource_id, oauth_scope_id, user_id, status, valid_from)
-      VALUES ($1,$2,$3,'active',now() - interval '1 minute')`,
-      [NATIVE_RESOURCE_UUID, NATIVE_SCOPE_IDS[0], IDS.user]);
+    const regrantNative = await source.app.inject({ method: "POST", url: "/v1/admin/oauth/native-grants",
+      headers: { authorization: `Bearer ${adminToken.token}`, "content-type": "application/json" },
+      payload: { resource_id: NATIVE_RESOURCE_UUID, user_id: IDS.user, scopes: [NATIVE_SCOPES[0]] } });
+    assert(regrantNative.statusCode === 200 && regrantNative.json().grants.length === 1,
+      "Admin must restore access through a new grant row");
 
     const nativeRetainedStart = await nativeAuthorization(source.app, source.google, "step4b-native-backup");
     assert(nativeRetainedStart.code, "native retained authorization must issue a code");
@@ -1115,10 +1150,10 @@ async function main() {
     const restoreConfig = { ...sourceConfig, databaseUrl: restoreUrl };
     const restore = await buildRealApp(restoreDb, restoreConfig);
     apps.push(restore.app);
-    const adminToken = await seedRestoreAdmin(restoreDb, restoreConfig, restore.tokenService);
+    const restoreAdminToken = await seedRestoreAdmin(restoreDb, restoreConfig, restore.tokenService);
     const restoreResponse = await restore.app.inject({
       method: "POST", url: "/v1/admin/backup/import",
-      headers: { authorization: `Bearer ${adminToken.token}`, "content-type": "application/json" },
+      headers: { authorization: `Bearer ${restoreAdminToken.token}`, "content-type": "application/json" },
       payload: { backup: encryptedBackup, replace_existing: true, confirm_replace: true }
     });
     assert(restoreResponse.statusCode === 200, "encrypted replace_existing restore must succeed through HTTP");
@@ -1132,7 +1167,7 @@ async function main() {
     const nativePostRestoreRefresh = await nativeRefresh(restore.app, nativeRetained.refresh_token);
     assert(nativePostRestoreRefresh.statusCode === 200, "restored native refresh lineage must rotate");
     const nativeRevocation = await restore.app.inject({ method: "POST", url: "/oauth/revoke",
-      headers: { "content-type": "application/x-www-form-urlencoded", authorization: basic(CLIENT_ID, CLIENT_SECRET) },
+      headers: { "content-type": "application/x-www-form-urlencoded", authorization: basic(NATIVE_CLIENT_ID, NATIVE_CLIENT_SECRET) },
       payload: form({ token: nativePostRestoreRefresh.json().refresh_token, token_type_hint: "refresh_token" }) });
     assert(nativeRevocation.statusCode === 200, "native refresh family revocation endpoint must succeed");
     assert((await nativeIntrospection(restore.app, nativePostRestoreRefresh.json().access_token)).json().active === false,
@@ -1160,6 +1195,10 @@ async function main() {
         encrypted_replace_restore: "PASS",
         post_restore_access_and_refresh_continuity: "PASS",
         native_two_scope_http_lifecycle_and_provenance: "PASS",
+        admin_created_native_resource_grants_client_key_and_allowances: "PASS",
+        admin_native_user_lookup_and_no_legacy_binding: "PASS",
+        admin_native_revoke_and_new_row_regrant: "PASS",
+        admin_legacy_bridge_creation_and_lifecycle: "PASS",
         native_revocation_exchange_refresh_introspection: "PASS",
         native_encrypted_backup_restore_continuity: "PASS",
         native_grant_mutation_lock_order: "PASS",

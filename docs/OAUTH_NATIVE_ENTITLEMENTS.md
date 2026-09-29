@@ -1,6 +1,14 @@
-# OAuth native entitlements after Phase 9A.2
+# OAuth native entitlements after Phase 9A.3
 
-Status: **native protocol runtime implemented; native Admin writer/UI deferred**. Phase 9A.1 supplied migration 006. Phase 9A.2 uses it without a new migration. The frozen OAuth P0 contract in `OAUTH_P0_CONTRACT.md` and `specs/oauth-p0.v1.yml` remains the supported `legacy_bridge` compatibility profile. Native resources are available to controlled SQL fixtures; `/admin/oauth` still creates legacy-bridge resources only.
+## Phase 9A.3 administration
+
+`/admin/oauth` now creates explicit `native` resources and exact native human grants for existing active `users.id` records. The operator selects registered active scopes, searches users by email/display name, sees resource-filtered grants and explicitly revokes one grant. Native resource scopes store `legacy_permission_key=NULL`; native resources have no legacy-tool binding. The resource introspection credential remains generated and disclosed once. The legacy-bridge form uses an active-tool dropdown and that tool's registered permission keys. An omitted `entitlement_mode` is accepted only for the complete historical P0 `legacy_tool_slug` plus `scope_mappings` request; mixed shapes are rejected.
+
+The grant writer creates one row per exact canonical scope atomically, records the current Admin actor, and accepts optional validity dates. A time-elapsed persisted `active` row is marked terminal `expired` in the same transaction before a replacement is inserted. A currently active row is a deterministic conflict and is never silently changed. Revocation writes `status='revoked'`, timestamp, actor and update time atomically. Creation and revocation each write sanitized `oauth.native_grant.changed` audit metadata in the mutation transaction. Audit failure rolls back the mutation. Resource-mode UPDATE remains blocked by migration 006; no migration 007 is needed.
+
+Only active, already linked Access Layer users can receive grants here. The Admin API has no pending-email writer and the OAuth callback does not link by email. Google remains the sole OAuth upstream identity provider, while token `sub` retains its existing Google subject contract. Native OAuth is now operationally manageable; controlled `legacy_bridge -> native` migration, pending-email linking and multi-IdP OAuth remain deferred.
+
+Status: **native runtime and Admin management implemented locally**. Phase 9A.1 supplied migration 006. Phase 9A.2 uses it without a new migration. The frozen OAuth P0 contract in `OAUTH_P0_CONTRACT.md` and `specs/oauth-p0.v1.yml` remains the supported `legacy_bridge` compatibility profile. No production enablement is implied.
 
 ## Phase 9A.2 runtime decision
 
@@ -36,4 +44,4 @@ Encrypted full backup exports and imports the new columns, native grants and aut
 
 An older binary can continue legacy issuance against the expanded schema and fails closed on native resources, as the disposable previous-binary smoke proves. Its old backup exporter cannot represent native grants or provenance; do not use an old-binary full backup as the recovery source after native rows exist. Full N→N+1 session/refresh survival still requires the separately documented immutable-version exercise and is not inferred from this schema smoke.
 
-The 9A.2 work starts with a mode-aware, fail-closed entitlement evaluator and authorization/refresh/introspection provenance handling. Native grant Admin API and UI remain 9A.3.
+Phase 9A.2 established the mode-aware, fail-closed evaluator and authorization/refresh/introspection provenance handling. Phase 9A.3 supplies the native grant Admin API and UI described above.

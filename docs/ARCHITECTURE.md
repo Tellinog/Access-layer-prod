@@ -1,5 +1,9 @@
 # ARCHITECTURE.md
 
+## Phase 9A.3 Admin-native entitlement path
+
+`registerOAuthAdminHttp` retains the existing active `platform_admin` plus `admin:oauth:read/write` boundary, same-origin cookie mutation check and rate bucket. `OAuthAdminService` validates the discriminated resource input and exact scopes. `OAuthAdminRepository` writes native resource registration, one-time resource credential and normalized linked grants in PostgreSQL transactions with audit. The resource mode chooses native registration with NULL permission mappings and no binding, or the existing legacy bridge with its tool binding and exact mappings. A filtered grant read and bounded user search keep the global snapshot bounded. Protocol authorization, exchange, refresh and introspection continue to use the Phase 9A.2 evaluator; Admin never edits OAuth sessions. Migration 006 enforces mode and terminal grant constraints without modification.
+
 ## Phase 9A.2 OAuth entitlement runtime
 
 The OAuth resource's current `entitlement_mode` dispatches to the unchanged P0 legacy bridge or to `src/oauth/native-entitlement.ts`. The native evaluator uses internal `users.id`, exact resource/scope registration, client allowance and linked active in-window grants under transaction-duration SHARE locks. Callback issuance records exact native grant provenance with the authorization and code; exchange, refresh and introspection re-evaluate current grants. Source/mode disagreement denies live token use. Native Admin creation and controlled mode transition remain deferred; Google remains the only OAuth vNext upstream provider.

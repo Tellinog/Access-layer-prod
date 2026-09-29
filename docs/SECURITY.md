@@ -1,5 +1,9 @@
 # SECURITY.md
 
+## Phase 9A.3 native grant administration
+
+OAuth Admin reads require `platform_admin` plus `admin:oauth:read`; writes require `admin:oauth:write`. Cookie writes retain exact same-origin CSRF checks and the mutation rate limit. User lookup searches parameterized email/display-name fields with at most 25 results and returns only internal ID, email, display name, status and last-seen time. Resource-filtered grant reads return at most 200 rows and omit provider subjects. Native grant writes use `users.id`, require an existing active user and exact active registered scopes, and cannot create pending-email grants. They write sanitized `oauth.native_grant.changed` events in the same transaction. Audit failure rolls the mutation back. No credential secret, token, Google subject or raw provider payload is placed in grant audit metadata. The protocol still issues the frozen Google-subject token contract until a separate identity phase.
+
 ## Phase 9A.2 native runtime security boundary
 
 Native OAuth entitlement is exact, linked to internal `users.id` and selected solely by resource mode. Pending email, legacy grants, tool bindings and legacy permission keys cannot authorize a native resource. Callback, exchange and refresh lock current native registration/grants for the decision transaction; online introspection rechecks current grants and returns only inactive on failure. Native grant IDs stay in relational historical provenance and never appear in protocol responses or audit logs. A source/mode mismatch fails closed. Resource credentials are for introspection only: active resources in either mode are accepted, disabled native resources authenticate only to receive `active:false`, and draft resources plus disabled legacy resources are rejected. No OAuth provider linking, new secret, production change or Admin native writer is introduced.

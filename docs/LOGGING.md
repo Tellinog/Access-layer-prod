@@ -59,10 +59,11 @@ OAuth vNext target events:
 | `oauth.token.revoked` / `introspected` | Record revocation and authorised online validation without raw tokens or inactive reason leakage |
 | `oauth.client.changed` / `oauth.resource.changed` / `oauth.scope.changed` | Record controlled registration changes |
 | `oauth.signing_key.changed` | Record public `kid` lifecycle action without private key material |
+| `oauth.native_grant.changed` | Record exact linked grant creation or explicit revocation with internal IDs, canonical scopes, validity and outcome |
 
 Step 3C HTTP emits `oauth.authorization.requested`, `oauth.authorization.allowed`, `oauth.authorization.denied` and `oauth.code.issued`. Step 3D services add transaction-bound `oauth.code.exchanged`, `oauth.token.refreshed`, `oauth.refresh.replay_detected`, `oauth.token.revoked` and `oauth.token.introspected`; Step 3E mounts those service paths without changing audit payloads. Failed code exchange writes sanitized `oauth.code.exchange_denied` in a deliberately separate bounded transaction after the failed main transaction rolls back. If this mandatory denial audit write fails, the operation remains denied and surfaces only `temporarily_unavailable`. D-047 now emits stable transaction-bound `oauth.client.changed`, `oauth.resource.changed`, `oauth.scope.changed` and `oauth.signing_key.changed` events for Admin mutations. Automatic Fastify request logs stay silent on secret-producing OAuth Admin mutations and on `/oauth/authorize`, `/oauth/upstream/google/callback`, `/oauth/token`, `/oauth/revoke` and `/oauth/introspect`.
 
-OAuth audit metadata may contain client ID, exact resource ID, canonical scope IDs, stable Google subject/user ID when known, correlation ID, outcome and non-sensitive reason code. It must not contain authorization or Google codes, tokens, client secrets, cookies, PKCE verifiers/challenges, downstream/upstream state, nonce, private keys, secret hashes/verifiers, raw query strings or raw form bodies.
+OAuth audit metadata may contain client ID, exact resource ID, canonical scope IDs, internal user ID, correlation ID, outcome and non-sensitive reason code. Native grant Admin metadata uses internal IDs and never a provider subject or email. It must not contain authorization or Google codes, tokens, client secrets, cookies, PKCE verifiers/challenges, downstream/upstream state, nonce, private keys, secret hashes/verifiers, raw query strings or raw form bodies.
 
 ## Campi comuni
 

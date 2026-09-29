@@ -21,7 +21,7 @@ NOW = "2026-09-28T11:00:00Z"
 
 class NativeOAuthContractTest(unittest.TestCase):
     def test_machine_contract_preserves_p0_and_direct_mode_guard(self) -> None:
-        self.assertEqual(SPEC["phase"], "9A.2")
+        self.assertEqual(SPEC["phase"], "9A.3")
         self.assertEqual(SPEC["p0_profile"], "frozen_legacy_bridge_compatibility")
         self.assertEqual(SPEC["runtime_evaluation"], "mode_selected_exact_current_entitlement")
         self.assertEqual(SPEC["resource_entitlement_modes"], ["legacy_bridge", "native"])
@@ -34,7 +34,9 @@ class NativeOAuthContractTest(unittest.TestCase):
         self.assertEqual(SPEC["native"]["legacy_fallback"], "forbidden")
         self.assertTrue(SPEC["authorization_provenance"]["lifecycle_source_must_match_current_resource_mode"])
         self.assertEqual(SPEC["backup"]["native_authorization_writer"], "implemented")
-        self.assertEqual(SPEC["backup"]["native_admin_grant_writer"], "absent")
+        self.assertEqual(SPEC["backup"]["native_admin_grant_writer"], "implemented_for_existing_linked_users_only")
+        self.assertEqual(SPEC["admin"]["permission_write"], "admin:oauth:write")
+        self.assertEqual(SPEC["admin"]["pending_email_writer"], "absent")
 
     def test_schemas_compile_and_validate_native_rows(self) -> None:
         for schema in (GRANT_SCHEMA, PROVENANCE_SCHEMA):

@@ -1,5 +1,7 @@
 # OAuth vNext P0 contract
 
+Phase 9A.3 note: this frozen P0 profile remains the `legacy_bridge` compatibility path. New native resources and linked human grants are administered through `/admin/oauth` under the separate additive contract in `OAUTH_NATIVE_ENTITLEMENTS.md` and `../schemas/access-layer-oauth-admin-p0.openapi.yaml`. The historical protocol fields and legacy requests below remain valid.
+
 Post-P0 note (Phase 9A.1): this frozen profile remains valid and its runtime still uses the exact legacy-tool entitlement bridge described below. The additive dark native data model is specified separately in `OAUTH_NATIVE_ENTITLEMENTS.md` and `../specs/oauth-native-entitlements.v1.yml`; it does not revise P0 history or current OAuth behavior.
 
 Status: frozen protocol contract; Step 3E dark runtime plus controlled P0 administration candidate, protocol default-disabled

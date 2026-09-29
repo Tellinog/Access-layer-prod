@@ -11,18 +11,29 @@
 
 OAuth P0 administration is intentionally narrower: only `platform_admin` with `admin:oauth:read` or `admin:oauth:write` may use it. `tool_admin` assignments do not grant OAuth administration.
 
-## OAuth P0 administration
+## OAuth administration (Phase 9A.3)
 
 Open `/admin/oauth` in production (or `/access-control/oauth` under the local base path). The page is part of the same Access Layer service and uses the existing Admin session, CSRF and audit model.
 
-The Admin navigation shows **OAuth P0** after `/v1/me` confirms `role=platform_admin` and `admin:oauth:read`. The server checks the active session grant again on every OAuth Admin request; the link alone does not authorize access.
+The Admin navigation shows the OAuth link after `/v1/me` confirms `role=platform_admin` and `admin:oauth:read`. The server checks the active session grant again on every OAuth Admin request; the link alone does not authorize access.
 
 If `/admin/oauth` returns `ADMIN_FORBIDDEN`, check the current `/v1/me` response and the active `access-admin` grant. The grant must have role `platform_admin` and explicit `admin:oauth:read`; mutations also require `admin:oauth:write`. After deploying D-048, edit the **existing active** grant for `access-admin`: preserve its permissions, select `admin:oauth:read` and `admin:oauth:write`, save, then reload `/v1/me` and `/admin/oauth`. Creating a second grant for the same person/tool is unnecessary and may conflict with the existing grant. D-048 accepts the two official access-request keys containing `_` so all 15 platform-admin permissions can be saved together. If the API returns `VALIDATION_ERROR` with `details.unknown_permissions`, inspect the registered keys in **Tools > access-admin**. A remaining `400` needs its response body and correlation ID investigated; request-completion logs do not include response bodies.
 
-Recommended onboarding order:
+Native onboarding order:
+
+1. Create canonical `project:domain:action` scopes.
+2. Create a resource with mode **Native** (the UI default) and select its exact active scopes. Copy its one-time introspection credential.
+3. Search for an existing Access Layer user by email or display name; the user must have logged in at least once and be active. Select the resource's registered scopes and optional validity dates, then grant. The grant belongs to internal `users.id`.
+4. Create a confidential client with an exact redirect URI and explicit resource/scope allowances. Copy its one-time secret.
+5. Prepare, publish and activate an OAuth signing key using the existing lifecycle. Keep the protocol flag under its separate rollout control.
+6. Review the resource-filtered **Native human grants** list. Revoking one scope immediately changes online introspection, refresh and later authorization decisions. A local JWT can remain cryptographically valid until expiry. To restore access, create a new grant row.
+
+An elapsed `active` grant is changed to terminal `expired` before re-granting the same user/resource/scope. A still-current active grant returns a conflict and is never silently replaced. Native pending-email grants, automatic email linking and resource mode migration are not available.
+
+Legacy-bridge compatibility onboarding order:
 
 1. create each canonical `project:domain:action` scope;
-2. create the HTTPS resource, select one existing entitlement-only legacy tool and map every scope to one exact registered legacy permission;
+2. create the HTTPS resource with mode **Legacy bridge**, select one existing entitlement-only legacy tool from the live dropdown and map every scope to one exact registered permission of that tool;
 3. copy the generated resource introspection credential once;
 4. create the confidential BFF client with exact redirects and explicit resource/scope allowances;
 5. copy the generated client secret once;
@@ -32,7 +43,7 @@ Recommended onboarding order:
 
 Secrets shown in a one-time result panel cannot be retrieved again. Rotation immediately retires the previous active credential and returns a new plaintext value once. Client secrets, resource secrets, hashes and private signing keys never appear in list/read responses or audit metadata.
 
-The legacy tool is only the temporary P0 entitlement anchor. It must not be used as `client_id`, resource/audience or introspection credential. Native OAuth entitlement domains must replace this bridge after Nancy Phase 8 and before broad SDK-native rollout.
+The legacy tool is only the compatibility entitlement anchor for old consumers. It must not be used as `client_id`, resource/audience or introspection credential. New native resources have no legacy tool, binding or permission mapping.
 
 ## Bootstrap primo admin
 

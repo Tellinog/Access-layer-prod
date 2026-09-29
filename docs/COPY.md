@@ -87,3 +87,12 @@ The Admin UI root does not show unauthenticated dashboard copy. It redirects int
 - `Rotate and show secret once`
 - `Copy now; it cannot be shown again.`
 - `Private keys are generated server-side into the configured protected root and are never returned.`
+
+## OAuth native administration
+
+- `OAuth administration`
+- `legacy_bridge exists for old consumers`
+- `Users must have logged into Access Layer at least once before receiving a native grant.`
+- `Native human grants`
+- `Grant selected scopes`
+- `Revoke this exact native scope grant?`

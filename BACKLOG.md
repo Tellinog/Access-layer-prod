@@ -1,18 +1,19 @@
 # BACKLOG.md
 
-## Phase 9A.2 follow-up
+## Phase 9A.3 follow-up
 
-- **DEFERRED_SCOPE:** Phase 9A.3 must add privileged native resource creation, internal-user lookup, exact per-scope grant assignment/revocation and lifecycle API/UI, with audit and backup qualification. OAuth Admin remains legacy-bridge-only until then.
+- **RESOLVED (2026-09-29):** Phase 9A.3 adds privileged native resource creation, internal-user lookup, exact per-scope grant assignment/revocation and lifecycle API/UI, with audit and disposable backup qualification. The final exact-commit gate is recorded separately in the handoff artifact.
 - **DEFERRED_SCOPE:** Specify an explicit, audited pending-email-to-`users.id` native grant link operation. Native runtime never links or accepts a pending email; matching email across providers is not identity proof.
 - **DEFERRED_SCOPE:** Implement the controlled in-place `legacy_bridge -> native` resource transition only after a contract that terminates unsafe legacy sessions, validates scope/grant readiness, retires bridge mappings and retains historical provenance. Direct mode UPDATE remains blocked.
 - **DEFERRED_SCOPE:** Multi-provider/Entra OAuth and provider-neutral token subject remain outside 9A.2; the temporary Microsoft bridge remains legacy-only.
-- **QUESTION:** Define the operator-driven terminal status/retention process for time-expired native grants before 9A.3. Runtime denies passed `valid_until` even while status is `active`; a new active grant for that tuple requires explicit expiry/revocation of the old row.
+- **RESOLVED (2026-09-29):** The Admin writer marks a targeted time-elapsed active grant terminal `expired` before inserting a replacement in the same transaction. Runtime already denies elapsed rows. Long-term retention policy for terminal grant history remains deferred.
+- **DEFERRED_SCOPE:** Define terminal native-grant retention and cleanup policy without deleting authorization provenance.
 
 ## Phase 9A.1 follow-up
 
 - **RESOLVED (2026-09-28):** Phase 9A.1 disposable PostgreSQL 16 qualification applied migrations 001–006 from three fresh databases, checked native grant/provenance constraints, encrypted full replace restore, complete pre-9A.1 backup import, and actual previous-binary legacy issuance/native fail-closed behavior. See `operations/phase9a1-qualification.evidence.json`. Phase 9A.2 adds the protocol authorization/provenance writer and requalifies its backup path; native grant Admin writes remain deferred.
 - **RESOLVED (2026-09-28):** Phase 9A.2 implements mode-aware native grant evaluation for authorize, exchange, refresh and introspection. Explicit pending-email linking remains deferred above.
-- **DEFERRED_SCOPE:** Phase 9A.3 must provide native resource/grant Admin API and UI plus its audit/permission contract. The legacy-tool dropdown improvement remains in 9A.3.
+- **RESOLVED (2026-09-29):** Phase 9A.3 provides native resource/grant Admin API and UI under the existing `admin:oauth` boundary, plus the legacy-tool dropdown and exact registered permissions.
 - **DEFERRED_SCOPE:** Specify and implement the privileged, audited in-place `legacy_bridge -> native` transition on the same resource audience. It must prevent unsafe mixed serving, terminate or safely revoke legacy-derived OAuth sessions/authorizations, validate native scopes and grants, retire legacy bindings/mappings, and retain historical provenance. Arbitrary direct mode UPDATE remains blocked.
 
 - **QUESTION (2026-09-25, production Admin OAuth access):** D-048 fixes the reproduced all-15-key validation failure in source. After deploying this correction, edit the existing active `access-admin` grant, verify `/v1/me` reports `platform_admin` with `admin:oauth:read/write`, and verify `/admin/oauth` returns 200. The supplied request-completion log and browser console omit 400 response bodies; inspect any remaining 400 with its response `error.details` and correlation ID. No production grant was changed by this task.

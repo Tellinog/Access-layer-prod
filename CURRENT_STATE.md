@@ -1,5 +1,12 @@
 # CURRENT_STATE.md
 
+## Phase 9A.3 native OAuth administration candidate, 2026-09-29
+
+- `/admin/oauth` and `/v1/admin/oauth/*` now manage explicit native resources and exact linked human scope grants for existing active Access Layer users. The old complete P0 resource payload remains `legacy_bridge` when `entitlement_mode` is omitted. Legacy mode remains available with live tool and exact permission selection. Native resource scopes have NULL legacy permission keys and no entitlement binding.
+- Admin reads/writes retain the existing platform-admin permissions, cookie CSRF, mutation rate limit, one-time credentials and transaction-coupled sanitized audit. A dedicated bounded user search and resource-filtered grant list avoid adding native grants to the global snapshot. Current active grants conflict; elapsed rows can become terminal `expired` before a new row is created. Explicit revocation is terminal.
+- The disposable PostgreSQL 16.15 development run of the modified Step4B harness passed Admin-created native graph, authorize/exchange/introspection/refresh, Admin revoke and re-grant, legacy-bridge Admin creation/lifecycle, eight refresh races and encrypted replace restore. The clean exact-commit result is recorded in the Phase 9A.3 sidecar handoff artifact. No production/Coolify, Nancy registration, provider configuration or deployment action occurred.
+- Migration 006 is unchanged. Controlled resource mode migration, pending-email native linking and multi-IdP OAuth remain deferred. Native OAuth is operationally manageable locally but protocol enablement stays under its separate default-off flag.
+
 ## Phase 9A.2 native entitlement runtime candidate, 2026-09-28
 
 - OAuth protocol runtime selects `legacy_bridge` or `native` from the current resource mode. Native callback, code exchange, refresh and online introspection require exact active linked `users.id` grants for every resulting canonical scope plus current active registration/allowance. There is no legacy fallback. Native authorization source and exact per-scope grant provenance are written atomically with the code; later lifecycle checks use current grants. Pending-email native rows remain ineffective and unlinked.

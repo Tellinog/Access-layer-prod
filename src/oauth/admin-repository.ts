@@ -4,6 +4,7 @@ import { sanitizeMetadata } from "../audit.js";
 import type {
   OAuthAdminAuditContext,
   OAuthAdminClientInput,
+  OAuthAdminNativeGrantInput,
   OAuthAdminResourceInput,
   OAuthAdminScopeInput,
   OAuthAdminSnapshot
@@ -55,7 +56,7 @@ export class OAuthAdminRepository {
         FROM oauth_client_credentials ORDER BY created_at, id`);
       const redirectUris = await tx.query(`SELECT id, oauth_client_id, redirect_uri, created_at
         FROM oauth_client_redirect_uris ORDER BY oauth_client_id, redirect_uri`);
-      const resources = await tx.query(`SELECT id, resource_id, display_name, status, owner_team,
+      const resources = await tx.query(`SELECT id, resource_id, display_name, status, entitlement_mode, owner_team,
         owner_contact, audience_policy, protected_resource_metadata_url, created_at, updated_at
         FROM oauth_resources ORDER BY resource_id`);
       const resourceCredentials = await tx.query(`SELECT id, oauth_resource_id, credential_id,
@@ -128,6 +129,45 @@ export class OAuthAdminRepository {
     return result.rows[0] ?? null;
   }
 
+  async listLegacyTools() {
+    const result = await this.db.query(`SELECT t.id, t.slug, t.display_name,
+      COALESCE(array_agg(p.permission_key ORDER BY p.permission_key)
+        FILTER (WHERE p.permission_key IS NOT NULL), ARRAY[]::text[]) AS registered_permission_keys
+      FROM tools t LEFT JOIN tool_permissions p ON p.tool_id = t.id
+      WHERE t.status = 'active' GROUP BY t.id, t.slug, t.display_name
+      HAVING count(p.id) > 0 AND bool_and(p.permission_key ~ '^[a-z0-9-]+(:[a-z0-9-]+)+$')
+      ORDER BY t.display_name, t.slug LIMIT 200`);
+    return result.rows;
+  }
+
+  async searchUsers(query: string) {
+    const escaped = query.replace(/[\\%_]/g, "\\$&");
+    const result = await this.db.query(`SELECT id, email, display_name, status, last_seen_at
+      FROM users WHERE email::text ILIKE $1 ESCAPE '\\' OR display_name ILIKE $1 ESCAPE '\\'
+      ORDER BY email LIMIT 25`, [`%${escaped}%`]);
+    return result.rows;
+  }
+
+  async listNativeGrants(resourceId: string) {
+    const resource = await this.db.query<{ id: string; entitlement_mode: string }>(
+      `SELECT id, entitlement_mode FROM oauth_resources WHERE id = $1`, [resourceId]);
+    if (!resource.rows[0]) reject("resource_not_found");
+    if (resource.rows[0].entitlement_mode !== "native") reject("native_resource_required");
+    const result = await this.db.query(`SELECT g.id, g.oauth_resource_id AS resource_id, r.display_name AS resource_display_name,
+      s.scope, g.user_id, u.email AS user_email, u.display_name AS user_display_name,
+      g.status, (g.status = 'active' AND g.revoked_at IS NULL AND u.status = 'active'
+        AND g.valid_from <= now() AND (g.valid_until IS NULL OR g.valid_until > now())
+        AND r.status = 'active' AND s.status = 'active' AND rs.status = 'active') AS effective,
+      g.valid_from, g.valid_until, g.created_at, g.revoked_at
+      FROM oauth_native_human_grants g
+      JOIN oauth_resources r ON r.id = g.oauth_resource_id
+      JOIN oauth_scopes s ON s.id = g.oauth_scope_id
+      JOIN oauth_resource_scopes rs ON rs.oauth_resource_id = g.oauth_resource_id AND rs.oauth_scope_id = g.oauth_scope_id
+      LEFT JOIN users u ON u.id = g.user_id
+      WHERE g.oauth_resource_id = $1 ORDER BY g.created_at DESC, g.id DESC LIMIT 200`, [resourceId]);
+    return result.rows;
+  }
+
   async findScopes(scopeNames: string[]) {
     const result = await this.db.query<{ id: string; scope: string; status: "active" | "disabled" }>(
       `SELECT id, scope, status FROM oauth_scopes WHERE scope = ANY($1::text[]) ORDER BY scope`, [scopeNames]
@@ -137,38 +177,46 @@ export class OAuthAdminRepository {
 
   async createResource(input: OAuthAdminResourceInput, credential: { id: string; secretHash: string }, ctx: OAuthAdminAuditContext) {
     return this.db.transaction(async (tx) => {
-      const toolResult = await tx.query<{ id: string }>(`SELECT id FROM tools WHERE slug = $1 FOR SHARE`, [input.legacyToolSlug]);
-      const tool = toolResult.rows[0];
-      if (!tool) reject("legacy_tool_not_found");
-      const permissionResult = await tx.query<{ permission_key: string }>(
-        `SELECT permission_key FROM tool_permissions WHERE tool_id = $1 ORDER BY permission_key FOR SHARE`, [tool.id]
-      );
-      const registeredPermissions = new Set(permissionResult.rows.map((row) => row.permission_key));
-      if (input.scopeMappings.some((mapping) => !registeredPermissions.has(mapping.legacyPermissionKey))) {
-        reject("legacy_permission_not_registered");
+      let tool: { id: string } | undefined;
+      if (input.entitlementMode !== "native") {
+        const toolResult = await tx.query<{ id: string }>(`SELECT id FROM tools WHERE slug = $1 FOR SHARE`, [input.legacyToolSlug]);
+        tool = toolResult.rows[0];
+        if (!tool) reject("legacy_tool_not_found");
+        const permissionResult = await tx.query<{ permission_key: string }>(
+          `SELECT permission_key FROM tool_permissions WHERE tool_id = $1 ORDER BY permission_key FOR SHARE`, [tool.id]
+        );
+        const registeredPermissions = new Set(permissionResult.rows.map((row) => row.permission_key));
+        if (input.scopeMappings.some((mapping) => !registeredPermissions.has(mapping.legacyPermissionKey))) {
+          reject("legacy_permission_not_registered");
+        }
       }
+      const scopeNames = input.entitlementMode === "native" ? input.scopes : input.scopeMappings.map((mapping) => mapping.scope);
       const scopeResult = await tx.query<{ id: string; scope: string }>(
         `SELECT id, scope FROM oauth_scopes WHERE scope = ANY($1::text[]) AND status = 'active' ORDER BY scope FOR SHARE`,
-        [input.scopeMappings.map((mapping) => mapping.scope)]
+        [scopeNames]
       );
-      if (scopeResult.rows.length !== input.scopeMappings.length) reject("scope_not_found_or_disabled");
+      if (scopeResult.rows.length !== scopeNames.length) reject("scope_not_found_or_disabled");
       const resourceResult = await tx.query(`INSERT INTO oauth_resources (
         resource_id, display_name, status, owner_team, owner_contact,
-        audience_policy, protected_resource_metadata_url
-      ) VALUES ($1, $2, $3, $4, $5, 'exact_single_resource', $6)
+        audience_policy, protected_resource_metadata_url, entitlement_mode
+      ) VALUES ($1, $2, $3, $4, $5, 'exact_single_resource', $6, $7)
       RETURNING id, resource_id, display_name, status, owner_team, owner_contact,
-        audience_policy, protected_resource_metadata_url, created_at, updated_at`,
+        audience_policy, protected_resource_metadata_url, entitlement_mode, created_at, updated_at`,
       [input.resourceId, input.displayName, input.status, input.ownerTeam, input.ownerContact,
-        input.protectedResourceMetadataUrl]);
+        input.protectedResourceMetadataUrl, input.entitlementMode ?? "legacy_bridge"]);
       const resource = resourceResult.rows[0] as Record<string, unknown> & { id: string };
-      await tx.query(`INSERT INTO oauth_resource_entitlement_bindings
-        (oauth_resource_id, binding_type, legacy_tool_id, status)
-        VALUES ($1, 'legacy_tool', $2, 'active')`, [resource.id, tool.id]);
+      if (input.entitlementMode !== "native") {
+        await tx.query(`INSERT INTO oauth_resource_entitlement_bindings
+          (oauth_resource_id, binding_type, legacy_tool_id, status)
+          VALUES ($1, 'legacy_tool', $2, 'active')`, [resource.id, tool!.id]);
+      }
       const scopeByName = new Map(scopeResult.rows.map((row) => [row.scope, row.id]));
-      for (const mapping of input.scopeMappings) {
+      for (const scope of scopeNames) {
+        const permission = input.entitlementMode === "native" ? null
+          : input.scopeMappings.find((mapping) => mapping.scope === scope)!.legacyPermissionKey;
         await tx.query(`INSERT INTO oauth_resource_scopes
           (oauth_resource_id, oauth_scope_id, legacy_permission_key, status)
-          VALUES ($1, $2, $3, 'active')`, [resource.id, scopeByName.get(mapping.scope), mapping.legacyPermissionKey]);
+          VALUES ($1, $2, $3, 'active')`, [resource.id, scopeByName.get(scope), permission]);
       }
       await tx.query(`INSERT INTO oauth_resource_credentials
         (oauth_resource_id, credential_id, secret_hash, authentication_method, status, activated_at)
@@ -176,7 +224,8 @@ export class OAuthAdminRepository {
       [resource.id, credential.id, credential.secretHash]);
       await writeAudit(tx, ctx, "oauth.resource.changed", {
         action: "created", oauth_resource_id: resource.id, resource_id: input.resourceId,
-        legacy_tool_slug: input.legacyToolSlug, scopes: input.scopeMappings.map((mapping) => mapping.scope),
+        entitlement_mode: input.entitlementMode ?? "legacy_bridge",
+        ...(input.entitlementMode === "native" ? {} : { legacy_tool_slug: input.legacyToolSlug }), scopes: scopeNames,
         resource_credential_id: credential.id
       });
       return resource;
@@ -280,14 +329,24 @@ export class OAuthAdminRepository {
     });
   }
 
-  async setResourceScope(resourceId: string, scopeId: string, input: { legacyPermissionKey: string; status: "active" | "disabled" }, ctx: OAuthAdminAuditContext) {
+  async setResourceScope(resourceId: string, scopeId: string, input: { legacyPermissionKey: string | null; status: "active" | "disabled" }, ctx: OAuthAdminAuditContext) {
     return this.db.transaction(async (tx) => {
-      const binding = await tx.query<{ legacy_tool_id: string }>(`SELECT legacy_tool_id
-        FROM oauth_resource_entitlement_bindings WHERE oauth_resource_id = $1 AND status = 'active' FOR SHARE`, [resourceId]);
-      if (!binding.rows[0]) reject("active_entitlement_binding_required");
-      const permission = await tx.query(`SELECT 1 FROM tool_permissions WHERE tool_id = $1 AND permission_key = $2 FOR SHARE`,
-        [binding.rows[0].legacy_tool_id, input.legacyPermissionKey]);
-      if (!permission.rows[0]) reject("legacy_permission_not_registered");
+      const resource = await tx.query<{ entitlement_mode: string }>(`SELECT entitlement_mode FROM oauth_resources WHERE id = $1 FOR SHARE`, [resourceId]);
+      if (!resource.rows[0]) reject("resource_not_found");
+      const scope = await tx.query<{ status: string }>(`SELECT status FROM oauth_scopes WHERE id = $1 FOR SHARE`, [scopeId]);
+      if (!scope.rows[0]) reject("scope_not_found");
+      if (input.status === "active" && scope.rows[0].status !== "active") reject("scope_not_active");
+      if (resource.rows[0].entitlement_mode === "native") {
+        if (input.legacyPermissionKey !== null) reject("native_scope_legacy_permission_forbidden");
+      } else {
+        if (!input.legacyPermissionKey) reject("legacy_permission_required");
+        const binding = await tx.query<{ legacy_tool_id: string }>(`SELECT legacy_tool_id
+          FROM oauth_resource_entitlement_bindings WHERE oauth_resource_id = $1 AND status = 'active' FOR SHARE`, [resourceId]);
+        if (!binding.rows[0]) reject("active_entitlement_binding_required");
+        const permission = await tx.query(`SELECT 1 FROM tool_permissions WHERE tool_id = $1 AND permission_key = $2 FOR SHARE`,
+          [binding.rows[0].legacy_tool_id, input.legacyPermissionKey]);
+        if (!permission.rows[0]) reject("legacy_permission_not_registered");
+      }
       const result = await tx.query(`INSERT INTO oauth_resource_scopes
         (oauth_resource_id, oauth_scope_id, legacy_permission_key, status)
         VALUES ($1, $2, $3, $4)
@@ -302,8 +361,9 @@ export class OAuthAdminRepository {
 
   async setEntitlementBinding(resourceId: string, legacyToolSlug: string, status: "active" | "disabled", ctx: OAuthAdminAuditContext) {
     return this.db.transaction(async (tx) => {
-      const resource = await tx.query(`SELECT id FROM oauth_resources WHERE id = $1 FOR UPDATE`, [resourceId]);
+      const resource = await tx.query<{ id: string; entitlement_mode: string }>(`SELECT id, entitlement_mode FROM oauth_resources WHERE id = $1 FOR UPDATE`, [resourceId]);
       if (!resource.rows[0]) reject("resource_not_found");
+      if (resource.rows[0].entitlement_mode !== "legacy_bridge") reject("legacy_bridge_resource_required");
       const tool = await tx.query<{ id: string }>(`SELECT id FROM tools WHERE slug = $1 FOR SHARE`, [legacyToolSlug]);
       if (!tool.rows[0]) reject("legacy_tool_not_found");
       if (status === "active") {
@@ -327,6 +387,73 @@ export class OAuthAdminRepository {
           ORDER BY created_at DESC LIMIT 1`, [resourceId]);
       }
       await writeAudit(tx, ctx, "oauth.resource.changed", { action: "entitlement_binding_changed", oauth_resource_id: resourceId, legacy_tool_slug: legacyToolSlug, status });
+      return result.rows[0];
+    });
+  }
+
+  async createNativeGrants(input: OAuthAdminNativeGrantInput & { validFrom: Date }, now: Date, ctx: OAuthAdminAuditContext) {
+    return this.db.transaction(async (tx) => {
+      const user = await tx.query<{ id: string; status: string }>(
+        `SELECT id, status FROM users WHERE id = $1 FOR UPDATE`, [input.userId]);
+      if (!user.rows[0] || user.rows[0].status !== "active") reject("user_not_found_or_inactive");
+      const resource = await tx.query<{ id: string; entitlement_mode: string }>(
+        `SELECT id, entitlement_mode FROM oauth_resources WHERE id = $1 FOR SHARE`, [input.resourceId]);
+      if (!resource.rows[0]) reject("resource_not_found");
+      if (resource.rows[0].entitlement_mode !== "native") reject("native_resource_required");
+      const registrations = await tx.query<{ id: string; scope: string; scope_status: string; registration_status: string }>(
+        `SELECT s.id, s.scope, s.status AS scope_status, rs.status AS registration_status
+         FROM oauth_scopes s JOIN oauth_resource_scopes rs ON rs.oauth_scope_id = s.id
+         WHERE rs.oauth_resource_id = $1 AND s.scope = ANY($2::text[])
+         ORDER BY s.scope FOR SHARE OF s, rs`, [input.resourceId, input.scopes]);
+      const scopeByName = new Map(registrations.rows.map((row) => [row.scope, row]));
+      const created: unknown[] = [];
+      for (const scope of [...input.scopes].sort()) {
+        const registration = scopeByName.get(scope);
+        if (!registration || registration.registration_status !== "active") reject("scope_not_registered_on_resource");
+        if (registration.scope_status !== "active") reject("scope_not_active");
+        const existing = await tx.query<{ id: string; valid_until: Date | null }>(
+          `SELECT id, valid_until FROM oauth_native_human_grants
+           WHERE user_id = $1 AND oauth_resource_id = $2 AND oauth_scope_id = $3 AND status = 'active'
+           FOR UPDATE`, [input.userId, input.resourceId, registration.id]);
+        if (existing.rows[0]) {
+          if (!existing.rows[0].valid_until || existing.rows[0].valid_until > now) reject("native_grant_already_active");
+          await tx.query(`UPDATE oauth_native_human_grants SET status = 'expired', updated_at = $2 WHERE id = $1`,
+            [existing.rows[0].id, now]);
+        }
+        const inserted = await tx.query(`INSERT INTO oauth_native_human_grants
+          (oauth_resource_id, oauth_scope_id, user_id, status, valid_from, valid_until, created_by_user_id)
+          VALUES ($1, $2, $3, 'active', $4, $5, $6)
+          RETURNING id, oauth_resource_id AS resource_id, oauth_scope_id, user_id, status,
+            valid_from, valid_until, created_at`,
+        [input.resourceId, registration.id, input.userId, input.validFrom, input.validUntil, ctx.actor.userId]);
+        created.push({ ...inserted.rows[0], scope });
+      }
+      await writeAudit(tx, ctx, "oauth.native_grant.changed", {
+        action: "created", outcome: "success", oauth_resource_id: input.resourceId, user_id: input.userId,
+        scopes: [...input.scopes].sort(), valid_from: input.validFrom.toISOString(),
+        valid_until: input.validUntil?.toISOString() ?? null
+      });
+      return { grants: created };
+    });
+  }
+
+  async revokeNativeGrant(id: string, ctx: OAuthAdminAuditContext) {
+    return this.db.transaction(async (tx) => {
+      const grant = await tx.query<{ id: string; status: string; oauth_resource_id: string; user_id: string; scope: string }>(
+        `SELECT g.id, g.status, g.oauth_resource_id, g.user_id, s.scope
+         FROM oauth_native_human_grants g JOIN oauth_scopes s ON s.id = g.oauth_scope_id
+         WHERE g.id = $1 FOR UPDATE OF g`, [id]);
+      if (!grant.rows[0]) reject("native_grant_not_found");
+      if (grant.rows[0].status !== "active") reject("native_grant_terminal");
+      const result = await tx.query(`UPDATE oauth_native_human_grants SET status = 'revoked',
+        revoked_at = GREATEST(now(), created_at), revoked_by_user_id = $2, updated_at = now()
+        WHERE id = $1 RETURNING id, status, revoked_at, revoked_by_user_id, updated_at`,
+      [id, ctx.actor.userId]);
+      await writeAudit(tx, ctx, "oauth.native_grant.changed", {
+        action: "revoked", outcome: "success", native_grant_id: id,
+        oauth_resource_id: grant.rows[0].oauth_resource_id, user_id: grant.rows[0].user_id,
+        scope: grant.rows[0].scope
+      });
       return result.rows[0];
     });
   }

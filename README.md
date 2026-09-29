@@ -4,7 +4,7 @@
 
 > Platform status (2026-08-25): Template v2.1 is adopted in `legacy-migration` mode. Live evidence resolved the source Compose PostgreSQL logical-volume mismatch without renaming the live volume. Deployment remains blocked by the backup/restore, ownership, registry and remaining continuity gates in `BACKLOG.md`.
 
-> OAuth vNext status (2026-09-23): the complete frozen P0 HTTP runtime remains behind default-false `OAUTH_P0_ENABLED`; D-047 adds a platform-admin-only `/admin/oauth` and `/v1/admin/oauth/*` administration candidate for that existing model. Administration does not enable protocol routes. No production Nancy record, signing key, secret, deployment or enablement exists, and native OAuth entitlement domains remain deferred until after the Nancy Phase 8 pilot and before broad SDK-native onboarding.
+> OAuth vNext status (2026-09-29): the complete frozen P0 HTTP runtime remains behind default-false `OAUTH_P0_ENABLED`. Phase 9A.3 makes native resource and linked human grant management available to authorized platform admins through `/admin/oauth`, while retaining the legacy-bridge compatibility path. Administration does not enable protocol routes. No production Nancy record, signing key, secret, deployment or enablement exists. Controlled resource-mode migration, pending-email linking and multi-IdP OAuth remain deferred.
 
 Layer di accesso condiviso per tool web interni aziendali.
 

@@ -1,5 +1,9 @@
 # SCOPE.md
 
+## Phase 9A.3 implementation boundary
+
+The OAuth Admin surface can create new native resources, select exact canonical scopes, find existing linked Access Layer users and atomically grant or revoke those scopes. Legacy-bridge creation and old P0 API payloads remain supported. Existing Admin security controls and the default-off protocol flag remain. Resource mode migration, pending-email native grant writing/linking, Microsoft/Entra OAuth, provider-neutral subjects, Nancy registration and deployment remain out of scope.
+
 ## Project goals
 
 - Create a shared access layer for all internal web tools.

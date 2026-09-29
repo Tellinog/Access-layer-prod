@@ -1,5 +1,9 @@
 # DEVLOG.md
 
+## 2026-09-29 — Phase 9A.3 native OAuth administration candidate
+
+Added discriminated native/legacy resource creation with complete old P0 payload compatibility; native creation registers only active exact scopes with NULL legacy mapping and no binding. Added bounded legacy-tool/permission selector, safe user lookup, resource-filtered native grant list, atomic multi-scope linked grant creation, elapsed-grant expiry/re-grant and explicit terminal revocation. `/admin/oauth` now defaults new resources to native and guides existing-user scope grants while retaining legacy compatibility and one-time secret handling. The existing Admin authorization, CSRF, rate, audit and protocol runtime boundaries remain. Updated the Admin OpenAPI and native entitlement contract. No migration or deployment change. A disposable PostgreSQL 16.15 development run passed the modified full Step4B harness; the clean exact-commit result is recorded in the Phase 9A.3 sidecar handoff artifact.
+
 ## 2026-09-28 — Phase 9A.2 final credential and callback hardening
 
 Restricted introspection resource credential authentication to active legacy-bridge resources and active or disabled native resources. Draft resources in either mode and disabled legacy resources are rejected; disabled native resources still receive inactive introspection. Added default-suite native callback/evaluator tests for exact linked scopes, two-scope provenance, missing/pending/wrong-user/invalid-window grants, no legacy fallback and P0 issuance. Extended the disposable PostgreSQL 16 HTTP qualifier with the six-case credential matrix. D-050 wording and native security/contract/testing documentation now state that boundary explicitly. No migration, Admin native writer, production or deployment change was made. Final clean-commit checks are recorded in the external Phase 9A.2 summary.

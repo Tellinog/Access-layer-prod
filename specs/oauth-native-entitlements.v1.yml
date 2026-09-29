@@ -1,6 +1,6 @@
 schema_version: 1
-phase: 9A.2
-status: native_runtime_implemented_admin_writer_deferred
+phase: 9A.3
+status: native_runtime_and_admin_management_implemented
 p0_profile: frozen_legacy_bridge_compatibility
 runtime_evaluation: mode_selected_exact_current_entitlement
 upstream_identity_provider: google_only
@@ -69,5 +69,23 @@ backup:
   encrypted_export_and_import_includes_native_grants_and_provenance: true
   pre_9A_1_complete_oauth_backup_import: supported_with_empty_native_sections
   native_authorization_writer: implemented
-  native_admin_grant_writer: absent
-deferred: [native_grant_admin_api_ui, pending_email_link_operation, resource_mode_transition, multi_provider_oauth, entra_oauth, automatic_provider_account_linking]
+  native_admin_grant_writer: implemented_for_existing_linked_users_only
+admin:
+  permission_read: admin:oauth:read
+  permission_write: admin:oauth:write
+  resource_create_default_ui_mode: native
+  legacy_payload_without_mode: accepted_only_if_complete
+  mixed_mode_payload: rejected
+  native_resource_scopes: exact_active_canonical_with_null_legacy_permission
+  legacy_tool_selector: active_tools_with_exact_registered_permissions_only
+  user_search: bounded_email_or_display_name_without_provider_subject
+  grant_target: active_existing_users.id
+  grant_write: atomic_one_row_per_exact_scope
+  grant_validity: valid_until_strictly_after_valid_from
+  elapsed_active_grant: transition_to_expired_before_regrant_in_same_transaction
+  current_active_grant: deterministic_conflict_without_replacement
+  revocation: explicit_terminal_with_actor_and_timestamp
+  audit_event: oauth.native_grant.changed
+  pending_email_writer: absent
+  resource_mode_mutation: forbidden
+deferred: [pending_email_link_operation, resource_mode_transition, multi_provider_oauth, entra_oauth, automatic_provider_account_linking]

@@ -8,6 +8,7 @@ import { hashOAuthCredentialSecret, randomToken } from "../security.js";
 import type {
   OAuthAdminAuditContext,
   OAuthAdminClientInput,
+  OAuthAdminNativeGrantInput,
   OAuthAdminResourceInput,
   OAuthAdminScopeInput
 } from "./admin-types.js";
@@ -29,6 +30,8 @@ export class OAuthAdminValidationError extends Error {
     this.name = "OAuthAdminValidationError";
   }
 }
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function assertNoIssues(issues: string[]): void {
   const unique = [...new Set(issues)].sort();
@@ -94,31 +97,47 @@ export class OAuthAdminService {
   }
 
   async createResource(input: OAuthAdminResourceInput, ctx: OAuthAdminAuditContext) {
-    const entitlement = await this.input.repository.resolveLegacyEntitlement(input.legacyToolSlug);
-    const scopes = await this.input.repository.findScopes(input.scopeMappings.map((mapping) => mapping.scope));
-    const registration = {
-      resourceId: input.resourceId,
-      displayName: input.displayName,
-      status: input.status,
-      ownerTeam: input.ownerTeam,
-      ownerContact: input.ownerContact,
-      scopes: input.scopeMappings.map((mapping) => mapping.scope),
-      scopeEntitlementMappings: input.scopeMappings,
-      audiencePolicy: "exact_single_resource" as const,
-      protectedResourceMetadataUrl: input.protectedResourceMetadataUrl,
-      entitlementBinding: { type: "legacy_tool" as const, legacyToolSlug: input.legacyToolSlug }
-    };
-    const issues = entitlement === null
-      ? ["legacy_tool_not_found"]
-      : validateOAuthResourceRegistration(registration, {
-        legacyToolId: entitlement.legacy_tool_id,
-        legacyToolSlug: entitlement.legacy_tool_slug,
-        registeredPermissionKeys: entitlement.registered_permission_keys
-      });
-    if (scopes.length !== input.scopeMappings.length || scopes.some((scope) => scope.status !== "active")) {
-      issues.push("scope_not_found_or_disabled");
+    if (input.entitlementMode === "native") {
+      assertNoIssues([
+        ...(!isExactOAuthHttpsUri(input.resourceId) ? ["resource_id_invalid"] : []),
+        ...(!isExactOAuthHttpsUri(input.protectedResourceMetadataUrl) ? ["protected_resource_metadata_url_invalid"] : []),
+        ...(!input.displayName.trim() ? ["resource_display_name_required"] : []),
+        ...(!input.ownerTeam.trim() ? ["resource_owner_team_required"] : []),
+        ...(!["draft", "active", "disabled"].includes(input.status) ? ["resource_status_invalid"] : []),
+        ...(input.scopes.length === 0 ? ["resource_scope_required"] : []),
+        ...(new Set(input.scopes).size !== input.scopes.length ? ["resource_scope_duplicate"] : []),
+        ...(input.scopes.some((scope) => !isCanonicalOAuthScope(scope)) ? ["resource_scope_invalid"] : [])
+      ]);
+      const found = await this.input.repository.findScopes(input.scopes);
+      assertNoIssues(found.length !== input.scopes.length || found.some((scope) => scope.status !== "active")
+        ? ["scope_not_found_or_disabled"] : []);
+    } else {
+      const entitlement = await this.input.repository.resolveLegacyEntitlement(input.legacyToolSlug);
+      const scopes = await this.input.repository.findScopes(input.scopeMappings.map((mapping) => mapping.scope));
+      const registration = {
+        resourceId: input.resourceId,
+        displayName: input.displayName,
+        status: input.status,
+        ownerTeam: input.ownerTeam,
+        ownerContact: input.ownerContact,
+        scopes: input.scopeMappings.map((mapping) => mapping.scope),
+        scopeEntitlementMappings: input.scopeMappings,
+        audiencePolicy: "exact_single_resource" as const,
+        protectedResourceMetadataUrl: input.protectedResourceMetadataUrl,
+        entitlementBinding: { type: "legacy_tool" as const, legacyToolSlug: input.legacyToolSlug }
+      };
+      const issues = entitlement === null
+        ? ["legacy_tool_not_found"]
+        : validateOAuthResourceRegistration(registration, {
+          legacyToolId: entitlement.legacy_tool_id,
+          legacyToolSlug: entitlement.legacy_tool_slug,
+          registeredPermissionKeys: entitlement.registered_permission_keys
+        });
+      if (scopes.length !== input.scopeMappings.length || scopes.some((scope) => scope.status !== "active")) {
+        issues.push("scope_not_found_or_disabled");
+      }
+      assertNoIssues(issues);
     }
-    assertNoIssues(issues);
 
     const pepper = requireCredentialPepper(this.input.config);
     const credentialId = `orc_${randomBytes(18).toString("hex")}`;
@@ -126,6 +145,36 @@ export class OAuthAdminService {
     const secretHash = await hashOAuthCredentialSecret(secret, pepper);
     const resource = await this.input.repository.createResource(input, { id: credentialId, secretHash }, ctx);
     return { resource, resource_credential_id: credentialId, resource_credential_secret: secret };
+  }
+
+  legacyTools() { return this.input.repository.listLegacyTools(); }
+
+  searchUsers(query: string) {
+    assertNoIssues(query.trim().length < 2 || query.length > 100 ? ["user_search_invalid"] : []);
+    return this.input.repository.searchUsers(query.trim());
+  }
+
+  listNativeGrants(resourceId: string) {
+    assertNoIssues(!UUID_REGEX.test(resourceId) ? ["resource_id_invalid"] : []);
+    return this.input.repository.listNativeGrants(resourceId);
+  }
+
+  createNativeGrants(input: OAuthAdminNativeGrantInput, ctx: OAuthAdminAuditContext) {
+    const validFrom = input.validFrom ?? this.now();
+    assertNoIssues([
+      ...(!UUID_REGEX.test(input.resourceId) ? ["resource_id_invalid"] : []),
+      ...(!UUID_REGEX.test(input.userId) ? ["user_id_invalid"] : []),
+      ...(input.scopes.length === 0 || input.scopes.length > 50 ? ["grant_scopes_invalid"] : []),
+      ...(new Set(input.scopes).size !== input.scopes.length ? ["grant_scope_duplicate"] : []),
+      ...(input.scopes.some((scope) => !isCanonicalOAuthScope(scope)) ? ["grant_scope_invalid"] : []),
+      ...(input.validUntil && input.validUntil <= validFrom ? ["grant_validity_invalid"] : [])
+    ]);
+    return this.input.repository.createNativeGrants({ ...input, validFrom }, this.now(), ctx);
+  }
+
+  revokeNativeGrant(id: string, ctx: OAuthAdminAuditContext) {
+    assertNoIssues(!UUID_REGEX.test(id) ? ["native_grant_not_found"] : []);
+    return this.input.repository.revokeNativeGrant(id, ctx);
   }
 
   async createClient(input: OAuthAdminClientInput, ctx: OAuthAdminAuditContext) {
@@ -194,8 +243,8 @@ export class OAuthAdminService {
     return this.input.repository.replaceAllowances(clientId, allowances, ctx);
   }
 
-  setResourceScope(resourceId: string, scopeId: string, input: { legacyPermissionKey: string; status: "active" | "disabled" }, ctx: OAuthAdminAuditContext) {
-    if (!resourceId || !scopeId || !input.legacyPermissionKey || !["active", "disabled"].includes(input.status)) {
+  setResourceScope(resourceId: string, scopeId: string, input: { legacyPermissionKey: string | null; status: "active" | "disabled" }, ctx: OAuthAdminAuditContext) {
+    if (!resourceId || !scopeId || !["active", "disabled"].includes(input.status)) {
       throw new OAuthAdminValidationError(["resource_scope_update_invalid"]);
     }
     return this.input.repository.setResourceScope(resourceId, scopeId, input, ctx);

@@ -113,7 +113,7 @@ try {
     $env:STEP4B_EXPECTED_COMMIT = $qualifiedCommit
     $env:OAUTH_NATIVE_DISPOSABLE_PG_URL = $sourceUrl
     $env:OAUTH_NATIVE_DISPOSABLE_PG_CONFIRM = 'yes'
-    & npm.cmd test -- tests/oauth-native-postgres.test.ts
+    & npm.cmd test -- tests/oauth-native-postgres.test.ts tests/oauth-admin-native-postgres.test.ts
     if ($LASTEXITCODE -ne 0) { throw "Native foundation PostgreSQL assertions failed" }
     & (Join-Path $repoRoot "node_modules\.bin\tsx.cmd") (Join-Path $repoRoot "scripts\step4b\qualify.ts")
     if ($LASTEXITCODE -ne 0) { throw "Step4B qualification harness failed" }

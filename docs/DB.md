@@ -1,5 +1,11 @@
 # DB.md
 
+## Phase 9A.3 use of migration 006
+
+No migration 007 is introduced. Admin-created native resources set `oauth_resources.entitlement_mode='native'`, register exact active `oauth_scopes` entries in `oauth_resource_scopes` with `legacy_permission_key=NULL`, and create no `oauth_resource_entitlement_bindings`. Existing and newly created `legacy_bridge` resources keep one tool binding and exact non-null permission mappings. The mode guard remains immutable.
+
+Native grant creation locks the linked user and selected registration rows, checks for a targeted active row, and atomically marks a time-elapsed row `expired` before inserting a new active row. A current active row conflicts. Revocation sets `status`, `revoked_at`, `revoked_by_user_id` and `updated_at` in one audited transaction. Terminal rows are never reactivated. The composite resource/scope FK, partial active uniqueness index and migration 006 lifecycle triggers remain authoritative.
+
 ## Phase 9A.2 runtime qualification
 
 Migration 006 is unchanged and sufficient for native protocol issuance. The runtime writes native authorization source and exact historical grant links in the same transaction as the code and transaction completion. Current native entitlement is re-evaluated at exchange, refresh and introspection; persisted provenance cannot revive a revoked or expired grant. SHARE locks on registration/grants are held through code or refresh issuance, with PostgreSQL time sampled after grant locking; code/refresh UPDATE locks retain the Step 4B replay order. Encrypted full backup includes native mode, grants, source and provenance, and restore preserves native session/refresh lineage. Direct mode UPDATE remains blocked pending the controlled transition contract.

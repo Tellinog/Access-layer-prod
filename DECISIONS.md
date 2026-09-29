@@ -563,3 +563,13 @@ The legacy OpenAPI and JSON permission-item patterns record the same exact excep
 Rationale: selecting all official `platform_admin` permissions for `access-admin` previously failed as `VALIDATION_ERROR` before registered-key lookup because these two longstanding keys contain an underscore. That blocked adding `admin:oauth:read/write` to an existing admin grant. The exact exception lets a platform admin preserve access-request permissions while editing the grant and keeps unknown keys denied.
 
 Rollback: revert the validator and spec exception only if the active Admin grants no longer require editing with these two official keys. Reverting earlier would restore the reported 400 and impede grant maintenance; existing grants are not rewritten by this change.
+
+## D-051 - Make native human entitlement operable through the existing OAuth Admin boundary
+
+Status: accepted for the Phase 9A.3 candidate
+
+Confirmed: 2026-09-29
+
+Decision: `POST /v1/admin/oauth/resources` is a strict mode-discriminated write. A complete old P0 payload without `entitlement_mode` remains `legacy_bridge`; the UI always sends the mode and defaults to `native`. Native creation registers exact active canonical scopes with NULL legacy mapping and no legacy-tool binding. Native grants target existing active internal `users.id`, one row per exact resource/scope, through audited atomic writes. A targeted elapsed `active` row may become terminal `expired` before re-grant; a current active row conflicts. Revocation is an explicit terminal action. Read models expose bounded safe user lookup, eligible legacy tools with exact permission keys and resource-filtered native grants. Migration 006 remains authoritative and unchanged.
+
+Rationale: Phase 9A.2 already evaluates current native grants, but direct SQL fixtures are not an operator workflow. The existing OAuth Admin security boundary can manage the model without changing protocol semantics, Google subject claims, legacy grants or old P0 requests. Controlled mode migration, pending-email linking and multi-IdP identity remain separate decisions.

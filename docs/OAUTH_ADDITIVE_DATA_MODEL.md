@@ -1,5 +1,7 @@
 # Proposed additive OAuth data model
 
+Phase 9A.3 uses migration 006 without alteration: OAuth Admin creates explicit native resources with NULL legacy permission mappings/no binding and linked `oauth_native_human_grants` rows for existing `users.id`. It marks targeted time-elapsed active rows `expired` before replacement and explicitly revokes with actor/timestamp. Pending-email native writing/linking and resource mode migration remain deferred. The historical foundation and P0 text below describes its original phase boundary.
+
 ## Phase 9A.2 runtime use of migration 006
 
 No new migration is needed. The resource's current `entitlement_mode` selects the P0 bridge or the native evaluator. Native authorization issuance writes `entitlement_source='native'`, null legacy grant FK and exact `oauth_authorization_native_grants` links in the code transaction. Exchange, refresh and online introspection use current linked native grants and active resource/scope/client allowance, never historical provenance as current truth. The P0 bridge remains supported; the detailed 9A.1 schema below remains its historical foundation description. Native Admin writes remain deferred to 9A.3.

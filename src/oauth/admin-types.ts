@@ -12,15 +12,26 @@ export interface OAuthAdminScopeInput {
   description: string;
 }
 
-export interface OAuthAdminResourceInput {
+export interface OAuthAdminResourceCommon {
   resourceId: string;
   displayName: string;
   ownerTeam: string;
   ownerContact: string | null;
   status: "draft" | "active" | "disabled";
   protectedResourceMetadataUrl: string;
-  legacyToolSlug: string;
-  scopeMappings: Array<{ scope: string; legacyPermissionKey: string }>;
+}
+
+export type OAuthAdminResourceInput = OAuthAdminResourceCommon & (
+  { entitlementMode: "native"; scopes: string[]; legacyToolSlug?: never; scopeMappings?: never } |
+  { entitlementMode?: "legacy_bridge"; legacyToolSlug: string; scopeMappings: Array<{ scope: string; legacyPermissionKey: string }>; scopes?: never }
+);
+
+export interface OAuthAdminNativeGrantInput {
+  resourceId: string;
+  userId: string;
+  scopes: string[];
+  validFrom: Date | null;
+  validUntil: Date | null;
 }
 
 export interface OAuthAdminClientInput {

@@ -1,5 +1,9 @@
 # DOMAIN.md
 
+## Phase 9A.3 native administration terms
+
+An OAuth-native resource uses `entitlement_mode=native`, exact canonical resource-scope registrations with no legacy permission key and direct linked human grants. A native human grant is one `users.id` plus OAuth resource plus canonical scope with a validity window and terminal revoke/expiry lifecycle. A legacy-bridge resource retains one entitlement-only legacy tool binding and exact permission mappings. The Admin UI defaults new resources to native; existing resources keep their mode.
+
 ## Domain language
 
 | Term | Meaning |

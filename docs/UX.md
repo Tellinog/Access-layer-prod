@@ -19,6 +19,8 @@ Admin UI must optimize for safe operations:
 - audit preview after sensitive changes;
 - visible environment badge to avoid local/production mistakes.
 
+For `/admin/oauth`, native resource creation is the default. The resource form shows exact active scope selection in both modes; legacy mode alone shows a live legacy-tool dropdown and mappings restricted to that tool's registered permission keys. The Native human grants form selects a native resource, searches existing users by email/name, presents only that resource's active registered scopes, accepts optional validity and shows a resource-filtered grant list with explicit per-grant revocation. It explains that a user must have logged in at least once. Secret output stays in the existing one-time panel.
+
 ## Auditor UX
 
 Audit log search must support:

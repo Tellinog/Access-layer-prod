@@ -27,6 +27,10 @@ EXPECTED_PATHS = {
 }
 EXPECTED_ADMIN_PATHS = {
     "/v1/admin/oauth",
+    "/v1/admin/oauth/legacy-tools",
+    "/v1/admin/oauth/users",
+    "/v1/admin/oauth/native-grants",
+    "/v1/admin/oauth/native-grants/{id}/revoke",
     "/v1/admin/oauth/scopes",
     "/v1/admin/oauth/scopes/{id}",
     "/v1/admin/oauth/resources",
@@ -168,7 +172,7 @@ def validate() -> list[str]:
     if set(openapi.get("paths", {})) != EXPECTED_PATHS:
         errors.append("target OpenAPI path set differs from the frozen P0 surface")
     if set(admin_openapi.get("paths", {})) != EXPECTED_ADMIN_PATHS:
-        errors.append("OAuth Admin OpenAPI path set differs from the D-047 surface")
+        errors.append("OAuth Admin OpenAPI path set differs from the supported P0 plus 9A.3 surface")
     administration = spec.get("administration", {})
     if administration.get("status") != "candidate_implemented":
         errors.append("OAuth Admin machine profile does not record candidate implementation")

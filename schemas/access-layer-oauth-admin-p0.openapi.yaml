@@ -1,11 +1,10 @@
 openapi: 3.1.0
 info:
-  title: Access Layer OAuth P0 Administration API
-  version: 1.0.0-candidate
+  title: Access Layer OAuth Administration API
+  version: 1.1.0-candidate
   description: >-
-    Platform-admin-only control surface for the existing default-off OAuth P0
-    data model. It does not enable OAuth, alter the protocol runtime, migrate
-    legacy consumers, or implement native OAuth entitlement domains.
+    Platform-admin-only control surface for legacy-bridge and native human
+    OAuth entitlement administration. Protocol enablement remains separate.
 servers:
   - url: https://access-layer.unguess-internal.net
 security:
@@ -20,6 +19,46 @@ paths:
       responses:
         '200': {description: Secret-free OAuth administration state}
         '403': {$ref: '#/components/responses/Error'}
+  /v1/admin/oauth/legacy-tools:
+    get:
+      operationId: listOAuthEligibleLegacyTools
+      summary: List active legacy tools with exact registered permission keys, without secrets
+      responses:
+        '200': {description: Bounded tool selector data}
+  /v1/admin/oauth/users:
+    get:
+      operationId: searchOAuthGrantUsers
+      summary: Search existing users by email or display name
+      parameters:
+        - {in: query, name: q, required: true, schema: {type: string, minLength: 2, maxLength: 100}}
+      responses:
+        '200': {description: At most 25 users with id, email, display_name, status and last_seen_at only}
+  /v1/admin/oauth/native-grants:
+    get:
+      operationId: listOAuthNativeHumanGrants
+      summary: List at most 200 grants for one native resource
+      parameters:
+        - {in: query, name: resource_id, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200': {description: Linked grants and current display-only effective state}
+    post:
+      operationId: createOAuthNativeHumanGrants
+      summary: Atomically grant exact registered scopes to one existing active user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/NativeGrantCreate'}
+      responses:
+        '200': {description: One new normalized grant row per requested scope}
+        '400': {$ref: '#/components/responses/Error'}
+  /v1/admin/oauth/native-grants/{id}/revoke:
+    post:
+      operationId: revokeOAuthNativeHumanGrant
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '200': {description: Grant marked revoked with actor and timestamp}
+        '400': {$ref: '#/components/responses/Error'}
   /v1/admin/oauth/scopes:
     post:
       operationId: createOAuthScope
@@ -54,7 +93,7 @@ paths:
   /v1/admin/oauth/resources:
     post:
       operationId: createOAuthResource
-      summary: Create a resource, scope mappings, entitlement binding and first resource credential
+      summary: Create a native or legacy-bridge resource and first introspection credential
       requestBody:
         required: true
         content:
@@ -110,7 +149,7 @@ paths:
               additionalProperties: false
               required: [legacy_permission_key, status]
               properties:
-                legacy_permission_key: {type: string, pattern: '^[a-z0-9-]+(?::[a-z0-9-]+)+$'}
+                legacy_permission_key: {type: [string, 'null'], description: 'Null is required for native resource scopes; an exact registered key is required for legacy_bridge.'}
                 status: {enum: [active, disabled]}
       responses:
         '200': {description: Explicit resource-scope mapping updated}
@@ -274,9 +313,14 @@ components:
         resource_id: {type: string, format: uri}
         scope: {type: string}
     ResourceCreate:
+      oneOf:
+        - {$ref: '#/components/schemas/NativeResourceCreate'}
+        - {$ref: '#/components/schemas/LegacyResourceCreate'}
+      unevaluatedProperties: false
+      description: Omitted entitlement_mode is accepted only with a complete historical legacy payload.
+    ResourceCommon:
       type: object
-      additionalProperties: false
-      required: [resource_id, display_name, owner_team, status, protected_resource_metadata_url, legacy_tool_slug, scope_mappings]
+      required: [resource_id, display_name, owner_team, status, protected_resource_metadata_url]
       properties:
         resource_id: {type: string, format: uri}
         display_name: {type: string, minLength: 1}
@@ -284,8 +328,33 @@ components:
         owner_contact: {type: [string, 'null']}
         status: {enum: [draft, active, disabled]}
         protected_resource_metadata_url: {type: string, format: uri}
-        legacy_tool_slug: {type: string}
-        scope_mappings: {type: array, minItems: 1, uniqueItems: true, items: {$ref: '#/components/schemas/ScopeMapping'}}
+    NativeResourceCreate:
+      allOf:
+        - {$ref: '#/components/schemas/ResourceCommon'}
+        - type: object
+          required: [entitlement_mode, scopes]
+          properties:
+            entitlement_mode: {const: native}
+            scopes: {type: array, minItems: 1, uniqueItems: true, items: {type: string}}
+    LegacyResourceCreate:
+      allOf:
+        - {$ref: '#/components/schemas/ResourceCommon'}
+        - type: object
+          required: [legacy_tool_slug, scope_mappings]
+          properties:
+            entitlement_mode: {const: legacy_bridge}
+            legacy_tool_slug: {type: string}
+            scope_mappings: {type: array, minItems: 1, uniqueItems: true, items: {$ref: '#/components/schemas/ScopeMapping'}}
+    NativeGrantCreate:
+      type: object
+      additionalProperties: false
+      required: [resource_id, user_id, scopes]
+      properties:
+        resource_id: {type: string, format: uuid}
+        user_id: {type: string, format: uuid}
+        scopes: {type: array, minItems: 1, maxItems: 50, uniqueItems: true, items: {type: string}}
+        valid_from: {type: string, format: date-time}
+        valid_until: {type: string, format: date-time}
     ClientCreate:
       type: object
       additionalProperties: false

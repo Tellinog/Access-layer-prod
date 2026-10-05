@@ -71,6 +71,7 @@ backup:
   native_authorization_writer: implemented
   native_admin_grant_writer: implemented_for_existing_linked_users_only
 admin:
+  bulk_operability_contract: oauth-admin-operability.v1.yml
   permission_read: admin:oauth:read
   permission_write: admin:oauth:write
   resource_create_default_ui_mode: native

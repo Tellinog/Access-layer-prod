@@ -1,5 +1,9 @@
 # DB.md
 
+## Phase 9A.4 uses the existing schema
+
+Bulk OAuth administration uses migrations 001–006 without a new table or migration. Previews are computed read-only. Atomic commits lock current catalogue/resource/user/registration/grant rows and couple mutations with append-only audit. Effective native grants skip; elapsed active rows become expired before re-grant; terminal grants remain unchanged. Resource/client allowance and redirect replacement use their existing exact tables and compare the preview's current set before replacement.
+
 ## Phase 9A.3 use of migration 006
 
 No migration 007 is introduced. Admin-created native resources set `oauth_resources.entitlement_mode='native'`, register exact active `oauth_scopes` entries in `oauth_resource_scopes` with `legacy_permission_key=NULL`, and create no `oauth_resource_entitlement_bindings`. Existing and newly created `legacy_bridge` resources keep one tool binding and exact non-null permission mappings. The mode guard remains immutable.

@@ -3,13 +3,16 @@ import type { Db } from "../db.js";
 import { sanitizeMetadata } from "../audit.js";
 import type {
   OAuthAdminAuditContext,
+  OAuthAdminAllowanceState,
+  OAuthAdminBulkGrantInput,
+  OAuthAdminBulkScopesInput,
   OAuthAdminClientInput,
   OAuthAdminNativeGrantInput,
   OAuthAdminResourceInput,
   OAuthAdminScopeInput,
   OAuthAdminSnapshot
 } from "./admin-types.js";
-import { OAUTH_SIGNING_PUBLISH_LEAD_MS, OAUTH_SIGNING_RETIRE_GRACE_MS } from "./validation.js";
+import { isCanonicalOAuthScope, OAUTH_SIGNING_PUBLISH_LEAD_MS, OAUTH_SIGNING_RETIRE_GRACE_MS } from "./validation.js";
 
 export class OAuthAdminRepositoryError extends Error {
   constructor(public readonly reason: string) {
@@ -118,6 +121,99 @@ export class OAuthAdminRepository {
     });
   }
 
+  private async scopeBulkPlan(tx: Db, input: OAuthAdminBulkScopesInput, commit: boolean) {
+    const names = input.rows.map((row) => row.scope);
+    const found = await tx.query<{ id: string; scope: string; description: string; status: string }>(
+      `SELECT id, scope, description, status FROM oauth_scopes WHERE scope = ANY($1::text[])
+       ORDER BY scope ${commit ? "FOR UPDATE" : ""}`, [names]);
+    const byName = new Map(found.rows.map((row) => [row.scope, row]));
+    const seen = new Set<string>();
+    const rows = input.rows.map((item) => {
+      const existing = byName.get(item.scope);
+      let operation: "create" | "skip" | "update_description" | "reactivate" | "error" = "create";
+      let result: "ready" | "skip" | "warning" | "error" = "ready";
+      let reason = "scope_missing";
+      if (!isCanonicalOAuthScope(item.scope)) { operation = "error"; result = "error"; reason = "scope_invalid"; }
+      else if (!item.description.trim()) { operation = "error"; result = "error"; reason = "scope_description_required"; }
+      else if (seen.has(item.scope)) { operation = "error"; result = "error"; reason = "duplicate_input_scope"; }
+      else if (existing) {
+        if (existing.status === "disabled") {
+          if (!input.reactivateDisabled) { operation = "skip"; result = "warning"; reason = "disabled_requires_opt_in"; }
+          else if (existing.description !== item.description && !input.updateDescriptions) {
+            operation = "skip"; result = "warning"; reason = "description_change_requires_opt_in";
+          } else { operation = "reactivate"; reason = "explicit_reactivation"; }
+        } else if (existing.description === item.description) {
+          operation = "skip"; result = "skip"; reason = "identical_active";
+        } else if (input.updateDescriptions) {
+          operation = "update_description"; reason = "explicit_description_update";
+        } else { operation = "skip"; result = "warning"; reason = "description_change_requires_opt_in"; }
+      }
+      seen.add(item.scope);
+      return { row: item.row, scope: item.scope, description: item.description, result, operation, reason,
+        existing_scope_id: existing?.id ?? null, existing_status: existing?.status ?? null,
+        existing_description: existing?.description ?? null };
+    });
+    return { rows, summary: { total: rows.length, create: rows.filter((r) => r.operation === "create").length,
+      skip: rows.filter((r) => r.operation === "skip").length,
+      update: rows.filter((r) => r.operation === "update_description").length,
+      reactivate: rows.filter((r) => r.operation === "reactivate").length,
+      error: rows.filter((r) => r.operation === "error").length } };
+  }
+
+  async bulkScopes(input: OAuthAdminBulkScopesInput, commit: boolean, ctx?: OAuthAdminAuditContext) {
+    return this.db.transaction(async (tx) => {
+      if (!commit) await tx.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY");
+      const plan = await this.scopeBulkPlan(tx, input, commit);
+      if (!commit) return plan;
+      if (!ctx || plan.summary.error) reject("bulk_scope_validation_failed");
+      const changed: string[] = [];
+      for (const row of plan.rows) {
+        if (row.operation === "create") {
+          await tx.query(`INSERT INTO oauth_scopes (scope, description, status) VALUES ($1, $2, 'active')`, [row.scope, row.description]);
+        } else if (row.operation === "update_description") {
+          await tx.query(`UPDATE oauth_scopes SET description = $2, updated_at = now() WHERE id = $1 AND status = 'active'`,
+            [row.existing_scope_id, row.description]);
+        } else if (row.operation === "reactivate") {
+          await tx.query(`UPDATE oauth_scopes SET description = $2, status = 'active', updated_at = now()
+            WHERE id = $1 AND status = 'disabled'`, [row.existing_scope_id, row.description]);
+        } else continue;
+        changed.push(row.scope);
+        await writeAudit(tx, ctx, "oauth.scope.changed", { action: row.operation === "create" ? "created" : "updated",
+          operation: row.operation, scope: row.scope, batch: true });
+      }
+      if (changed.length) await writeAudit(tx, ctx, "oauth.scope.bulk_changed", {
+        action: "committed", count: changed.length, scopes: changed
+      });
+      return { ...plan, committed: changed.length };
+    });
+  }
+
+  async bulkScopeStatus(scopes: string[], status: "active" | "disabled", commit: boolean, ctx?: OAuthAdminAuditContext) {
+    return this.db.transaction(async (tx) => {
+      if (!commit) await tx.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY");
+      const found = await tx.query<{ id: string; scope: string; status: string; resource_count: string; client_count: string }>(
+        `SELECT s.id, s.scope, s.status,
+          (SELECT count(DISTINCT rs.oauth_resource_id)::text FROM oauth_resource_scopes rs WHERE rs.oauth_scope_id = s.id AND rs.status = 'active') AS resource_count,
+          (SELECT count(DISTINCT a.oauth_client_id)::text FROM oauth_client_resource_scopes a WHERE a.oauth_scope_id = s.id AND a.status = 'active') AS client_count
+         FROM oauth_scopes s WHERE s.scope = ANY($1::text[]) ORDER BY s.scope ${commit ? "FOR UPDATE OF s" : ""}`, [scopes]);
+      const byName = new Map(found.rows.map((row) => [row.scope, row]));
+      const rows = scopes.map((scope) => {
+        const current = byName.get(scope);
+        return { scope, status: current?.status ?? null, operation: !current ? "error" : current.status === status ? "skip" : status,
+          reason: !current ? "scope_not_found" : current.status === status ? "already_in_status" : "explicit_status_change",
+          affected_resources: Number(current?.resource_count ?? 0), affected_clients: Number(current?.client_count ?? 0), id: current?.id ?? null };
+      });
+      if (!commit) return { rows, summary: { total: rows.length, change: rows.filter((r) => r.operation === status).length,
+        skip: rows.filter((r) => r.operation === "skip").length, error: rows.filter((r) => r.operation === "error").length } };
+      if (!ctx || rows.some((row) => row.operation === "error")) reject("bulk_scope_status_invalid");
+      for (const row of rows) if (row.operation === status) {
+        await tx.query(`UPDATE oauth_scopes SET status = $2, updated_at = now() WHERE id = $1`, [row.id, status]);
+        await writeAudit(tx, ctx, "oauth.scope.changed", { action: "updated", operation: "status_changed", scope: row.scope, status, batch: true });
+      }
+      return { rows, committed: rows.filter((row) => row.operation === status).length };
+    });
+  }
+
   async resolveLegacyEntitlement(legacyToolSlug: string) {
     const result = await this.db.query<{ legacy_tool_id: string; legacy_tool_slug: string; registered_permission_keys: string[] }>(
       `SELECT t.id AS legacy_tool_id, t.slug AS legacy_tool_slug,
@@ -148,12 +244,14 @@ export class OAuthAdminRepository {
     return result.rows;
   }
 
-  async listNativeGrants(resourceId: string) {
+  async listNativeGrants(resourceId: string, filters: { query: string; scope: string; status: string; effective: string; offset: number } =
+    { query: "", scope: "", status: "", effective: "", offset: 0 }) {
     const resource = await this.db.query<{ id: string; entitlement_mode: string }>(
       `SELECT id, entitlement_mode FROM oauth_resources WHERE id = $1`, [resourceId]);
     if (!resource.rows[0]) reject("resource_not_found");
     if (resource.rows[0].entitlement_mode !== "native") reject("native_resource_required");
-    const result = await this.db.query(`SELECT g.id, g.oauth_resource_id AS resource_id, r.display_name AS resource_display_name,
+    const escaped = filters.query.replace(/[\\%_]/g, "\\$&");
+    const result = await this.db.query(`SELECT * FROM (SELECT g.id, g.oauth_resource_id AS resource_id, r.display_name AS resource_display_name,
       s.scope, g.user_id, u.email AS user_email, u.display_name AS user_display_name,
       g.status, (g.status = 'active' AND g.revoked_at IS NULL AND u.status = 'active'
         AND g.valid_from <= now() AND (g.valid_until IS NULL OR g.valid_until > now())
@@ -164,7 +262,16 @@ export class OAuthAdminRepository {
       JOIN oauth_scopes s ON s.id = g.oauth_scope_id
       JOIN oauth_resource_scopes rs ON rs.oauth_resource_id = g.oauth_resource_id AND rs.oauth_scope_id = g.oauth_scope_id
       LEFT JOIN users u ON u.id = g.user_id
-      WHERE g.oauth_resource_id = $1 ORDER BY g.created_at DESC, g.id DESC LIMIT 200`, [resourceId]);
+      WHERE g.oauth_resource_id = $1) AS grants
+      WHERE ($2 = '' OR coalesce(grants.user_email::text, '') ILIKE $2 ESCAPE '\\'
+        OR coalesce(grants.user_display_name, '') ILIKE $2 ESCAPE '\\'
+        OR grants.user_id::text ILIKE $2 ESCAPE '\\')
+        AND ($3 = '' OR grants.scope ILIKE $3 ESCAPE '\\')
+        AND ($4 = '' OR grants.status = $4)
+        AND ($5 = '' OR grants.effective = ($5 = 'true'))
+      ORDER BY grants.created_at DESC, grants.id DESC LIMIT 100 OFFSET $6`,
+      [resourceId, escaped ? `%${escaped}%` : "", filters.scope ? `%${filters.scope.replace(/[\\%_]/g, "\\$&")}%` : "",
+        filters.status, filters.effective, filters.offset]);
     return result.rows;
   }
 
@@ -329,6 +436,80 @@ export class OAuthAdminRepository {
     });
   }
 
+  async previewCommitAllowances(clientId: string, allowances: OAuthAdminClientInput["allowances"],
+    expectedCurrent: OAuthAdminAllowanceState[] | null, commit: boolean, ctx?: OAuthAdminAuditContext) {
+    return this.db.transaction(async (tx) => {
+      if (!commit) await tx.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY");
+      const client = await tx.query(`SELECT id FROM oauth_clients WHERE id = $1 ${commit ? "FOR UPDATE" : ""}`, [clientId]);
+      if (!client.rows[0]) reject("client_not_found");
+      const currentResult = await tx.query<{ resource_id: string; scope: string; status: "active" | "disabled" }>(
+        `SELECT r.resource_id, s.scope, a.status FROM oauth_client_resource_scopes a
+         JOIN oauth_resources r ON r.id = a.oauth_resource_id JOIN oauth_scopes s ON s.id = a.oauth_scope_id
+         WHERE a.oauth_client_id = $1 ORDER BY r.resource_id, s.scope`, [clientId]);
+      const key = (item: { resourceId: string; scope: string }) => `${item.resourceId}\u0000${item.scope}`;
+      const current = currentResult.rows.map((row) => ({ resourceId: row.resource_id, scope: row.scope, status: row.status }));
+      const stateKey = (item: OAuthAdminAllowanceState) => `${key(item)}\u0000${item.status}`;
+      const currentStateKeys = new Set(current.map(stateKey));
+      const currentByPair = new Map(current.map((item) => [key(item), item]));
+      const activeKeys = new Set(current.filter((item) => item.status === "active").map(key));
+      const desiredKeys = new Set(allowances.map(key));
+      const diff = [...allowances.map((item) => ({ resource_id: item.resourceId, scope: item.scope,
+        operation: activeKeys.has(key(item)) ? "unchanged" : "add", current_status: currentByPair.get(key(item))?.status ?? null })),
+        ...current.filter((item) => !desiredKeys.has(key(item))).map((item) => ({ resource_id: item.resourceId,
+          scope: item.scope, operation: "remove", current_status: item.status }))];
+      const summary = { add: diff.filter((row) => row.operation === "add").length,
+        remove: diff.filter((row) => row.operation === "remove").length,
+        unchanged: diff.filter((row) => row.operation === "unchanged").length };
+      for (const item of allowances) {
+        const target = await tx.query<{ resource_pk: string; scope_pk: string }>(
+          `SELECT rs.oauth_resource_id AS resource_pk, rs.oauth_scope_id AS scope_pk FROM oauth_resource_scopes rs
+           JOIN oauth_resources r ON r.id = rs.oauth_resource_id JOIN oauth_scopes s ON s.id = rs.oauth_scope_id
+           WHERE r.resource_id = $1 AND s.scope = $2 AND rs.status = 'active'
+             AND r.status <> 'disabled' AND s.status = 'active' ${commit ? "FOR SHARE OF rs, r, s" : ""}`,
+          [item.resourceId, item.scope]);
+        if (!target.rows[0]) reject("allowance_target_not_registered");
+      }
+      if (!commit) return { current: current.map((item) => ({ resource_id: item.resourceId, scope: item.scope, status: item.status })), diff, summary };
+      if (!ctx || !expectedCurrent ||
+        new Set(expectedCurrent.map(stateKey)).size !== currentStateKeys.size ||
+        expectedCurrent.some((item) => !currentStateKeys.has(stateKey(item)))) reject("allowance_preview_stale");
+      await tx.query(`DELETE FROM oauth_client_resource_scopes WHERE oauth_client_id = $1`, [clientId]);
+      for (const item of allowances) await tx.query(`INSERT INTO oauth_client_resource_scopes
+        (oauth_client_id, oauth_resource_id, oauth_scope_id, status)
+        SELECT $1, rs.oauth_resource_id, rs.oauth_scope_id, 'active' FROM oauth_resource_scopes rs
+        JOIN oauth_resources r ON r.id = rs.oauth_resource_id JOIN oauth_scopes s ON s.id = rs.oauth_scope_id
+        WHERE r.resource_id = $2 AND s.scope = $3`, [clientId, item.resourceId, item.scope]);
+      await writeAudit(tx, ctx, "oauth.client.changed", { action: "allowances_replaced", oauth_client_id: clientId,
+        add: summary.add, remove: summary.remove, unchanged: summary.unchanged });
+      return { diff, summary, committed: true };
+    });
+  }
+
+  async previewCommitRedirectUris(clientId: string, redirectUris: string[], expectedCurrent: string[] | null,
+    commit: boolean, ctx?: OAuthAdminAuditContext) {
+    return this.db.transaction(async (tx) => {
+      if (!commit) await tx.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY");
+      const client = await tx.query(`SELECT id FROM oauth_clients WHERE id = $1 ${commit ? "FOR UPDATE" : ""}`, [clientId]);
+      if (!client.rows[0]) reject("client_not_found");
+      const rows = await tx.query<{ redirect_uri: string }>(
+        `SELECT redirect_uri FROM oauth_client_redirect_uris WHERE oauth_client_id = $1 ORDER BY redirect_uri`, [clientId]);
+      const current = rows.rows.map((row) => row.redirect_uri);
+      const currentSet = new Set(current); const desiredSet = new Set(redirectUris);
+      const diff = [...redirectUris.map((uri) => ({ redirect_uri: uri, operation: currentSet.has(uri) ? "unchanged" : "add" })),
+        ...current.filter((uri) => !desiredSet.has(uri)).map((uri) => ({ redirect_uri: uri, operation: "remove" }))];
+      if (!commit) return { current, diff };
+      if (!ctx || !expectedCurrent || new Set(expectedCurrent).size !== currentSet.size ||
+        expectedCurrent.some((uri) => !currentSet.has(uri))) reject("redirect_preview_stale");
+      await tx.query(`DELETE FROM oauth_client_redirect_uris WHERE oauth_client_id = $1`, [clientId]);
+      for (const uri of redirectUris) await tx.query(`INSERT INTO oauth_client_redirect_uris
+        (oauth_client_id, redirect_uri) VALUES ($1, $2)`, [clientId, uri]);
+      await writeAudit(tx, ctx, "oauth.client.changed", { action: "redirect_uris_replaced", oauth_client_id: clientId,
+        added: diff.filter((row) => row.operation === "add").length,
+        removed: diff.filter((row) => row.operation === "remove").length });
+      return { diff, committed: true };
+    });
+  }
+
   async setResourceScope(resourceId: string, scopeId: string, input: { legacyPermissionKey: string | null; status: "active" | "disabled" }, ctx: OAuthAdminAuditContext) {
     return this.db.transaction(async (tx) => {
       const resource = await tx.query<{ entitlement_mode: string }>(`SELECT entitlement_mode FROM oauth_resources WHERE id = $1 FOR SHARE`, [resourceId]);
@@ -356,6 +537,47 @@ export class OAuthAdminRepository {
       [resourceId, scopeId, input.legacyPermissionKey, input.status]);
       await writeAudit(tx, ctx, "oauth.resource.changed", { action: "scope_mapping_changed", oauth_resource_id: resourceId, oauth_scope_id: scopeId, status: input.status });
       return result.rows[0];
+    });
+  }
+
+  async bulkNativeResourceScopes(resourceId: string, operations: Array<{ scope: string; action: "activate" | "disable" }>,
+    commit: boolean, ctx?: OAuthAdminAuditContext) {
+    return this.db.transaction(async (tx) => {
+      if (!commit) await tx.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY");
+      const resource = await tx.query<{ entitlement_mode: string; status: string }>(
+        `SELECT entitlement_mode, status FROM oauth_resources WHERE id = $1 ${commit ? "FOR UPDATE" : ""}`, [resourceId]);
+      if (!resource.rows[0]) reject("resource_not_found");
+      if (resource.rows[0].entitlement_mode !== "native") reject("native_resource_required");
+      const names = operations.map((item) => item.scope);
+      const found = await tx.query<{ id: string; scope: string; status: string; registration_status: string | null }>(
+        `SELECT s.id, s.scope, s.status, rs.status AS registration_status FROM oauth_scopes s
+         LEFT JOIN oauth_resource_scopes rs ON rs.oauth_scope_id = s.id AND rs.oauth_resource_id = $1
+         WHERE s.scope = ANY($2::text[]) ORDER BY s.scope ${commit ? "FOR SHARE OF s" : ""}`, [resourceId, names]);
+      const byName = new Map(found.rows.map((row) => [row.scope, row]));
+      const rows = operations.map((item) => {
+        const scope = byName.get(item.scope);
+        const reason = !scope ? "scope_not_found" : item.action === "activate" && scope.status !== "active"
+          ? "scope_inactive" : item.action === "disable" && !scope.registration_status
+            ? "registration_not_found" : scope.registration_status === (item.action === "activate" ? "active" : "disabled")
+              ? "already_in_status" : "explicit_registration_change";
+        return { scope: item.scope, action: item.action, current_status: scope?.registration_status ?? null,
+          operation: reason === "explicit_registration_change" ? item.action : reason === "already_in_status" ? "no_change" : "error",
+          reason, scope_id: scope?.id ?? null };
+      });
+      if (!commit) return { rows, summary: { total: rows.length, change: rows.filter((r) => r.operation === "activate" || r.operation === "disable").length,
+        no_change: rows.filter((r) => r.operation === "no_change").length, error: rows.filter((r) => r.operation === "error").length } };
+      if (!ctx || rows.some((r) => r.operation === "error")) reject("resource_scope_bulk_invalid");
+      for (const row of rows) if (row.operation === "activate" || row.operation === "disable") {
+        if (row.operation === "activate") await tx.query(`INSERT INTO oauth_resource_scopes
+          (oauth_resource_id, oauth_scope_id, legacy_permission_key, status) VALUES ($1, $2, NULL, 'active')
+          ON CONFLICT (oauth_resource_id, oauth_scope_id) DO UPDATE SET legacy_permission_key = NULL,
+            status = 'active', updated_at = now()`, [resourceId, row.scope_id]);
+        else await tx.query(`UPDATE oauth_resource_scopes SET status = 'disabled', updated_at = now()
+          WHERE oauth_resource_id = $1 AND oauth_scope_id = $2`, [resourceId, row.scope_id]);
+        await writeAudit(tx, ctx, "oauth.resource.changed", { action: "scope_mapping_changed", oauth_resource_id: resourceId,
+          scope: row.scope, status: row.operation === "activate" ? "active" : "disabled", batch: true });
+      }
+      return { rows, committed: rows.filter((r) => r.operation === "activate" || r.operation === "disable").length };
     });
   }
 
@@ -434,6 +656,133 @@ export class OAuthAdminRepository {
         valid_until: input.validUntil?.toISOString() ?? null
       });
       return { grants: created };
+    });
+  }
+
+  async bulkNativeGrants(input: OAuthAdminBulkGrantInput, commit: boolean, ctx?: OAuthAdminAuditContext) {
+    return this.db.transaction(async (tx) => {
+      if (!commit) await tx.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY");
+      const resource = await tx.query<{ id: string; entitlement_mode: string; display_name: string; status: string }>(
+        `SELECT id, entitlement_mode, display_name, status FROM oauth_resources WHERE id = $1 ${commit ? "FOR SHARE" : ""}`, [input.resourceId]);
+      if (!resource.rows[0]) reject("resource_not_found");
+      if (resource.rows[0].entitlement_mode !== "native") reject("native_resource_required");
+      const users = await tx.query<{ id: string; email: string; display_name: string | null; status: string }>(
+        `SELECT id, email, display_name, status FROM users
+         WHERE id = ANY($1::uuid[]) OR lower(email::text) = ANY($2::text[])
+         ORDER BY id ${commit ? "FOR UPDATE" : ""}`,
+        [input.userIds, input.emails]);
+      const userById = new Map(users.rows.map((row) => [row.id, row]));
+      const userByEmail = new Map(users.rows.map((row) => [row.email.toLowerCase(), row]));
+      const registrations = await tx.query<{ id: string; scope: string; scope_status: string; registration_status: string }>(
+        `SELECT s.id, s.scope, s.status AS scope_status, rs.status AS registration_status
+         FROM oauth_scopes s JOIN oauth_resource_scopes rs ON rs.oauth_scope_id = s.id
+         WHERE rs.oauth_resource_id = $1 AND s.scope = ANY($2::text[])
+         ORDER BY s.scope ${commit ? "FOR SHARE OF s, rs" : ""}`, [input.resourceId, input.scopes]);
+      const scopeByName = new Map(registrations.rows.map((row) => [row.scope, row]));
+      const existing = await tx.query<{ id: string; user_id: string; oauth_scope_id: string; valid_from: Date; valid_until: Date | null }>(
+        `SELECT id, user_id, oauth_scope_id, valid_from, valid_until FROM oauth_native_human_grants
+         WHERE oauth_resource_id = $1 AND status = 'active'
+           AND user_id = ANY($2::uuid[]) AND oauth_scope_id = ANY($3::uuid[])
+         ORDER BY user_id, oauth_scope_id ${commit ? "FOR UPDATE" : ""}`,
+        [users.rows.map((row) => row.id), registrations.rows.map((row) => row.id)]);
+      const clock = await tx.query<{ current_time: Date }>(`SELECT clock_timestamp() AS current_time`);
+      const now = clock.rows[0].current_time;
+      const validFrom = input.validFrom ?? now;
+      if (input.validUntil && input.validUntil <= validFrom) reject("grant_validity_invalid");
+      const existingByPair = new Map(existing.rows.map((row) => [`${row.user_id}:${row.oauth_scope_id}`, row]));
+      const identities = [...input.userIds.map((value) => ({ type: "id", value })), ...input.emails.map((value) => ({ type: "email", value }))];
+      const seenUsers = new Set<string>();
+      const rows = identities.flatMap((identity) => {
+        const user = identity.type === "id" ? userById.get(identity.value) : userByEmail.get(identity.value);
+        const duplicate = !!user && seenUsers.has(user.id);
+        if (user) seenUsers.add(user.id);
+        return input.scopes.map((scope) => {
+          const registered = scopeByName.get(scope);
+          const old = user && registered ? existingByPair.get(`${user.id}:${registered.id}`) : undefined;
+          let operation = "create";
+          if (!user || user.status !== "active") operation = "user_not_found_or_inactive";
+          else if (duplicate) operation = "error";
+          else if (!registered || registered.registration_status !== "active") operation = "scope_not_registered";
+          else if (registered.scope_status !== "active") operation = "scope_inactive";
+          else if (old && old.valid_until && old.valid_until <= now) operation = "elapsed_active_will_expire_then_regrant";
+          else if (old && old.valid_from <= now) operation = resource.rows[0].status === "active"
+            ? "already_effective" : "already_active_not_effective";
+          else if (old) operation = "error";
+          return { user_id: user?.id ?? null, user_email: user?.email ?? (identity.type === "email" ? identity.value : null),
+            user_display_name: user?.display_name ?? null, scope, resource_id: input.resourceId,
+            operation, reason: duplicate ? "duplicate_user_input" : operation, existing_grant_id: old?.id ?? null,
+            scope_id: registered?.id ?? null };
+        });
+      });
+      const summary = { total: rows.length, create: rows.filter((r) => r.operation === "create").length,
+        already_effective: rows.filter((r) => r.operation === "already_effective").length,
+        already_active_not_effective: rows.filter((r) => r.operation === "already_active_not_effective").length,
+        regrant: rows.filter((r) => r.operation === "elapsed_active_will_expire_then_regrant").length,
+        error: rows.filter((r) => !["create", "already_effective", "already_active_not_effective", "elapsed_active_will_expire_then_regrant"].includes(r.operation)).length };
+      if (!commit) return { rows, summary };
+      if (!ctx || summary.error) reject("bulk_native_grant_validation_failed");
+      const changed: string[] = [];
+      const mutations: Array<{ id: string; userId: string; scope: string }> = [];
+      for (const row of rows) {
+        if (["already_effective", "already_active_not_effective"].includes(row.operation)) continue;
+        if (row.operation === "elapsed_active_will_expire_then_regrant") await tx.query(
+          `UPDATE oauth_native_human_grants SET status = 'expired', updated_at = $2 WHERE id = $1`, [row.existing_grant_id, now]);
+        const inserted = await tx.query<{ id: string }>(`INSERT INTO oauth_native_human_grants
+          (oauth_resource_id, oauth_scope_id, user_id, status, valid_from, valid_until, created_by_user_id)
+          VALUES ($1, $2, $3, 'active', $4, $5, $6) RETURNING id`,
+        [input.resourceId, row.scope_id, row.user_id, validFrom, input.validUntil, ctx.actor.userId]);
+        changed.push(inserted.rows[0].id);
+        mutations.push({ id: inserted.rows[0].id, userId: row.user_id!, scope: row.scope });
+      }
+      for (const userId of [...new Set(mutations.map((row) => row.userId))].sort()) {
+        const userMutations = mutations.filter((row) => row.userId === userId);
+        await writeAudit(tx, ctx, "oauth.native_grant.changed", { action: "created", batch: true,
+          oauth_resource_id: input.resourceId, user_id: userId, scopes: userMutations.map((row) => row.scope),
+          grant_ids: userMutations.map((row) => row.id), valid_from: validFrom.toISOString(),
+          valid_until: input.validUntil?.toISOString() ?? null });
+      }
+      if (changed.length) await writeAudit(tx, ctx, "oauth.native_grant.bulk_changed", {
+        action: "created", oauth_resource_id: input.resourceId, count: changed.length,
+        grant_ids: changed, valid_from: validFrom.toISOString(), valid_until: input.validUntil?.toISOString() ?? null
+      });
+      return { rows, summary, committed: changed.length };
+    });
+  }
+
+  async bulkRevokeNativeGrants(ids: string[], commit: boolean, ctx?: OAuthAdminAuditContext) {
+    return this.db.transaction(async (tx) => {
+      if (!commit) await tx.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY");
+      const found = await tx.query<{ id: string; status: string; user_id: string; user_email: string | null;
+        scope: string; resource_id: string; resource_display_name: string }>(
+        `SELECT g.id, g.status, g.user_id, u.email AS user_email, s.scope,
+           g.oauth_resource_id AS resource_id, r.display_name AS resource_display_name
+         FROM oauth_native_human_grants g JOIN oauth_scopes s ON s.id = g.oauth_scope_id
+         JOIN oauth_resources r ON r.id = g.oauth_resource_id LEFT JOIN users u ON u.id = g.user_id
+         WHERE g.id = ANY($1::uuid[]) ORDER BY g.id ${commit ? "FOR UPDATE OF g" : ""}`, [ids]);
+      const byId = new Map(found.rows.map((row) => [row.id, row]));
+      const rows = ids.map((id) => {
+        const current = byId.get(id);
+        return { grant_id: id, user_id: current?.user_id ?? null, user_email: current?.user_email ?? null,
+          scope: current?.scope ?? null, resource_id: current?.resource_id ?? null,
+          resource_display_name: current?.resource_display_name ?? null, current_status: current?.status ?? null,
+          operation: !current ? "error" : current.status === "active" ? "revoke" : "skip" };
+      });
+      if (!commit) return { rows, summary: { total: rows.length, revoke: rows.filter((r) => r.operation === "revoke").length,
+        skip: rows.filter((r) => r.operation === "skip").length, error: rows.filter((r) => r.operation === "error").length } };
+      if (!ctx || rows.some((r) => r.operation === "error")) reject("bulk_revoke_invalid");
+      const changed = rows.filter((row) => row.operation === "revoke").map((row) => row.grant_id);
+      for (const id of changed) {
+        await tx.query(`UPDATE oauth_native_human_grants SET status = 'revoked',
+          revoked_at = GREATEST(now(), created_at), revoked_by_user_id = $2, updated_at = now() WHERE id = $1`,
+        [id, ctx.actor.userId]);
+        const row = rows.find((item) => item.grant_id === id)!;
+        await writeAudit(tx, ctx, "oauth.native_grant.changed", { action: "revoked", batch: true,
+          native_grant_id: id, oauth_resource_id: row.resource_id, user_id: row.user_id, scope: row.scope });
+      }
+      if (changed.length) await writeAudit(tx, ctx, "oauth.native_grant.bulk_changed", {
+        action: "revoked", count: changed.length, grant_ids: changed
+      });
+      return { rows, committed: changed.length };
     });
   }
 

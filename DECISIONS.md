@@ -1,5 +1,15 @@
 # DECISIONS.md
 
+## D-052 — Bound OAuth administration batches and retain explicit operator intent
+
+Status: accepted for Phase 9A.4
+
+Confirmed: 2026-10-05
+
+Decision: extend the existing platform-admin OAuth boundary with computed previews and transactional commits over the current schema. Scope catalogue/lifecycle and resource registrations allow at most 200 entries; native human grant batches allow at most 100 existing-user inputs, 50 scopes and 1,000 exact user/resource/scope pairs; exact grant revocation allows at most 200 IDs. Preview has no persistence. Commit repeats validation against current locked state and fails atomically on invalid mutations or audit failure. Scope descriptions/reactivation require explicit opt-ins, resource operations never imply replacement, and effective native grants skip safely. Email resolves an existing active user and is never the persisted native principal.
+
+Allowance and redirect replacement show exact add/remove/unchanged diffs and require the preview's current set at commit; concurrent set changes invalidate the replacement. Searchable selectors remove UUID typing from routine work. Resource/client creation, credential rotation and signing-key lifecycle remain explicit single-entity operations; no bulk credential or key action exists. No database migration, entitlement/runtime change, legacy coupling, Nancy registration or deployment is authorized by this decision.
+
 ## D-050 - Evaluate native OAuth entitlement at each live protocol decision
 
 Status: accepted for Phase 9A.2

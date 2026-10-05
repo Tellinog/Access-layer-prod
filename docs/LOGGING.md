@@ -1,5 +1,9 @@
 # LOGGING.md
 
+## Phase 9A.4 batch audit
+
+Scope batches retain one `oauth.scope.changed` event per mutation with the existing created/updated action, canonical scope, explicit operation and a batch marker, plus `oauth.scope.bulk_changed` with count and exact canonical scope set. Lifecycle/registration changes retain `oauth.scope.changed`/`oauth.resource.changed`. Native batch creation groups exact mutation IDs/scopes per user in `oauth.native_grant.changed`; revocation retains exact per-grant events. A sanitized `oauth.native_grant.bulk_changed` records aggregate count/IDs. Allowance/redirect replacement retains `oauth.client.changed` with entity ID and diff counts. All audit writes are inside the mutation transaction and must succeed. Skips do not produce mutation audit. Descriptions, pasted lookup emails, provider subjects, raw input and credentials are absent from batch metadata. All new POST routes use silent request logging.
+
 ## Temporary legacy Microsoft bridge events
 
 The conditional Microsoft callback emits `microsoft.callback.received` and then the same existing `auth.allowed`/`auth.denied.*`, session and exchange events as Google. Provider selection denials use the existing safe audit envelope with the new reason codes. `actor_google_sub` remains the frozen field name and may contain the approved synthetic `msft:<tid>:<oid>` value for this bridge.

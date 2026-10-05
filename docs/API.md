@@ -1,5 +1,9 @@
 # API.md
 
+## Phase 9A.4 additive OAuth Admin API
+
+The structured JSON preview/commit paths for scope catalogue/lifecycle, native resource scopes, allowance/redirect replacement, existing-user native grants and exact revocation are specified in `../schemas/access-layer-oauth-admin-p0.openapi.yaml` and `../specs/oauth-admin-operability.v1.yml`. HTTP APIs never parse the UI's semicolon/TAB paste format. Preview is read-only and commit repeats current validation transactionally with audit. Existing OAuth protocol and legacy endpoints remain unchanged.
+
 ## Phase 9A.3 OAuth Admin additions
 
 `POST /v1/admin/oauth/resources` accepts explicit `entitlement_mode: native` with `scopes[]`, or `entitlement_mode: legacy_bridge` with `legacy_tool_slug` and `scope_mappings[]`. A complete old P0 legacy payload without the mode remains accepted. Mixed shapes fail validation. Native resource creation returns the same one-time introspection credential shape as legacy creation.

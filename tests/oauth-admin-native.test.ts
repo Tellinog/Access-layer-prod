@@ -4,6 +4,7 @@ import Fastify from "fastify";
 import rateLimit from "@fastify/rate-limit";
 import { registerOAuthAdminHttp } from "../src/oauth/admin-http.js";
 import { AppError, sendJsonError } from "../src/errors.js";
+import { signCookie } from "../src/security.js";
 import type { Repositories } from "../src/repositories.js";
 import type { TokenService } from "../src/token-service.js";
 import { OAuthAdminService } from "../src/oauth/admin-service.js";
@@ -94,7 +95,8 @@ describe("Phase 9A.3 HTTP boundary", () => {
       listNativeGrants: async () => [],
       createResource: async (input: unknown) => { nativeCalls.push(input); return input; },
       createNativeGrants: async (input: unknown) => { nativeCalls.push(input); return input; },
-      revokeNativeGrant: async () => ({ status: "revoked" })
+      revokeNativeGrant: async () => ({ status: "revoked" }),
+      bulkScopes: async (input: unknown, commit: boolean) => { nativeCalls.push(input); return { committed: commit }; }
     } as unknown as OAuthAdminService;
     const repositories = {
       findUserByGoogleSub: async () => ({ id: ctx.actor.userId, google_sub: "admin-sub", email: "admin@example.invalid", hd: "example.invalid", status: "active" }),
@@ -112,6 +114,7 @@ describe("Phase 9A.3 HTTP boundary", () => {
     try {
       expect((await app.inject({ method: "GET", url: "/v1/admin/oauth/users?q=human", headers })).statusCode).toBe(403);
       expect((await app.inject({ method: "POST", url: "/v1/admin/oauth/native-grants", headers, payload: {} })).statusCode).toBe(403);
+      expect((await app.inject({ method: "POST", url: "/v1/admin/oauth/scopes/bulk/preview", headers, payload: {} })).statusCode).toBe(403);
       role = "platform_admin";
       const users = await app.inject({ method: "GET", url: "/v1/admin/oauth/users?q=human", headers });
       expect(Object.keys(users.json()[0]).sort()).toEqual(["display_name", "email", "id", "last_seen_at", "status"]);
@@ -132,6 +135,16 @@ describe("Phase 9A.3 HTTP boundary", () => {
         payload: { ...commonBody, legacy_tool_slug: "known-tool", scope_mappings: [{ scope: scopes[0], legacy_permission_key: "known:read" }] } });
       expect(legacy.statusCode).toBe(200);
       expect(nativeCalls[1]).toMatchObject({ entitlementMode: "legacy_bridge", legacyToolSlug: "known-tool" });
+      const batch = { rows: [{ scope: scopes[0], description: "Read records" }] };
+      expect((await app.inject({ method: "POST", url: "/v1/admin/oauth/scopes/bulk/preview", headers, payload: batch })).statusCode).toBe(200);
+      expect(nativeCalls[2]).toMatchObject({ mode: "create_missing", updateDescriptions: false, reactivateDisabled: false,
+        rows: [{ row: 1, scope: scopes[0], description: "Read records" }] });
+      expect((await app.inject({ method: "POST", url: "/v1/admin/oauth/scopes/bulk/commit", headers,
+        payload: { ...batch, raw_text: "scope ; description" } })).statusCode).toBe(400);
+      expect((await app.inject({ method: "POST", url: "/v1/admin/oauth/scopes/bulk/commit", headers: {
+        cookie: `admin=${encodeURIComponent(signCookie("synthetic-admin-token", appConfig.sessionSecret))}`,
+        "content-type": "application/json", origin: "https://evil.example.invalid" },
+        payload: batch })).statusCode).toBe(403);
       const ui = await app.inject({ method: "GET", url: "/admin/oauth", headers });
       expect(ui.body).toContain("OAuth administration");
       expect(ui.body).toContain("id=\"grant-resource\"");

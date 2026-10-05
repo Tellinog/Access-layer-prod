@@ -1,5 +1,7 @@
 # ANALYTICS.md
 
+Phase 9A.4 batch events may be counted by operation/outcome and bounded mutation count. Scope descriptions, user email lookup lists, internal user/grant IDs and any credentials must not become metric labels. Existing audit access/retention rules apply.
+
 ## Scope
 
 This project does not track product analytics for user behavior. It tracks security and operational metrics derived from audit events.

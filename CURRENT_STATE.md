@@ -1,5 +1,11 @@
 # CURRENT_STATE.md
 
+## Phase 9A.4 OAuth Admin operability candidate, 2026-10-05
+
+- `/admin/oauth` now has a bulk scope paste path (`scope ; description` or scope plus TAB plus description), a searchable scope catalogue with selected lifecycle preview, searchable exact scope pickers, human-readable resource/client/credential selectors, structured allowance and redirect diffs, and bounded native grant/revoke controls. The existing single-scope, per-grant revoke, resource/client creation, one-time credential and signing-key lifecycle paths remain.
+- New platform-admin-only JSON preview/commit APIs cover at most 200 scope rows, selected scope lifecycle, explicit native resource-scope operations, allowance/redirect replacement, at most 1,000 user-scope native grant pairs, and at most 200 exact grant revocations. Commits recompute current state in transactions and write sanitized audit in those transactions; identical scopes and effective grants skip on retries. Native grants persist exact `users.id`; pasted email is lookup only. Resource registration never writes a legacy permission for native mode.
+- The OAuth runtime, token claims, entitlement evaluation, legacy Admin and consumers, migration 006, signing-key publication rules and default-off protocol flag are unchanged. No Nancy registration, production scope creation or deployment is part of this candidate. Final qualification evidence belongs in the Phase 9A.4 sidecar summary for the exact clean commit.
+
 ## Phase 9A.3 native OAuth administration candidate, 2026-09-29
 
 - `/admin/oauth` and `/v1/admin/oauth/*` now manage explicit native resources and exact linked human scope grants for existing active Access Layer users. The old complete P0 resource payload remains `legacy_bridge` when `entitlement_mode` is omitted. Legacy mode remains available with live tool and exact permission selection. Native resource scopes have NULL legacy permission keys and no entitlement binding.

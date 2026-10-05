@@ -1,5 +1,11 @@
 # OAuth native entitlements after Phase 9A.3
 
+## Phase 9A.4 administration operability
+
+The accepted native model/runtime is unchanged. Additive bulk JSON APIs and operator controls now support scope catalogue/lifecycle, explicit native resource registrations, finite exact client allowance sets, existing-user native grant matrices and exact grant-ID revocation. Scope paste is a browser concern: `scope ; description` or `scope<TAB>description`; commas are never delimiters. Batches are computed from persisted state without preview tables or migration 007. Commit repeats validation transactionally with sanitized audit, and a failed audit aborts the batch.
+
+Native bulk grant identity remains exact `users.id`. Optional pasted emails resolve existing active users and are never persisted as entitlement principals or pending grants. Effective exact grants skip safely; elapsed active rows expire before re-grant; revoked/expired rows remain terminal. The dedicated resource-filtered grant read model supports bounded filters and 100-row pages. Resource operations are explicit register/activate or disable with null legacy mapping, with no implicit replace or cascade. Allowance and redirect replacement compare the current exact set with the preview set. Resource/client creation, credential rotation and signing-key lifecycle remain single entity. No OAuth endpoint/claim/evaluator, legacy grant, Nancy or deployment change occurs.
+
 ## Phase 9A.3 administration
 
 `/admin/oauth` now creates explicit `native` resources and exact native human grants for existing active `users.id` records. The operator selects registered active scopes, searches users by email/display name, sees resource-filtered grants and explicitly revokes one grant. Native resource scopes store `legacy_permission_key=NULL`; native resources have no legacy-tool binding. The resource introspection credential remains generated and disclosed once. The legacy-bridge form uses an active-tool dropdown and that tool's registered permission keys. An omitted `entitlement_mode` is accepted only for the complete historical P0 `legacy_tool_slug` plus `scope_mappings` request; mixed shapes are rejected.

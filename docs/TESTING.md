@@ -1,5 +1,11 @@
 # TESTING.md
 
+## Phase 9A.4 OAuth Admin operability
+
+`tests/oauth-admin-bulk.test.ts` exercises scope batch preview/commit/retry, explicit update/reactivation, invalid/duplicate input, atomic mutation/audit rollback, batch bounds, the actual generated scope paste parser (BOM, CRLF, blanks, TAB, first semicolon and preserved comma), and required page controls. Existing Admin HTML parseability, native/P0 authorization and legacy contract suites remain active.
+
+The clean-worktree OAuth Admin PostgreSQL qualifier in `scripts/oauth-admin/run-qualification.ps1` now adds a 25-scope synthetic Nancy simulation through real Admin HTTP: bulk scope preview/commit/retry, native resource, confidential client with all exact allowances, existing-email resolution to stable user ID, bulk grants/retry, real authorize/callback/exchange/introspection and exact bulk grant revoke making that token inactive. Direct SQL is used only for synthetic bootstrap users/Admin session and read assertions. `scripts/step4b/run-qualification.ps1` remains the full Phase 9A.3 native/P0, eight-refresh-race, encrypted backup/replace restore and legacy smoke gate. Both use disposable loopback PostgreSQL 16 and clean exact commits. Record final results and counts in the sidecar package; do not infer a pass from an opt-in test skip.
+
 ## Phase 9A.3 qualification
 
 `tests/oauth-admin-native.test.ts` covers native service validation and the strict Admin HTTP permission/payload boundary while retaining the unchanged P0 Admin suite. `tests/oauth-admin-native-postgres.test.ts` is opt-in on a confirmed disposable loopback PostgreSQL 16 database; it applies migrations 001–006 in a temporary schema and checks both resource modes, NULL native mappings/no binding, safe selectors, client allowances, linked grant creation, active conflict, terminal revoke, elapsed re-grant and sanitized audit records. The Step4B runner invokes both PostgreSQL native suites.

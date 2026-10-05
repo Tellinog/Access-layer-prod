@@ -1,5 +1,9 @@
 # UX.md
 
+## Phase 9A.4 OAuth operator flow
+
+The normal flow is readable entity selection, exact set selection/paste, row validation preview, explicit commit and visible result. Scope paste uses semicolon or TAB only. Searchable checkbox scope pickers replace routine Ctrl-click selection. The catalogue provides status and usage counts. Resource registration actions are explicit and additive. Allowance/redirect replacement displays every add/remove/unchanged row, preserves unseen resources in structured allowance editing, and rejects a stale current set. Existing-user bulk grants and exact selected revoke use dedicated server batches. Grant reads stay resource-filtered and paginated. The advanced snapshot retains UUID details; it is not required for ordinary work. Credential/key actions stay single entity and one-time secret output stays separate.
+
 ## User login UX
 
 - Tool owns the protected page and starts login automatically or via button.

@@ -1,0 +1,75 @@
+schema_version: 1
+phase: 9A.4
+status: candidate_implemented
+runtime_contract: unchanged
+database_migration: none
+frozen_migrations: [001, 002, 003, 004, 005, 006]
+permission: admin:oauth:write
+cookie_origin: exact_same_origin
+write_rate_controls: existing_oauth_admin_bucket
+preview: read_only_computed_without_persistence
+commit: revalidate_current_state_atomic_with_sanitized_audit
+audit_failure: rollback
+secrets_in_bulk_responses: forbidden
+scope_catalogue:
+  max_rows: 200
+  default_mode: create_missing
+  description_update: explicit_opt_in
+  reactivation: explicit_opt_in
+  identical_active: skip
+  duplicate_input: error
+  invalid_scope_or_blank_description: row_error
+  paste_delimiters: [first_tab_if_present, otherwise_first_semicolon]
+  comma_delimiter: forbidden
+  blank_lines: ignored
+  original_line_numbers: preserved
+  bom_and_crlf: normalized
+scope_lifecycle:
+  max_rows: 200
+  operations: [active, disabled]
+  preview_impact: affected_registered_resource_and_allowed_client_counts
+  cascade_delete: forbidden
+resource_scopes:
+  max_rows: 200
+  bulk_mode: native_only
+  boundary_identity: canonical_scope
+  operations: [activate, disable]
+  implicit_replace: forbidden
+  native_legacy_permission_key: null
+  already_in_status: no_change
+  legacy_bridge: existing_exact_mapping_rules_unchanged
+allowances:
+  max_rows: 200
+  exact_resource_scope_pairs: required
+  select_all: current_selected_active_registered_set_only
+  wildcard_prefix_or_future_scope: forbidden
+  diff: [add, remove, unchanged]
+  commit_current_set_comparison: required
+redirects:
+  max_rows: 100
+  exact_uris: required
+  diff: [add, remove, unchanged]
+  commit_current_set_comparison: required
+native_grants:
+  max_user_inputs: 100
+  max_scopes: 50
+  max_matrix: 1000
+  principal: users.id
+  email: existing_active_user_lookup_only
+  unknown_or_inactive_user: preview_error
+  pending_email_writer: forbidden
+  duplicate_user_or_scope_input: rejected
+  effective_exact_grant: already_effective_no_write
+  in_window_active_grant_on_inactive_resource: already_active_not_effective_no_write
+  elapsed_active: expire_then_regrant_same_transaction
+  future_active_conflict: error
+  terminal_rows: immutable
+  bulk_revoke_max_ids: 200
+  revoke_boundary: exact_grant_ids_only
+  terminal_revoke: skip
+  read_model: dedicated_resource_filtered
+  page_size: 100
+  max_offset: 10000
+  filters: [user_email_display, scope, persisted_status, effective]
+single_entity_by_design: [resource_creation, client_creation, credential_rotation, signing_key_lifecycle]
+excluded: [oauth_runtime_changes, token_claim_changes, entitlement_changes, legacy_admin_changes, nancy_registration, deployment]

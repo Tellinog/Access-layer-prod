@@ -1,5 +1,11 @@
 # DEVLOG.md
 
+## 2026-10-05 — Phase 9A.4 OAuth Admin operability
+
+Added bounded structured JSON preview/commit workflows for the scope catalogue, scope lifecycle, explicit native resource-scope registrations, client allowance/redirect replacement, native human grant matrices and exact grant revocation. Commits revalidate persisted state, retain the existing Admin permission/origin/rate boundary, and couple mutation and sanitized audit in one transaction. Identical active scopes and currently effective grants are repeatable no-ops. Description replacement and disabled-scope reactivation are explicit opt-ins.
+
+The English OAuth page now supports semicolon/TAB scope paste with original line numbers, readable catalogue/preview tables, searchable checkbox scope pickers, human-readable entity selectors, allowance/redirect diffs, existing-user/email-resolution bulk grants, filtered paginated grant reads and selected revocation. Credentials and signing keys stay single-entity actions. Updated the additive Admin OpenAPI and native entitlement specification. Migrations 001–006 and OAuth/legacy runtime are unchanged. Final clean-commit validation and disposable PostgreSQL results are recorded in the Phase 9A.4 sidecar summary. Nancy and deployment were not changed.
+
 ## 2026-09-29 — Phase 9A.3 native OAuth administration candidate
 
 Added discriminated native/legacy resource creation with complete old P0 payload compatibility; native creation registers only active exact scopes with NULL legacy mapping and no binding. Added bounded legacy-tool/permission selector, safe user lookup, resource-filtered native grant list, atomic multi-scope linked grant creation, elapsed-grant expiry/re-grant and explicit terminal revocation. `/admin/oauth` now defaults new resources to native and guides existing-user scope grants while retaining legacy compatibility and one-time secret handling. The existing Admin authorization, CSRF, rate, audit and protocol runtime boundaries remain. Updated the Admin OpenAPI and native entitlement contract. No migration or deployment change. A disposable PostgreSQL 16.15 development run passed the modified full Step4B harness; the clean exact-commit result is recorded in the Phase 9A.3 sidecar handoff artifact.

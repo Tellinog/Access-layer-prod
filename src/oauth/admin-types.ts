@@ -12,6 +12,22 @@ export interface OAuthAdminScopeInput {
   description: string;
 }
 
+export interface OAuthAdminBulkScopesInput {
+  mode: "create_missing";
+  updateDescriptions: boolean;
+  reactivateDisabled: boolean;
+  rows: Array<OAuthAdminScopeInput & { row: number }>;
+}
+
+export interface OAuthAdminBulkGrantInput {
+  resourceId: string;
+  userIds: string[];
+  emails: string[];
+  scopes: string[];
+  validFrom: Date | null;
+  validUntil: Date | null;
+}
+
 export interface OAuthAdminResourceCommon {
   resourceId: string;
   displayName: string;
@@ -44,6 +60,8 @@ export interface OAuthAdminClientInput {
   redirectUris: string[];
   allowances: Array<{ resourceId: string; scope: string }>;
 }
+
+export type OAuthAdminAllowanceState = OAuthAdminClientInput["allowances"][number] & { status: "active" | "disabled" };
 
 export interface OAuthAdminSnapshot {
   clients: Array<Record<string, unknown>>;

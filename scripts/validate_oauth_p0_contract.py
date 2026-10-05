@@ -31,18 +31,32 @@ EXPECTED_ADMIN_PATHS = {
     "/v1/admin/oauth/users",
     "/v1/admin/oauth/native-grants",
     "/v1/admin/oauth/native-grants/{id}/revoke",
+    "/v1/admin/oauth/native-grants/bulk/preview",
+    "/v1/admin/oauth/native-grants/bulk/commit",
+    "/v1/admin/oauth/native-grants/bulk-revoke/preview",
+    "/v1/admin/oauth/native-grants/bulk-revoke/commit",
     "/v1/admin/oauth/scopes",
     "/v1/admin/oauth/scopes/{id}",
+    "/v1/admin/oauth/scopes/bulk/preview",
+    "/v1/admin/oauth/scopes/bulk/commit",
+    "/v1/admin/oauth/scopes/bulk-status/preview",
+    "/v1/admin/oauth/scopes/bulk-status/commit",
     "/v1/admin/oauth/resources",
     "/v1/admin/oauth/resources/{id}/status",
     "/v1/admin/oauth/resources/{id}/entitlement-binding",
     "/v1/admin/oauth/resources/{resourceId}/scopes/{scopeId}",
+    "/v1/admin/oauth/resources/{id}/scopes/bulk/preview",
+    "/v1/admin/oauth/resources/{id}/scopes/bulk/commit",
     "/v1/admin/oauth/resources/{id}/credentials/rotate",
     "/v1/admin/oauth/resources/credentials/{credentialId}/retire",
     "/v1/admin/oauth/clients",
     "/v1/admin/oauth/clients/{id}/status",
     "/v1/admin/oauth/clients/{id}/redirect-uris",
     "/v1/admin/oauth/clients/{id}/allowances",
+    "/v1/admin/oauth/clients/{id}/allowances/preview",
+    "/v1/admin/oauth/clients/{id}/allowances/commit",
+    "/v1/admin/oauth/clients/{id}/redirect-uris/preview",
+    "/v1/admin/oauth/clients/{id}/redirect-uris/commit",
     "/v1/admin/oauth/clients/{id}/credentials/rotate",
     "/v1/admin/oauth/clients/credentials/{credentialId}/retire",
     "/v1/admin/oauth/signing-keys",
@@ -172,7 +186,7 @@ def validate() -> list[str]:
     if set(openapi.get("paths", {})) != EXPECTED_PATHS:
         errors.append("target OpenAPI path set differs from the frozen P0 surface")
     if set(admin_openapi.get("paths", {})) != EXPECTED_ADMIN_PATHS:
-        errors.append("OAuth Admin OpenAPI path set differs from the supported P0 plus 9A.3 surface")
+        errors.append("OAuth Admin OpenAPI path set differs from the supported P0 plus 9A.4 surface")
     administration = spec.get("administration", {})
     if administration.get("status") != "candidate_implemented":
         errors.append("OAuth Admin machine profile does not record candidate implementation")

@@ -7,6 +7,9 @@ import type { Config } from "../types.js";
 import { hashOAuthCredentialSecret, randomToken } from "../security.js";
 import type {
   OAuthAdminAuditContext,
+  OAuthAdminAllowanceState,
+  OAuthAdminBulkGrantInput,
+  OAuthAdminBulkScopesInput,
   OAuthAdminClientInput,
   OAuthAdminNativeGrantInput,
   OAuthAdminResourceInput,
@@ -96,6 +99,38 @@ export class OAuthAdminService {
     return this.input.repository.updateScope(id, input, ctx);
   }
 
+  bulkScopes(input: OAuthAdminBulkScopesInput, commit: boolean, ctx?: OAuthAdminAuditContext) {
+    assertNoIssues([
+      ...(input.mode !== "create_missing" ? ["bulk_scope_mode_invalid"] : []),
+      ...(input.rows.length < 1 || input.rows.length > 200 ? ["bulk_scope_batch_size_invalid"] : []),
+      ...(input.rows.some((row) => row.scope.length > 200 || row.description.length > 2000 ||
+        !Number.isInteger(row.row) || row.row < 1 || row.row > 100000) ? ["bulk_scope_row_invalid"] : [])
+    ]);
+    return this.input.repository.bulkScopes({ ...input, rows: input.rows.map((row) => ({ ...row, description: row.description.trim() })) }, commit, ctx);
+  }
+
+  bulkScopeStatus(scopes: string[], status: "active" | "disabled", commit: boolean, ctx?: OAuthAdminAuditContext) {
+    assertNoIssues([
+      ...(scopes.length < 1 || scopes.length > 200 ? ["bulk_scope_batch_size_invalid"] : []),
+      ...(new Set(scopes).size !== scopes.length ? ["bulk_scope_duplicate"] : []),
+      ...(scopes.some((scope) => !isCanonicalOAuthScope(scope)) ? ["scope_invalid"] : []),
+      ...(!["active", "disabled"].includes(status) ? ["scope_status_invalid"] : [])
+    ]);
+    return this.input.repository.bulkScopeStatus(scopes, status, commit, ctx);
+  }
+
+  bulkNativeResourceScopes(resourceId: string, operations: Array<{ scope: string; action: "activate" | "disable" }>,
+    commit: boolean, ctx?: OAuthAdminAuditContext) {
+    assertNoIssues([
+      ...(!UUID_REGEX.test(resourceId) ? ["resource_id_invalid"] : []),
+      ...(operations.length < 1 || operations.length > 200 ? ["resource_scope_batch_size_invalid"] : []),
+      ...(new Set(operations.map((row) => row.scope)).size !== operations.length ? ["resource_scope_duplicate"] : []),
+      ...(operations.some((row) => !isCanonicalOAuthScope(row.scope) || !["activate", "disable"].includes(row.action))
+        ? ["resource_scope_operation_invalid"] : [])
+    ]);
+    return this.input.repository.bulkNativeResourceScopes(resourceId, operations, commit, ctx);
+  }
+
   async createResource(input: OAuthAdminResourceInput, ctx: OAuthAdminAuditContext) {
     if (input.entitlementMode === "native") {
       assertNoIssues([
@@ -154,9 +189,17 @@ export class OAuthAdminService {
     return this.input.repository.searchUsers(query.trim());
   }
 
-  listNativeGrants(resourceId: string) {
-    assertNoIssues(!UUID_REGEX.test(resourceId) ? ["resource_id_invalid"] : []);
-    return this.input.repository.listNativeGrants(resourceId);
+  listNativeGrants(resourceId: string, filters: { query: string; scope: string; status: string; effective: string; offset: number } =
+    { query: "", scope: "", status: "", effective: "", offset: 0 }) {
+    assertNoIssues([
+      ...(!UUID_REGEX.test(resourceId) ? ["resource_id_invalid"] : []),
+      ...(filters.query.length > 100 || filters.scope.length > 200 ? ["grant_filter_invalid"] : []),
+      ...(filters.status && !["active", "expired", "revoked", "pending_user_link"].includes(filters.status)
+        ? ["grant_status_filter_invalid"] : []),
+      ...(filters.effective && !["true", "false"].includes(filters.effective) ? ["grant_effective_filter_invalid"] : []),
+      ...(!Number.isInteger(filters.offset) || filters.offset < 0 || filters.offset > 10000 ? ["grant_offset_invalid"] : [])
+    ]);
+    return this.input.repository.listNativeGrants(resourceId, filters);
   }
 
   createNativeGrants(input: OAuthAdminNativeGrantInput, ctx: OAuthAdminAuditContext) {
@@ -175,6 +218,33 @@ export class OAuthAdminService {
   revokeNativeGrant(id: string, ctx: OAuthAdminAuditContext) {
     assertNoIssues(!UUID_REGEX.test(id) ? ["native_grant_not_found"] : []);
     return this.input.repository.revokeNativeGrant(id, ctx);
+  }
+
+  bulkNativeGrants(input: OAuthAdminBulkGrantInput, commit: boolean, ctx?: OAuthAdminAuditContext) {
+    const matrix = (input.userIds.length + input.emails.length) * input.scopes.length;
+    assertNoIssues([
+      ...(!UUID_REGEX.test(input.resourceId) ? ["resource_id_invalid"] : []),
+      ...(matrix < 1 || matrix > 1000 || input.userIds.length + input.emails.length > 100 || input.scopes.length > 50
+        ? ["bulk_grant_batch_size_invalid"] : []),
+      ...(input.userIds.some((id) => !UUID_REGEX.test(id)) ? ["user_id_invalid"] : []),
+      ...(input.emails.some((email) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254)
+        ? ["grant_email_invalid"] : []),
+      ...(input.scopes.some((scope) => !isCanonicalOAuthScope(scope)) ? ["grant_scope_invalid"] : []),
+      ...(new Set(input.scopes).size !== input.scopes.length ? ["grant_scope_duplicate"] : []),
+      ...(new Set(input.userIds).size !== input.userIds.length ? ["grant_user_duplicate"] : []),
+      ...(new Set(input.emails.map((email) => email.toLowerCase())).size !== input.emails.length ? ["grant_email_duplicate"] : []),
+      ...(input.validUntil && input.validUntil <= (input.validFrom ?? this.now()) ? ["grant_validity_invalid"] : [])
+    ]);
+    return this.input.repository.bulkNativeGrants({ ...input, emails: input.emails.map((email) => email.toLowerCase()) }, commit, ctx);
+  }
+
+  bulkRevokeNativeGrants(ids: string[], commit: boolean, ctx?: OAuthAdminAuditContext) {
+    assertNoIssues([
+      ...(ids.length < 1 || ids.length > 200 ? ["bulk_revoke_batch_size_invalid"] : []),
+      ...(ids.some((id) => !UUID_REGEX.test(id)) ? ["native_grant_id_invalid"] : []),
+      ...(new Set(ids).size !== ids.length ? ["native_grant_duplicate"] : [])
+    ]);
+    return this.input.repository.bulkRevokeNativeGrants(ids, commit, ctx);
   }
 
   async createClient(input: OAuthAdminClientInput, ctx: OAuthAdminAuditContext) {
@@ -232,6 +302,19 @@ export class OAuthAdminService {
     return this.input.repository.replaceRedirectUris(clientId, redirectUris, ctx);
   }
 
+  previewCommitRedirectUris(clientId: string, redirectUris: string[], expectedCurrent: string[] | null,
+    commit: boolean, ctx?: OAuthAdminAuditContext) {
+    assertNoIssues([
+      ...(!UUID_REGEX.test(clientId) ? ["client_id_invalid"] : []),
+      ...(redirectUris.length < 1 || redirectUris.length > 100 ? ["redirect_uri_count_invalid"] : []),
+      ...(new Set(redirectUris).size !== redirectUris.length ? ["redirect_uri_duplicate"] : []),
+      ...(redirectUris.some((uri) => !isExactOAuthRedirectUri(uri)) ? ["redirect_uri_invalid"] : []),
+      ...(commit && !expectedCurrent ? ["redirect_preview_required"] : []),
+      ...(expectedCurrent && expectedCurrent.length > 100 ? ["redirect_current_set_too_large"] : [])
+    ]);
+    return this.input.repository.previewCommitRedirectUris(clientId, redirectUris, expectedCurrent, commit, ctx);
+  }
+
   replaceAllowances(clientId: string, allowances: OAuthAdminClientInput["allowances"], ctx: OAuthAdminAuditContext) {
     const keys = allowances.map((item) => `${item.resourceId}\u0000${item.scope}`);
     assertNoIssues([
@@ -241,6 +324,22 @@ export class OAuthAdminService {
       ...(allowances.some((item) => !isCanonicalOAuthScope(item.scope)) ? ["allowance_scope_invalid"] : [])
     ]);
     return this.input.repository.replaceAllowances(clientId, allowances, ctx);
+  }
+
+  previewCommitAllowances(clientId: string, allowances: OAuthAdminClientInput["allowances"],
+    expectedCurrent: OAuthAdminAllowanceState[] | null, commit: boolean, ctx?: OAuthAdminAuditContext) {
+    const keys = allowances.map((item) => `${item.resourceId}\u0000${item.scope}`);
+    assertNoIssues([
+      ...(!UUID_REGEX.test(clientId) ? ["client_id_invalid"] : []),
+      ...(allowances.length > 200 ? ["allowance_batch_size_invalid"] : []),
+      ...(new Set(keys).size !== keys.length ? ["allowance_duplicate"] : []),
+      ...(allowances.some((item) => !isExactOAuthHttpsUri(item.resourceId) || !isCanonicalOAuthScope(item.scope))
+        ? ["allowance_invalid"] : []),
+      ...(commit && !expectedCurrent ? ["allowance_preview_required"] : []),
+      ...(expectedCurrent && expectedCurrent.length > 200 ? ["allowance_current_set_too_large"] : []),
+      ...(expectedCurrent?.some((item) => !["active", "disabled"].includes(item.status)) ? ["allowance_current_status_invalid"] : [])
+    ]);
+    return this.input.repository.previewCommitAllowances(clientId, allowances, expectedCurrent, commit, ctx);
   }
 
   setResourceScope(resourceId: string, scopeId: string, input: { legacyPermissionKey: string | null; status: "active" | "disabled" }, ctx: OAuthAdminAuditContext) {

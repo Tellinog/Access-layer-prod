@@ -1,5 +1,19 @@
 # ADMIN_GUIDE.md
 
+## Phase 9A.4 OAuth bulk workflows
+
+Use `/admin/oauth` with an active platform-admin session and explicit `admin:oauth:read/write`. Normal administration selects clients and resources by readable name, canonical URI/ID, mode and status. Internal UUIDs remain in the advanced snapshot for troubleshooting.
+
+For **Bulk scope catalogue**, paste one `scope ; description` or `scope<TAB>description` row per line. Blank lines are ignored, CRLF/LF and a UTF-8 BOM are tolerated, whitespace is trimmed, and only the first TAB (otherwise first semicolon) separates columns. Later semicolons and commas remain in the description. Missing columns retain the original line number as an error. Preview shows every row and its operation. Commit is enabled only for the current successful preview. Editing input or options invalidates it. Existing descriptions and disabled scopes are unchanged unless their explicit options are selected. Batches are limited to 200 rows.
+
+The scope catalogue supports scope/status filtering, checkbox selection and status preview with affected resource/client counts. Disabling does not delete registrations, allowances or grants. The resource picker supports search, select/clear visible, select all active, clear all and a selected count. Native resource scope administration applies explicit register/activate or disable operations; unchecked scopes remain untouched and native legacy permission mappings remain null. Legacy-bridge mappings retain the existing exact registered-key rules.
+
+Structured client allowances select a resource and its exact current active registered scopes. Select all captures that finite set; it grants no wildcard or future scope. New-client creation can select the entire resource scope set once. Existing-client editing preserves other resource allowances and previews add/remove/unchanged before replacement. Advanced `resource URI = scope` paste remains available and previews its complete replacement. Redirect URIs remain one per line, with readable client selection, current values and a preview diff. Replacement commits reject a changed current set and require another preview.
+
+Bulk native grants select one native resource, exact scopes, existing users and optional validity. Search/select users or paste existing email addresses one per line. Emails resolve server-side only to existing active users; unknown/inactive targets fail preview and no pending grant is written. At most 100 user inputs, 50 scopes and 1,000 pairs are accepted. Effective exact grants skip; elapsed active rows expire before re-grant in the same transaction. The dedicated grant list has resource, user/email, scope, persisted-status and effective filters with 100-row pages. Checkbox selection previews and revokes at most 200 exact grant IDs; terminal rows skip.
+
+Bulk operations are scope catalogue/lifecycle, native scope registration, allowance UX, native grants and exact revocation. Resource/client creation, credential rotation and signing-key transitions remain single-entity by design. Credentials appear once in their dedicated panel and are discarded before another mutation. Never use the simulation fixture as production registration.
+
 ## Ruoli admin
 
 | Ruolo | Scopo |

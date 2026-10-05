@@ -268,7 +268,107 @@ try {
     oauthAdminService: service, audit: new AuditLogger(legacyRepositories), google,
     tokenService: legacyTokenService
   });
+  let bulkClientSecret = "", bulkResourceSecret = "";
   try {
+    const adminToolId = randomUUID(), adminGrantId = randomUUID(), adminSessionId = randomUUID();
+    await db.query(`INSERT INTO tools (id, slug, display_name, status, allowed_return_urls)
+      VALUES ($1, 'access-admin', 'Synthetic Admin', 'active', '[]'::jsonb)`, [adminToolId]);
+    await db.query(`INSERT INTO authorization_grants (id, tool_id, user_id, role, permissions, status)
+      VALUES ($1, $2, $3, 'platform_admin', '["admin:oauth:read","admin:oauth:write"]'::jsonb, 'active')`,
+    [adminGrantId, adminToolId, adminId]);
+    await db.query(`INSERT INTO sessions (id, user_id, tool_id, grant_id, status, issued_at, expires_at)
+      VALUES ($1, $2, $3, $4, 'active', now(), now() + interval '15 minutes')`,
+    [adminSessionId, adminId, adminToolId, adminGrantId]);
+    const adminToken = (await legacyTokenService.issueAccessToken({
+      user: { google_sub: "oauth-admin-local-admin", email: "admin@example.invalid", hd: "example.invalid" },
+      tool: { slug: "access-admin" }, grant: { permissions: ["admin:oauth:read", "admin:oauth:write"], role: "platform_admin" },
+      session: { id: adminSessionId }
+    } as Parameters<TokenService["issueAccessToken"]>[0])).token;
+    const adminHeaders = { authorization: `Bearer ${adminToken}`, "content-type": "application/json" };
+    const adminPost = async (path: string, payload: Record<string, unknown>) => {
+      const response = await runtimeApp.inject({ method: "POST", url: `/v1/admin/oauth${path}`, headers: adminHeaders, payload });
+      assert(response.statusCode === 200, `bulk Admin ${path} failed with HTTP ${response.statusCode}`);
+      return response.json() as Record<string, any>;
+    };
+    const simulatedScopes = Array.from({ length: 25 }, (_, index) => `nancy-sim:area-${String(index + 1).padStart(2, "0")}:read`);
+    const bulkScopePayload = { mode: "create_missing", update_descriptions: false, reactivate_disabled: false,
+      rows: simulatedScopes.map((scope, index) => ({ row: index + 1, scope, description: `Synthetic Nancy simulation area ${index + 1}` })) };
+    const scopePreview = await adminPost("/scopes/bulk/preview", bulkScopePayload);
+    assert(scopePreview.summary.create === 25 && scopePreview.summary.error === 0, "25-scope preview incomplete");
+    const scopeCommit = await adminPost("/scopes/bulk/commit", bulkScopePayload);
+    assert(scopeCommit.committed === 25, "25-scope commit incomplete");
+    const repeatScopes = await adminPost("/scopes/bulk/commit", bulkScopePayload);
+    assert(repeatScopes.committed === 0 && repeatScopes.summary.skip === 25, "scope retry was not idempotent");
+    const nativeResourceUri = "https://nancy-simulation.example.invalid/api";
+    const nativeResource = await adminPost("/resources", {
+      resource_id: nativeResourceUri, display_name: "Synthetic Nancy simulation API", owner_team: "local-qualification",
+      owner_contact: null, status: "active", entitlement_mode: "native", scopes: simulatedScopes,
+      protected_resource_metadata_url: "https://nancy-simulation.example.invalid/.well-known/oauth-protected-resource"
+    });
+    bulkResourceSecret = nativeResource.resource_credential_secret;
+    const nativeResourcePk = nativeResource.resource.id as string;
+    const nativeClient = await adminPost("/clients", {
+      client_id: "nancy-simulation-bff", client_name: "Synthetic Nancy simulation BFF", owner_team: "local-qualification",
+      owner_contact: null, status: "active", grant_types: ["authorization_code", "refresh_token"],
+      redirect_uris: ["https://nancy-simulation.example.invalid/auth/callback"],
+      allowances: simulatedScopes.map((scope) => ({ resource_id: nativeResourceUri, scope }))
+    });
+    bulkClientSecret = nativeClient.client_secret;
+    const nativeClientPk = nativeClient.client.id as string;
+    const allowancePayload = { allowances: simulatedScopes.map((scope) => ({ resource_id: nativeResourceUri, scope })) };
+    const allowancePreview = await adminPost(`/clients/${nativeClientPk}/allowances/preview`, allowancePayload);
+    assert(allowancePreview.summary.unchanged === 25 && allowancePreview.summary.remove === 0,
+      "25 exact allowance preview incomplete");
+    await adminPost(`/clients/${nativeClientPk}/allowances/commit`, {
+      ...allowancePayload, expected_current: allowancePreview.current
+    });
+    const grantPayload = { resource_id: nativeResourcePk, user_ids: [], emails: ["human@example.invalid"],
+      scopes: simulatedScopes };
+    const grantPreview = await adminPost("/native-grants/bulk/preview", grantPayload);
+    assert(grantPreview.summary.create === 25 && grantPreview.rows.every((row: Record<string, unknown>) => row.user_id === humanId),
+      "bulk email resolution did not target stable users.id");
+    const grantCommit = await adminPost("/native-grants/bulk/commit", grantPayload);
+    assert(grantCommit.committed === 25, "25 native grants not committed");
+    const grantRepeat = await adminPost("/native-grants/bulk/commit", grantPayload);
+    assert(grantRepeat.committed === 0 && grantRepeat.summary.already_effective === 25,
+      "native grant retry was not idempotent");
+    const nativeCallback = "https://nancy-simulation.example.invalid/auth/callback";
+    const nativeVerifier = randomBytes(48).toString("base64url");
+    const nativeAuthorizeUrl = new URL(`${config.authIssuer}/oauth/authorize`);
+    for (const [key, value] of Object.entries({ response_type: "code", client_id: "nancy-simulation-bff",
+      redirect_uri: nativeCallback, scope: simulatedScopes.join(" "), state: `synthetic-${randomUUID()}`,
+      code_challenge: sha256(nativeVerifier), code_challenge_method: "S256", resource: nativeResourceUri }))
+      nativeAuthorizeUrl.searchParams.set(key, value);
+    const nativeAuthorize = await runtimeApp.inject({ method: "GET", url: nativeAuthorizeUrl.pathname + nativeAuthorizeUrl.search });
+    assert(nativeAuthorize.statusCode === 302, "25-scope native authorization did not redirect upstream");
+    const nativeUpstream = new URL(String(nativeAuthorize.headers.location));
+    const nativeCallbackResponse = await runtimeApp.inject({ method: "GET",
+      url: `/oauth/upstream/google/callback?state=${encodeURIComponent(nativeUpstream.searchParams.get("state") ?? "")}&code=synthetic-native-code` });
+    assert(nativeCallbackResponse.statusCode === 302, "25-scope native callback failed");
+    const nativeCode = new URL(String(nativeCallbackResponse.headers.location)).searchParams.get("code");
+    assert(nativeCode, "25-scope native code missing");
+    const nativeExchange = await runtimeApp.inject({ method: "POST", url: "/oauth/token",
+      headers: { "content-type": "application/x-www-form-urlencoded",
+        authorization: basic("nancy-simulation-bff", nativeClient.client_secret) },
+      payload: form({ grant_type: "authorization_code", code: nativeCode, redirect_uri: nativeCallback,
+        client_id: "nancy-simulation-bff", code_verifier: nativeVerifier, resource: nativeResourceUri }) });
+    assert(nativeExchange.statusCode === 200, "25-scope native code exchange failed");
+    const nativeAccess = nativeExchange.json<{ access_token: string }>().access_token;
+    const nativeIntrospect = () => runtimeApp.inject({ method: "POST", url: "/oauth/introspect",
+      headers: { "content-type": "application/x-www-form-urlencoded",
+        authorization: basic(nativeResource.resource_credential_id, nativeResource.resource_credential_secret) },
+      payload: form({ token: nativeAccess, token_type_hint: "access_token" }) });
+    assert((await nativeIntrospect()).json<{ active: boolean }>().active === true,
+      "25-scope native token not active before exact grant revoke");
+    const grantList = await db.query<{ id: string }>(`SELECT g.id FROM oauth_native_human_grants g
+      JOIN oauth_scopes s ON s.id = g.oauth_scope_id WHERE g.oauth_resource_id = $1 AND s.scope = $2 AND g.user_id = $3`,
+    [nativeResourcePk, simulatedScopes[0], humanId]);
+    const revokePreview = await adminPost("/native-grants/bulk-revoke/preview", { grant_ids: [grantList.rows[0].id] });
+    assert(revokePreview.summary.revoke === 1, "exact native revoke preview failed");
+    const revokeCommit = await adminPost("/native-grants/bulk-revoke/commit", { grant_ids: [grantList.rows[0].id] });
+    assert(revokeCommit.committed === 1, "exact native grant not revoked");
+    assert((await nativeIntrospect()).json<{ active: boolean }>().active === false,
+      "native introspection remained active after exact grant revoke");
     const callbackUri = "https://survey-test.unguess-internal.net/auth/callback";
     const authorizeUrl = (scope: string, verifier: string) => {
       const url = new URL(`${config.authIssuer}/oauth/authorize`);
@@ -417,20 +517,25 @@ try {
   const backupJson = JSON.stringify(backup);
   assert(!backupJson.includes(clientCreated.client_secret) && !backupJson.includes(resourceCreated.resource_credential_secret) &&
     !backupJson.includes(rotatedClient.client_secret!) && !backupJson.includes(rotatedResource.resource_credential_secret!) &&
+    !backupJson.includes(bulkClientSecret) && !backupJson.includes(bulkResourceSecret) &&
     !backupJson.includes(privatePem), "private material entered database backup");
   const audit = await db.query<{ metadata: Record<string, unknown> }>(
-    "SELECT metadata FROM audit_logs WHERE event_type LIKE 'oauth.%.changed'");
+    "SELECT metadata FROM audit_logs WHERE event_type LIKE 'oauth.%'");
   assert(audit.rows.length >= 17 && !JSON.stringify(audit.rows).includes(clientCreated.client_secret) &&
     !JSON.stringify(audit.rows).includes(resourceCreated.resource_credential_secret) &&
     !JSON.stringify(audit.rows).includes(rotatedClient.client_secret!) &&
     !JSON.stringify(audit.rows).includes(rotatedResource.resource_credential_secret!) &&
+    !JSON.stringify(audit.rows).includes(bulkClientSecret) &&
+    !JSON.stringify(audit.rows).includes(bulkResourceSecret) &&
     !JSON.stringify(audit.rows).includes(privatePem), "Admin audit incomplete or secret-bearing");
 
-  process.stdout.write(JSON.stringify({ result: "PASS", postgres: "disposable-loopback", scopes: 2,
-    clients: 1, resources: 2, allowances: 2, signing_keys: 1, admin_audit_events: audit.rows.length,
+  process.stdout.write(JSON.stringify({ result: "PASS", postgres: "disposable-loopback", scopes: 27,
+    clients: 2, resources: 3, allowances: 27, signing_keys: 1, admin_audit_events: audit.rows.length,
     checks: ["real_repository", "credential_rotation", "binding_lifecycle", "jwks_503_200",
       "publication_lead", "jwks_only_token_verification", "nancy_http_authorize_code_refresh_introspect_revoke",
-      "nancy_negative_lifecycle", "legacy_credential_isolation", "secret_free_backup_and_audit"] }) + "\n");
+      "nancy_negative_lifecycle", "legacy_credential_isolation", "secret_free_backup_and_audit",
+      "bulk_25_scope_http_preview_commit_retry", "bulk_25_native_grants_email_resolution_and_retry",
+      "bulk_exact_revoke_introspection_inactive"] }) + "\n");
 } catch (error) {
   const safe = error && typeof error === "object" ? error as { name?: string; message?: string; code?: string; constraint?: string } : {};
   process.stderr.write(JSON.stringify({ result: "FAIL", error_type: safe.name ?? "unknown",

@@ -1,5 +1,11 @@
 # BACKLOG.md
 
+## Phase 9A.4 operability follow-up, 2026-10-05
+
+- **QUESTION:** The older `docs/DB.md` Local Docker PostgreSQL paragraph says the source Compose exposes localhost:5432, while authoritative platform/deployment classification and the current private Compose policy forbid published host ports. This phase does not change deployment; reconcile that historical paragraph in deployment documentation work.
+- **DEFERRED_SCOPE:** The optional combined onboarding checklist is deferred. The explicit scope/resource/client/allowance/grant controls remain the operator workflow; no monolithic backend transaction or automatic consumer registration was introduced.
+- **DEFERRED_SCOPE:** Nancy vNext Phase 10B remains the first real consumer onboarding step after review of the exact clean Phase 9A.4 qualification package. No Nancy or production records are created by this phase.
+
 ## Phase 9A.3 follow-up
 
 - **RESOLVED (2026-09-29):** Phase 9A.3 adds privileged native resource creation, internal-user lookup, exact per-scope grant assignment/revocation and lifecycle API/UI, with audit and disposable backup qualification. The final exact-commit gate is recorded separately in the handoff artifact.

@@ -1,5 +1,18 @@
 # COPY.md
 
+## Phase 9A.4 OAuth operability copy
+
+- `Bulk scope catalogue`
+- `Update descriptions of existing scopes`
+- `Reactivate disabled scopes`
+- `Preview` / `Commit` / `Clear`
+- `Select all visible` / `Clear visible` / `Select all active` / `Clear all`
+- `Allow all selected resource scopes`
+- `Select all active registered scopes`
+- `Bulk native grants`
+- `Preview revoke selected grants`
+- `Advanced snapshot / UUID details`
+
 ## Login button
 
 - `Accedi con Google aziendale`

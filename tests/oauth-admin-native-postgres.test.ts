@@ -118,14 +118,113 @@ describe.skipIf(!disposableUrl || !confirmed)("Phase 9A.3 Admin on disposable Po
       const audits = await client.query<{ metadata: Record<string, unknown> }>(`SELECT metadata FROM audit_logs WHERE event_type = 'oauth.native_grant.changed'`);
       expect(audits.rows).toHaveLength(4);
       expect(JSON.stringify(audits.rows)).not.toMatch(/synthetic-(?:admin|user)-sub|secret|token/i);
+      const scopeBatch = { mode: "create_missing" as const, updateDescriptions: false, reactivateDisabled: false,
+        rows: Array.from({ length: 200 }, (_, index) => ({ row: index + 1,
+          scope: `bulk-test:area-${String(index + 1).padStart(3, "0")}:read`, description: `Read synthetic area ${index + 1}` })) };
+      const scopesBefore = (await client.query(`SELECT count(*)::int AS n FROM oauth_scopes`)).rows[0].n;
+      expect(await service.bulkScopes(scopeBatch, false)).toMatchObject({ summary: { create: 200, error: 0 } });
+      expect((await client.query(`SELECT count(*)::int AS n FROM oauth_scopes`)).rows[0].n).toBe(scopesBefore);
+      expect(await service.bulkScopes(scopeBatch, true, actor)).toMatchObject({ committed: 200 });
+      expect(await service.bulkScopes(scopeBatch, true, actor)).toMatchObject({ committed: 0, summary: { skip: 200 } });
+      const lifecycleScope = scopeBatch.rows[199].scope;
+      await service.bulkScopeStatus([lifecycleScope], "disabled", true, actor);
+      const lifecycleBatch = { ...scopeBatch, rows: [scopeBatch.rows[199]] };
+      expect((await service.bulkScopes(lifecycleBatch, false)).rows[0]).toMatchObject({ operation: "skip", result: "warning" });
+      await service.bulkScopes({ ...lifecycleBatch, reactivateDisabled: true }, true, actor);
+      expect((await client.query(`SELECT status FROM oauth_scopes WHERE scope = $1`, [lifecycleScope])).rows[0].status).toBe("active");
+      const staleBatch = { ...scopeBatch, rows: [{ row: 1, scope: "bulk-test:stale:read", description: "Valid" }] };
+      expect(await service.bulkScopes(staleBatch, false)).toMatchObject({ summary: { create: 1 } });
+      await service.createScope({ scope: staleBatch.rows[0].scope, description: "Changed concurrently" }, actor);
+      expect(await service.bulkScopes(staleBatch, true, actor)).toMatchObject({ committed: 0, summary: { skip: 1 } });
+      await client.query(`CREATE FUNCTION reject_second_scope_test() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN IF NEW.scope = 'bulk-test:rollback-second:read' THEN RAISE EXCEPTION 'synthetic mutation failure'; END IF; RETURN NEW; END $$`);
+      await client.query(`CREATE TRIGGER reject_second_scope_test BEFORE INSERT ON oauth_scopes FOR EACH ROW EXECUTE FUNCTION reject_second_scope_test()`);
+      await expect(service.bulkScopes({ ...scopeBatch, rows: [
+        { row: 1, scope: "bulk-test:rollback-first:read", description: "First" },
+        { row: 2, scope: "bulk-test:rollback-second:read", description: "Second" }
+      ] }, true, actor)).rejects.toThrow();
+      expect((await client.query(`SELECT count(*)::int AS n FROM oauth_scopes WHERE scope LIKE 'bulk-test:rollback-%'`)).rows[0].n).toBe(0);
+      await client.query(`DROP TRIGGER reject_second_scope_test ON oauth_scopes`);
+      const extraScopes = scopeBatch.rows.slice(0, 3).map((row) => row.scope);
+      const registrationOps = extraScopes.map((scope) => ({ scope, action: "activate" as const }));
+      expect(await service.bulkNativeResourceScopes(nativeId, registrationOps, false)).toMatchObject({ summary: { change: 3 } });
+      expect(await service.bulkNativeResourceScopes(nativeId, registrationOps, true, actor)).toMatchObject({ committed: 3 });
+      expect(await service.bulkNativeResourceScopes(nativeId, registrationOps, true, actor)).toMatchObject({ committed: 0 });
+      expect(await service.bulkNativeResourceScopes(nativeId, [{ scope: extraScopes[2], action: "disable" }], true, actor))
+        .toMatchObject({ committed: 1 });
+      expect((await client.query(`SELECT count(*)::int AS n FROM oauth_resource_scopes
+        WHERE oauth_resource_id = $1 AND legacy_permission_key IS NOT NULL`, [nativeId])).rows[0].n).toBe(0);
+      await expect(service.bulkNativeResourceScopes(legacy.resource.id as string, registrationOps, true, actor))
+        .rejects.toMatchObject({ reason: "native_resource_required" });
+      const desiredAllowances = [scopeNames[0], extraScopes[0]].map((scope) => ({ resourceId: "https://synthetic-native.example.test/v1", scope }));
+      const allowancePlan = await service.previewCommitAllowances(clientCreated.client.id as string, desiredAllowances, null, false);
+      expect(allowancePlan).toMatchObject({ summary: { add: 1, remove: 1, unchanged: 1 } });
+      const expectedAllowances = (allowancePlan.current ?? []).map((row) => ({ resourceId: row.resource_id, scope: row.scope, status: row.status }));
+      await service.previewCommitAllowances(clientCreated.client.id as string, desiredAllowances, expectedAllowances, true, actor);
+      await expect(service.previewCommitAllowances(clientCreated.client.id as string, desiredAllowances, expectedAllowances, true, actor))
+        .rejects.toMatchObject({ reason: "allowance_preview_stale" });
+      const redirectPlan = await service.previewCommitRedirectUris(clientCreated.client.id as string,
+        ["https://synthetic-client.example.test/new-callback"], null, false);
+      expect(redirectPlan.diff.map((row) => row.operation).sort()).toEqual(["add", "remove"]);
+      await service.previewCommitRedirectUris(clientCreated.client.id as string, ["https://synthetic-client.example.test/new-callback"],
+        redirectPlan.current ?? [], true, actor);
+      const grantBatch = { resourceId: nativeId, userIds: [actorId, userId], emails: [],
+        scopes: [scopeNames[0], extraScopes[0]], validFrom: null, validUntil: null };
+      const grantsBefore = (await client.query(`SELECT count(*)::int AS n FROM oauth_native_human_grants`)).rows[0].n;
+      expect(await service.bulkNativeGrants(grantBatch, false)).toMatchObject({ summary: { create: 3, already_effective: 1, error: 0 } });
+      expect((await client.query(`SELECT count(*)::int AS n FROM oauth_native_human_grants`)).rows[0].n).toBe(grantsBefore);
+      expect(await service.bulkNativeGrants(grantBatch, true, actor)).toMatchObject({ committed: 3 });
+      expect(await service.bulkNativeGrants(grantBatch, true, actor)).toMatchObject({ committed: 0, summary: { already_effective: 4 } });
+      const emailBatch = { ...grantBatch, userIds: [], emails: ["USER@example.test"] };
+      expect((await service.bulkNativeGrants(emailBatch, false)).rows.every((row) => row.user_id === userId)).toBe(true);
+      expect(await service.bulkNativeGrants({ ...emailBatch, emails: ["missing@example.test", "inactive@example.test"] }, false))
+        .toMatchObject({ summary: { error: 4 } });
+      expect(() => service.bulkNativeGrants({ ...grantBatch, userIds: [actorId, actorId] }, false)).toThrow();
+      expect(() => service.bulkNativeGrants({ ...grantBatch, scopes: [scopeNames[0], scopeNames[0]] }, false)).toThrow();
+      expect(await service.bulkNativeGrants({ ...grantBatch, userIds: [actorId], scopes: [extraScopes[2]] }, false))
+        .toMatchObject({ summary: { error: 1 } });
+      await service.bulkScopeStatus([extraScopes[1]], "disabled", true, actor);
+      expect((await service.bulkNativeGrants({ ...grantBatch, userIds: [actorId], scopes: [extraScopes[1]] }, false)).rows[0].operation).toBe("scope_inactive");
+      await service.bulkScopeStatus([extraScopes[1]], "active", true, actor);
+      const atomicGrantCount = (await client.query(`SELECT count(*)::int AS n FROM oauth_native_human_grants`)).rows[0].n;
+      await expect(service.bulkNativeGrants({ ...grantBatch, userIds: [actorId], scopes: [extraScopes[1], extraScopes[2]] }, true, actor))
+        .rejects.toMatchObject({ reason: "bulk_native_grant_validation_failed" });
+      expect((await client.query(`SELECT count(*)::int AS n FROM oauth_native_human_grants`)).rows[0].n).toBe(atomicGrantCount);
+      const actorGrant = (await client.query<{ id: string }>(`SELECT g.id FROM oauth_native_human_grants g JOIN oauth_scopes s ON s.id = g.oauth_scope_id
+        WHERE g.user_id = $1 AND g.oauth_resource_id = $2 AND s.scope = $3 AND g.status = 'active'`, [actorId, nativeId, scopeNames[0]])).rows[0].id;
+      await client.query(`UPDATE oauth_native_human_grants SET valid_from = now() - interval '2 minutes',
+        valid_until = now() - interval '1 second' WHERE id = $1`, [actorGrant]);
+      expect(await service.bulkNativeGrants({ ...grantBatch, userIds: [actorId], scopes: [scopeNames[0]] }, false))
+        .toMatchObject({ summary: { regrant: 1 } });
+      expect(await service.bulkNativeGrants({ ...grantBatch, userIds: [actorId], scopes: [scopeNames[0]] }, true, actor))
+        .toMatchObject({ committed: 1 });
+      expect((await client.query(`SELECT status FROM oauth_native_human_grants WHERE id = $1`, [actorGrant])).rows[0].status).toBe("expired");
+      expect(await service.bulkRevokeNativeGrants([actorGrant], true, actor)).toMatchObject({ committed: 0 });
+      const actorCurrent = (await client.query<{ id: string }>(`SELECT id FROM oauth_native_human_grants
+        WHERE user_id = $1 AND oauth_resource_id = $2 AND status = 'active' ORDER BY id`, [actorId, nativeId])).rows.map((row) => row.id);
+      expect(await service.bulkRevokeNativeGrants([actorCurrent[0]], false)).toMatchObject({ summary: { revoke: 1 } });
+      expect(await service.bulkRevokeNativeGrants([actorCurrent[0]], true, actor)).toMatchObject({ committed: 1 });
+      expect(await service.bulkRevokeNativeGrants([actorCurrent[0]], true, actor)).toMatchObject({ committed: 0 });
+      expect((await service.listNativeGrants(nativeId, { query: "user@example.test", scope: "", status: "active", effective: "true", offset: 0 }))
+        .every((row) => row.user_id === userId && row.effective === true)).toBe(true);
       await client.query(`CREATE FUNCTION reject_native_audit_test() RETURNS trigger LANGUAGE plpgsql AS $$
         BEGIN IF NEW.event_type = 'oauth.native_grant.changed' THEN RAISE EXCEPTION 'synthetic audit failure'; END IF; RETURN NEW; END $$`);
       await client.query(`CREATE TRIGGER reject_native_audit_test BEFORE INSERT ON audit_logs
         FOR EACH ROW EXECUTE FUNCTION reject_native_audit_test()`);
       const beforeFailure = (await client.query(`SELECT count(*)::int AS n FROM oauth_native_human_grants`)).rows[0].n;
-      await expect(service.createNativeGrants({ resourceId: nativeId, userId: actorId, scopes: [scopeNames[0]],
+      await expect(service.createNativeGrants({ resourceId: nativeId, userId: actorId, scopes: [extraScopes[1]],
         validFrom: null, validUntil: null }, actor)).rejects.toThrow();
+      await expect(service.bulkNativeGrants({ ...grantBatch, userIds: [actorId], scopes: [extraScopes[1]] }, true, actor)).rejects.toThrow();
+      await expect(service.bulkRevokeNativeGrants([actorCurrent[1]], true, actor)).rejects.toThrow();
+      expect((await client.query(`SELECT status FROM oauth_native_human_grants WHERE id = $1`, [actorCurrent[1]])).rows[0].status).toBe("active");
       expect((await client.query(`SELECT count(*)::int AS n FROM oauth_native_human_grants`)).rows[0].n).toBe(beforeFailure);
+      await client.query(`DROP TRIGGER reject_native_audit_test ON audit_logs`);
+      await client.query(`CREATE FUNCTION reject_scope_audit_test() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN IF NEW.event_type = 'oauth.scope.changed' THEN RAISE EXCEPTION 'synthetic audit failure'; END IF; RETURN NEW; END $$`);
+      await client.query(`CREATE TRIGGER reject_scope_audit_test BEFORE INSERT ON audit_logs FOR EACH ROW EXECUTE FUNCTION reject_scope_audit_test()`);
+      const failedScope = { ...scopeBatch, rows: [{ row: 1, scope: "bulk-test:failure:read", description: "Synthetic rollback" }] };
+      await expect(service.bulkScopes(failedScope, true, actor)).rejects.toThrow();
+      expect((await client.query(`SELECT count(*)::int AS n FROM oauth_scopes WHERE scope = 'bulk-test:failure:read'`)).rows[0].n).toBe(0);
     } finally {
       await client.query("RESET search_path");
       await client.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);

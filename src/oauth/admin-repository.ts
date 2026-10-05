@@ -684,7 +684,7 @@ export class OAuthAdminRepository {
          WHERE oauth_resource_id = $1 AND status = 'active'
            AND user_id = ANY($2::uuid[]) AND oauth_scope_id = ANY($3::uuid[])
          ORDER BY user_id, oauth_scope_id ${commit ? "FOR UPDATE" : ""}`,
-        [users.rows.map((row) => row.id), registrations.rows.map((row) => row.id)]);
+        [input.resourceId, users.rows.map((row) => row.id), registrations.rows.map((row) => row.id)]);
       const clock = await tx.query<{ current_time: Date }>(`SELECT clock_timestamp() AS current_time`);
       const now = clock.rows[0].current_time;
       const validFrom = input.validFrom ?? now;

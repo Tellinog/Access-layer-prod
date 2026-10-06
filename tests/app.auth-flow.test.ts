@@ -233,6 +233,10 @@ class MemoryRepos {
     return user;
   }
 
+  async linkPendingNativeGrants() {
+    return [];
+  }
+
   async linkPendingEmailGrants(user: User) {
     if (!this.pendingEmailGrant || this.pendingEmailGrant.email_normalized !== user.email_normalized) return;
     this.pendingEmailGrant = {

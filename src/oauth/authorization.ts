@@ -116,7 +116,8 @@ async function auditDenied(
   });
 }
 
-async function upsertAndLinkVerifiedIdentity(repositories: Repositories, identity: GoogleIdentity, linkLegacyPending = true): Promise<User> {
+async function upsertAndLinkVerifiedIdentity(repositories: Repositories, identity: GoogleIdentity, correlationId: string,
+  linkLegacyPending = true): Promise<User> {
   return repositories.db.transaction(async (db) => {
     const tx = repositories.withDb(db);
     const user = await tx.upsertUser({
@@ -129,6 +130,7 @@ async function upsertAndLinkVerifiedIdentity(repositories: Repositories, identit
       pictureUrl: identity.pictureUrl
     });
     if (linkLegacyPending) await tx.linkPendingEmailGrants(user);
+    await tx.linkPendingNativeGrants(user, correlationId);
     return user;
   });
 }
@@ -367,7 +369,7 @@ export class OAuthAuthorizationService {
     }
     let user: User;
     try {
-      user = await upsertAndLinkVerifiedIdentity(this.deps.legacy, identity,
+      user = await upsertAndLinkVerifiedIdentity(this.deps.legacy, identity, ctx.correlationId,
         resourceAtIdentity.entitlementMode === "legacy_bridge");
     } catch {
       return denyRedirect("server_error");

@@ -1,5 +1,9 @@
 # SECURITY.md
 
+## Pending native grants (D-054)
+
+Pending native grants are addressed by normalized email and restricted to approved domains. They never authorize. They link only to an active user with `email_verified=true` and the exact normalized email, inside the login transaction, with `oauth.native_grant.changed` (`linked`) audit. Either approved provider can complete the link; provider accounts are never merged. Pending creation audit metadata excludes the email.
+
 ## Phase 9A.4 bulk administration boundary
 
 Every bulk preview/commit uses the existing active platform-admin grant, explicit `admin:oauth:write`, same-origin cookie write control and dedicated write-rate limiter. Preview responses contain no secret and perform read-only transactions. Commit recomputes the plan against current state, locks affected entities, enforces exact canonical scope/registration/user status, and writes sanitized audit in the mutation transaction. Audit failure rolls back. Scope and resource registration batches cap at 200, native grants at 100 users/50 scopes/1,000 pairs, and revocation at 200 exact IDs. Arbitrary descriptions and lookup email lists are excluded from batch audit; Admin audit records exact internal mutation IDs/counts as appropriate.

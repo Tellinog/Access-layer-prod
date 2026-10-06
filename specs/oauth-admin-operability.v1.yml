@@ -55,9 +55,12 @@ native_grants:
   max_scopes: 50
   max_matrix: 1000
   principal: users.id
-  email: existing_active_user_lookup_only
-  unknown_or_inactive_user: preview_error
-  pending_email_writer: forbidden
+  email: existing_active_user_lookup_else_pending_email
+  inactive_user_or_unknown_user_id: preview_error
+  pending_email_writer: unknown_email_with_approved_domain
+  pending_email_unapproved_domain: preview_error_email_domain_not_allowed
+  existing_pending_pair: already_pending_no_write
+  pending_audit_metadata_excludes_email: true
   duplicate_user_or_scope_input: rejected
   effective_exact_grant: already_effective_no_write
   in_window_active_grant_on_inactive_resource: already_active_not_effective_no_write

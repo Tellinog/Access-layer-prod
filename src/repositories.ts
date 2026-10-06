@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Db } from "./db.js";
 import type {
   AccessRequest,
@@ -603,6 +604,37 @@ export class Repositories {
         AND status = 'pending_user_link'`,
       [user.id, user.email_normalized]
     );
+  }
+
+  // D-054: pending native OAuth grants link at a verified login from any approved provider.
+  // A pending pair the user already holds as an active grant becomes terminal `expired` instead.
+  async linkPendingNativeGrants(user: User, correlationId: string): Promise<string[]> {
+    if (user.status !== "active" || !user.email_verified) return [];
+    await this.db.query(
+      `UPDATE oauth_native_human_grants p SET status = 'expired', updated_at = now()
+       WHERE p.status = 'pending_user_link' AND p.user_id IS NULL AND p.email_normalized = $2
+        AND EXISTS (SELECT 1 FROM oauth_native_human_grants a WHERE a.status = 'active' AND a.user_id = $1
+          AND a.oauth_resource_id = p.oauth_resource_id AND a.oauth_scope_id = p.oauth_scope_id)`,
+      [user.id, user.email_normalized]
+    );
+    const linked = await this.db.query<{ id: string; oauth_resource_id: string; scope: string }>(
+      `UPDATE oauth_native_human_grants g SET user_id = $1, status = 'active', updated_at = now()
+       FROM oauth_scopes s
+       WHERE s.id = g.oauth_scope_id AND g.status = 'pending_user_link' AND g.user_id IS NULL AND g.email_normalized = $2
+       RETURNING g.id, g.oauth_resource_id, s.scope`,
+      [user.id, user.email_normalized]
+    );
+    if (!linked.rowCount) return [];
+    for (const resourceId of [...new Set(linked.rows.map((row) => row.oauth_resource_id))].sort()) {
+      const rows = linked.rows.filter((row) => row.oauth_resource_id === resourceId);
+      await this.writeAudit({
+        event_id: randomUUID(), event_type: "oauth.native_grant.changed", outcome: "success", correlation_id: correlationId,
+        actor_user_id: user.id, actor_google_sub: user.google_sub, actor_email: user.email, actor_hd: user.hd,
+        metadata: { action: "linked", oauth_resource_id: resourceId, user_id: user.id,
+          scopes: rows.map((row) => row.scope).sort(), grant_ids: rows.map((row) => row.id).sort() }
+      });
+    }
+    return linked.rows.map((row) => row.id);
   }
 
   async findActiveGrant(toolId: string, userId: string, emailNormalized: string): Promise<AuthorizationGrant | null> {

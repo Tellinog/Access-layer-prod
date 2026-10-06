@@ -235,7 +235,8 @@ export class OAuthAdminService {
       ...(new Set(input.emails.map((email) => email.toLowerCase())).size !== input.emails.length ? ["grant_email_duplicate"] : []),
       ...(input.validUntil && input.validUntil <= (input.validFrom ?? this.now()) ? ["grant_validity_invalid"] : [])
     ]);
-    return this.input.repository.bulkNativeGrants({ ...input, emails: input.emails.map((email) => email.toLowerCase()) }, commit, ctx);
+    return this.input.repository.bulkNativeGrants({ ...input, emails: input.emails.map((email) => email.toLowerCase()) }, commit, ctx,
+      [...(this.input.config.googleAllowedHd ?? []), ...(this.input.config.microsoftAllowedEmailDomains ?? [])].map((domain) => domain.toLowerCase()));
   }
 
   bulkRevokeNativeGrants(ids: string[], commit: boolean, ctx?: OAuthAdminAuditContext) {

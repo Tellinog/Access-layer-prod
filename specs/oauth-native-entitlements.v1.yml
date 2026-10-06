@@ -31,6 +31,9 @@ native:
   automatic_cross_provider_email_linking: forbidden
   effective_grant_requires: [active_status, linked_user_id, active_user_resource_and_scope, valid_from_reached, valid_until_not_reached, unrevoked]
   pending_email_runtime_effective: false
+  pending_email_link: automatic_at_verified_login_any_approved_provider_same_transaction
+  pending_email_link_requires: [active_user, email_verified, exact_email_normalized_match]
+  pending_email_link_conflict_with_active_linked_grant: pending_becomes_expired
   evaluation_points: [google_callback, authorization_code_exchange, refresh, online_introspection]
   client_resource_scope_allowance_active: required
   all_requested_scopes: required_no_reduction
@@ -69,7 +72,7 @@ backup:
   encrypted_export_and_import_includes_native_grants_and_provenance: true
   pre_9A_1_complete_oauth_backup_import: supported_with_empty_native_sections
   native_authorization_writer: implemented
-  native_admin_grant_writer: implemented_for_existing_linked_users_only
+  native_admin_grant_writer: implemented_for_existing_linked_users_and_bulk_pending_email
 admin:
   bulk_operability_contract: oauth-admin-operability.v1.yml
   permission_read: admin:oauth:read
@@ -87,6 +90,8 @@ admin:
   current_active_grant: deterministic_conflict_without_replacement
   revocation: explicit_terminal_with_actor_and_timestamp
   audit_event: oauth.native_grant.changed
-  pending_email_writer: absent
+  pending_email_writer: bulk_only_approved_domains
+  pending_email_domains: [GOOGLE_ALLOWED_HD, MICROSOFT_ALLOWED_EMAIL_DOMAINS]
+  pending_revocation: explicit_terminal_with_actor_and_timestamp
   resource_mode_mutation: forbidden
-deferred: [pending_email_link_operation, resource_mode_transition, multi_provider_oauth, entra_oauth, automatic_provider_account_linking]
+deferred: [resource_mode_transition, multi_provider_oauth, entra_oauth, automatic_provider_account_linking]

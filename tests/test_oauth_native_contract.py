@@ -29,7 +29,7 @@ class NativeOAuthContractTest(unittest.TestCase):
         self.assertEqual(ADMIN_SPEC["scope_catalogue"]["comma_delimiter"], "forbidden")
         self.assertEqual(ADMIN_SPEC["native_grants"]["principal"], "users.id")
         self.assertEqual(ADMIN_SPEC["native_grants"]["max_matrix"], 1000)
-        self.assertEqual(ADMIN_SPEC["native_grants"]["pending_email_writer"], "forbidden")
+        self.assertEqual(ADMIN_SPEC["native_grants"]["pending_email_writer"], "unknown_email_with_approved_domain")
         self.assertEqual(ADMIN_SPEC["audit_failure"], "rollback")
         self.assertEqual(ADMIN_SPEC["single_entity_by_design"],
                          ["resource_creation", "client_creation", "credential_rotation", "signing_key_lifecycle"])
@@ -60,9 +60,10 @@ class NativeOAuthContractTest(unittest.TestCase):
         self.assertEqual(SPEC["native"]["legacy_fallback"], "forbidden")
         self.assertTrue(SPEC["authorization_provenance"]["lifecycle_source_must_match_current_resource_mode"])
         self.assertEqual(SPEC["backup"]["native_authorization_writer"], "implemented")
-        self.assertEqual(SPEC["backup"]["native_admin_grant_writer"], "implemented_for_existing_linked_users_only")
+        self.assertEqual(SPEC["backup"]["native_admin_grant_writer"], "implemented_for_existing_linked_users_and_bulk_pending_email")
         self.assertEqual(SPEC["admin"]["permission_write"], "admin:oauth:write")
-        self.assertEqual(SPEC["admin"]["pending_email_writer"], "absent")
+        self.assertEqual(SPEC["admin"]["pending_email_writer"], "bulk_only_approved_domains")
+        self.assertEqual(SPEC["native"]["pending_email_link"], "automatic_at_verified_login_any_approved_provider_same_transaction")
 
     def test_schemas_compile_and_validate_native_rows(self) -> None:
         for schema in (GRANT_SCHEMA, PROVENANCE_SCHEMA):

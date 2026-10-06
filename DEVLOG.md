@@ -1,5 +1,13 @@
 # DEVLOG.md
 
+## 2026-10-06 — Bulk pending native grants (D-054)
+
+Bulk native grant preview/commit now turns unknown emails with an approved domain into `pending_user_link` rows (`create_pending`, `already_pending`, `email_domain_not_allowed` operations). `Repositories.linkPendingNativeGrants` links them in the login transaction of the legacy Google/Microsoft login and of the OAuth vNext Google callback, expiring pairs the user already holds and auditing `linked`. Grant list/revoke include pending rows (email shown from the pending row). UI copy, preview hints and a "Pre-authorize as pending" shortcut from one-user search were added. No migration; OAuth evaluator unchanged (pending still never authorizes). New disposable PostgreSQL 16 test `tests/oauth-native-pending-postgres.test.ts`; the existing 9A.3 PostgreSQL test also passes.
+
+## 2026-10-06 — OAuth Admin page reorganization and user-access discoverability
+
+Reorganized `/admin/oauth` into tabs (Overview, User access, Scopes, Resources, Clients, Lifecycle & keys) with a persistent side panel for the one-time credential result and the operation result, plus a toast for success/error feedback. API errors are shown as readable message, issues, code and correlation ID instead of raw JSON at the bottom of the page. Native human grants now use one shared native resource selector for single and bulk grants, a One user / Several users or emails switch, visible user-search listboxes with match/no-match status, double-click to add a bulk user, and a preview hint naming pasted emails that do not resolve to an active Access Layer user. Copy explains that people appear only after their first Access Layer sign-in. Root cause of "no user found" reports: search results were written silently into a select and errors into an off-screen panel; the backend search was correct. All element IDs, form fields, endpoints, payloads and preview/commit semantics are unchanged; no backend, API, schema, migration or runtime change.
+
 ## 2026-10-05 — Phase 9A.4 OAuth Admin operability
 
 Added bounded structured JSON preview/commit workflows for the scope catalogue, scope lifecycle, explicit native resource-scope registrations, client allowance/redirect replacement, native human grant matrices and exact grant revocation. Commits revalidate persisted state, retain the existing Admin permission/origin/rate boundary, and couple mutation and sanitized audit in one transaction. Identical active scopes and currently effective grants are repeatable no-ops. Description replacement and disabled-scope reactivation are explicit opt-ins.

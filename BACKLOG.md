@@ -1,5 +1,9 @@
 # BACKLOG.md
 
+## OAuth Admin UI reorganization follow-up, 2026-10-06
+
+- **RESOLVED (2026-10-06, D-054):** Operators expect to add native-resource access for people who have never signed in, singly or by bulk email. Current rules (D-050/D-051, `specs/oauth-native-entitlements.v1.yml` `pending_email_writer: absent`) forbid it; the UI now states this and names unresolved emails in preview. Decide whether to specify the deferred audited pending-email native grant writer plus explicit link operation (Phase 9A.3 DEFERRED_SCOPE below), or keep the sign-in-first rule.
+
 ## Phase 9A.4 operability follow-up, 2026-10-05
 
 - **QUESTION:** The older `docs/DB.md` Local Docker PostgreSQL paragraph says the source Compose exposes localhost:5432, while authoritative platform/deployment classification and the current private Compose policy forbid published host ports. This phase does not change deployment; reconcile that historical paragraph in deployment documentation work.
@@ -9,7 +13,10 @@
 ## Phase 9A.3 follow-up
 
 - **RESOLVED (2026-09-29):** Phase 9A.3 adds privileged native resource creation, internal-user lookup, exact per-scope grant assignment/revocation and lifecycle API/UI, with audit and disposable backup qualification. The final exact-commit gate is recorded separately in the handoff artifact.
-- **DEFERRED_SCOPE:** Specify an explicit, audited pending-email-to-`users.id` native grant link operation. Native runtime never links or accepts a pending email; matching email across providers is not identity proof.
+- **RESOLVED (2026-10-06, D-054):** Pending-email native grants are written by the bulk Admin flow and link automatically at the first verified login of any approved provider.
+- **ASSUMPTION_TO_VALIDATE:** D-054 links pending native grants at login from either provider; confirm with security owners that a verified Microsoft mailbox at an approved domain is acceptable proof for native OAuth resources.
+- **DEFERRED_SCOPE:** Single-user (non-bulk) pending grant entry; the UI routes unknown emails to the bulk flow.
+- **DEFERRED_SCOPE:** The Step4B/OAuth Admin qualification harnesses do not yet cover pending creation/link; only `tests/oauth-native-pending-postgres.test.ts` does.
 - **DEFERRED_SCOPE:** Implement the controlled in-place `legacy_bridge -> native` resource transition only after a contract that terminates unsafe legacy sessions, validates scope/grant readiness, retires bridge mappings and retains historical provenance. Direct mode UPDATE remains blocked.
 - **DEFERRED_SCOPE:** Multi-provider/Entra OAuth and provider-neutral token subject remain outside 9A.2; the temporary Microsoft bridge remains legacy-only.
 - **RESOLVED (2026-09-29):** The Admin writer marks a targeted time-elapsed active grant terminal `expired` before inserting a replacement in the same transaction. Runtime already denies elapsed rows. Long-term retention policy for terminal grant history remains deferred.

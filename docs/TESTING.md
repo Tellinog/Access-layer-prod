@@ -1,5 +1,9 @@
 # TESTING.md
 
+## Pending native grants (D-054)
+
+`tests/oauth-native-pending-postgres.test.ts` (disposable PostgreSQL 16, same `OAUTH_NATIVE_DISPOSABLE_PG_URL` / `OAUTH_NATIVE_DISPOSABLE_PG_CONFIRM=yes` guard) covers pending preview/commit, approved/unapproved domains, idempotent repeat, list filter, unverified/verified link, Microsoft-style identity link, pending revocation, conflict expiry and audit content.
+
 ## Phase 9A.4 OAuth Admin operability
 
 `tests/oauth-admin-bulk.test.ts` exercises scope batch preview/commit/retry, explicit update/reactivation, invalid/duplicate input, atomic mutation/audit rollback, batch bounds, the actual generated scope paste parser (BOM, CRLF, blanks, TAB, first semicolon and preserved comma), and required page controls. Existing Admin HTML parseability, native/P0 authorization and legacy contract suites remain active.

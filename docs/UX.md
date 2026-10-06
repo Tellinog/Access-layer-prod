@@ -1,5 +1,9 @@
 # UX.md
 
+## OAuth Admin layout (2026-10-06)
+
+The OAuth page separates work into tabs: Overview, then the setup flow (Scopes → Resources → Clients → User access), plus Lifecycle & keys. Operation output stays visible beside the content. User search always states its result (type more, N matches, or no match with the sign-in-first explanation). Bulk preview names emails that will become pending, already pending or use an unapproved domain (D-054). Layout behavior and gating are unchanged (D-053).
+
 ## Phase 9A.4 OAuth operator flow
 
 The normal flow is readable entity selection, exact set selection/paste, row validation preview, explicit commit and visible result. Scope paste uses semicolon or TAB only. Searchable checkbox scope pickers replace routine Ctrl-click selection. The catalogue provides status and usage counts. Resource registration actions are explicit and additive. Allowance/redirect replacement displays every add/remove/unchanged row, preserves unseen resources in structured allowance editing, and rejects a stale current set. Existing-user bulk grants and exact selected revoke use dedicated server batches. Grant reads stay resource-filtered and paginated. The advanced snapshot retains UUID details; it is not required for ordinary work. Credential/key actions stay single entity and one-time secret output stays separate.

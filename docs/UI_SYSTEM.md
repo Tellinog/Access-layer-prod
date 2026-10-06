@@ -1,5 +1,9 @@
 # UI_SYSTEM.md
 
+## OAuth Admin layout (2026-10-06)
+
+Sticky tab bar with counts, card grid per tab, sticky right aside (stacked below content under 1100px), segmented One user / Several users switch, listbox user results and a toast status region (`role=status`). Still plain server-rendered HTML/JavaScript; no framework.
+
 ## Phase 9A.4 OAuth controls
 
 The existing lightweight English HTML/JavaScript page adds labelled textarea, checkbox pickers, readable selectors, safe text-only tables and disabled-until-preview commit buttons. Scope pickers show canonical scope plus description, filter/search, select/clear visible, select all active, clear all and selected count. Catalogue lifecycle preview shows resource/client impact counts. Structured allowance and redirect editing displays exact diffs. Bulk native grants resolve existing users and exact scope sets; the grant table provides bounded server filters/pagination, selection count and exact revoke preview. Changing batch input invalidates its preview. Single resource/client creation, credential actions and signing-key actions retain separate explicit forms; no frontend framework is introduced.

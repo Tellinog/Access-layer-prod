@@ -153,6 +153,7 @@ function harness(overrides: HarnessOverrides = {}) {
   let upstreamNonce = "";
   let claimed = false;
   let linkCalls = 0;
+  let nativeLinkCalls = 0;
   let legacyBindingCalls = 0;
   let legacyMappingCalls = 0;
   let legacyGrantCalls = 0;
@@ -263,6 +264,7 @@ function harness(overrides: HarnessOverrides = {}) {
   const txRepositories = {
     upsertUser: async () => ({ ...user, status: overrides.userStatus ?? "active" }),
     linkPendingEmailGrants: async () => { linkCalls += 1; },
+    linkPendingNativeGrants: async () => { nativeLinkCalls += 1; return []; },
     writeAudit: async (event: AuditEventInput) => { auditEvents.push(event); }
   };
   const legacy = {
@@ -345,6 +347,7 @@ function harness(overrides: HarnessOverrides = {}) {
     upstreamState: () => upstreamState,
     upstreamNonce: () => upstreamNonce,
     linkCalls: () => linkCalls,
+    nativeLinkCalls: () => nativeLinkCalls,
     legacyCalls: () => ({ binding: legacyBindingCalls, mapping: legacyMappingCalls, grant: legacyGrantCalls }),
     expire: () => {
       if (transaction) transaction.expiresAt = new Date(fixedNow.getTime() - 1);
@@ -531,6 +534,7 @@ describe("Step 3C callback, entitlement and issuance", () => {
       nativeGrants: grants.map((grant) => ({ scope: grant.scope, grantId: grant.id }))
     });
     expect(h.linkCalls()).toBe(0);
+    expect(h.nativeLinkCalls()).toBe(1);
     expect(h.legacyCalls()).toEqual({ binding: 0, mapping: 0, grant: 0 });
   });
 

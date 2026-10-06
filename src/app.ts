@@ -865,6 +865,7 @@ async function completeLegacyIdentity(
       pictureUrl: identity.pictureUrl
     });
     await txRepos.linkPendingEmailGrants(user);
+    await txRepos.linkPendingNativeGrants(user, authRequest.correlation_id);
     const tool = await txRepos.findToolById(authRequest.tool_id);
     if (!tool || tool.status !== "active") {
       await txAudit.write({

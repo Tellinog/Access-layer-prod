@@ -1,5 +1,16 @@
 # COPY.md
 
+## OAuth Admin layout copy (2026-10-06)
+
+- Tabs: `Overview` / `User access` / `Scopes` / `Resources` / `Clients` / `Lifecycle & keys`
+- `Who can receive a grant?`
+- `One user` / `Several users or emails`
+- `No Access Layer user matches "<query>". The person has not signed in yet.` + `Pre-authorize <email> as pending`
+- `Emails without an Access Layer user become pending grants (approved domains only).`
+- `<n> email(s) have never signed in and will be stored as pending grants, activated automatically at first verified sign-in: <emails>.`
+- `<n> email(s) use a domain that is not approved for pending grants: <emails>.`
+- `No native resource exists yet. Create one in Resources with entitlement mode Native.`
+
 ## Phase 9A.4 OAuth operability copy
 
 - `Bulk scope catalogue`

@@ -1,5 +1,25 @@
 # DECISIONS.md
 
+## D-054 — Bulk pending native grants by email with automatic link at first login
+
+Status: accepted (operator decision, 2026-10-06)
+
+Confirmed: 2026-10-06
+
+Decision: native bulk grants accept emails of people who have never signed in. An email that matches no Access Layer user and whose domain is in `GOOGLE_ALLOWED_HD` or `MICROSOFT_ALLOWED_EMAIL_DOMAINS` becomes one `pending_user_link` row per exact resource/scope (existing migration 006 shape, no migration). Other domains are a preview error; an email of a suspended/disabled user stays an error; an existing pending pair is a no-op. Pending rows never authorize. At every verified login through any approved provider (legacy Google/Microsoft login and the OAuth vNext Google callback), in the same transaction as the user upsert, pending rows with the exact normalized email link to that active, email-verified `users.id` and become `active`; a pending pair the user already holds actively becomes terminal `expired`. Linking writes `oauth.native_grant.changed` (action `linked`) with the user as actor. Pending creation audit omits the email. Pending rows can be revoked. Single-user grants remain existing-user only.
+
+Supersedes: the "pending email never links" clause of D-050, the pending-writer exclusion of D-051 and the "email is lookup only" clause of D-052. D-049's ban on merging provider accounts stays: the first verified identity holding the email receives the grant; no accounts are merged.
+
+Risk accepted: whoever first signs in with a verified mailbox at an approved domain receives the pending grants addressed to that email, from either provider. A user created concurrently with a bulk commit may link only at the next login.
+
+## D-053 — Tabbed OAuth Admin layout without functional change
+
+Status: accepted
+
+Confirmed: 2026-10-06
+
+Decision: `/admin/oauth` groups the existing controls into Overview, User access, Scopes, Resources, Clients and Lifecycle & keys tabs (hash-addressable), with the one-time credential and operation result in an always-visible side panel. Single and bulk native grants share the visible native resource selector; the bulk selector remains as a synchronized hidden control. Errors surface as readable text with correlation ID. This is a presentation change only: no endpoint, payload, permission, preview/commit, secret-handling or entitlement rule changes, and no pending-email native grant writer is introduced.
+
 ## D-052 — Bound OAuth administration batches and retain explicit operator intent
 
 Status: accepted for Phase 9A.4

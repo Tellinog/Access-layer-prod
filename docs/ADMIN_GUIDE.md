@@ -1,5 +1,11 @@
 # ADMIN_GUIDE.md
 
+## OAuth page layout (2026-10-06)
+
+`/admin/oauth` is organized in tabs: **Overview** (counts, setup order, current state, advanced snapshot), **User access** (native human grants), **Scopes**, **Resources**, **Clients** and **Lifecycle & keys** (registration status, credential rotation/retirement, signing keys). The URL hash keeps the current tab. The right-hand panel always shows the one-time credential result and the last operation result; errors also appear as a toast with the correlation ID.
+
+In **User access**, choose the native resource once; it applies to the single grant, bulk grant and existing-grant list. **One user** searches by email or name and lists matches; **Several users or emails** combines searched users (Add or double-click) and pasted emails. A person appears in search only after their first Access Layer sign-in. To pre-authorize someone who has never signed in, paste the email in **Several users or emails** (or use **Pre-authorize … as pending** from a no-match search): with an approved domain (`GOOGLE_ALLOWED_HD` or `MICROSOFT_ALLOWED_EMAIL_DOMAINS`) the preview shows `create_pending`, and commit stores `pending_user_link` grants. They activate automatically at the person's first verified sign-in (Google or Microsoft) and authorize nothing before. Other domains show `email_domain_not_allowed`; suspended/disabled users stay errors. Pending grants appear in **Existing grants** (status filter `pending_user_link`) and can be revoked.
+
 ## Phase 9A.4 OAuth bulk workflows
 
 Use `/admin/oauth` with an active platform-admin session and explicit `admin:oauth:read/write`. Normal administration selects clients and resources by readable name, canonical URI/ID, mode and status. Internal UUIDs remain in the advanced snapshot for troubleshooting.

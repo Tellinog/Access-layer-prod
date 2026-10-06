@@ -252,7 +252,7 @@ export class OAuthAdminRepository {
     if (resource.rows[0].entitlement_mode !== "native") reject("native_resource_required");
     const escaped = filters.query.replace(/[\\%_]/g, "\\$&");
     const result = await this.db.query(`SELECT * FROM (SELECT g.id, g.oauth_resource_id AS resource_id, r.display_name AS resource_display_name,
-      s.scope, g.user_id, u.email AS user_email, u.display_name AS user_display_name,
+      s.scope, g.user_id, coalesce(u.email::text, g.email_normalized::text) AS user_email, u.display_name AS user_display_name,
       g.status, (g.status = 'active' AND g.revoked_at IS NULL AND u.status = 'active'
         AND g.valid_from <= now() AND (g.valid_until IS NULL OR g.valid_until > now())
         AND r.status = 'active' AND s.status = 'active' AND rs.status = 'active') AS effective,
@@ -659,7 +659,8 @@ export class OAuthAdminRepository {
     });
   }
 
-  async bulkNativeGrants(input: OAuthAdminBulkGrantInput, commit: boolean, ctx?: OAuthAdminAuditContext) {
+  async bulkNativeGrants(input: OAuthAdminBulkGrantInput, commit: boolean, ctx?: OAuthAdminAuditContext,
+    pendingEmailDomains: readonly string[] = []) {
     return this.db.transaction(async (tx) => {
       if (!commit) await tx.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY");
       const resource = await tx.query<{ id: string; entitlement_mode: string; display_name: string; status: string }>(
@@ -685,6 +686,16 @@ export class OAuthAdminRepository {
            AND user_id = ANY($2::uuid[]) AND oauth_scope_id = ANY($3::uuid[])
          ORDER BY user_id, oauth_scope_id ${commit ? "FOR UPDATE" : ""}`,
         [input.resourceId, users.rows.map((row) => row.id), registrations.rows.map((row) => row.id)]);
+      // D-054: an email without any Access Layer user becomes a pending grant when its domain is approved.
+      const unknownEmails = input.emails.filter((email) => !userByEmail.has(email));
+      const pending = await tx.query<{ id: string; email_normalized: string; oauth_scope_id: string }>(
+        `SELECT id, email_normalized::text AS email_normalized, oauth_scope_id FROM oauth_native_human_grants
+         WHERE oauth_resource_id = $1 AND status = 'pending_user_link'
+           AND email_normalized::text = ANY($2::text[]) AND oauth_scope_id = ANY($3::uuid[])
+         ORDER BY email_normalized, oauth_scope_id ${commit ? "FOR UPDATE" : ""}`,
+        [input.resourceId, unknownEmails, registrations.rows.map((row) => row.id)]);
+      const pendingByPair = new Map(pending.rows.map((row) => [`${row.email_normalized}:${row.oauth_scope_id}`, row]));
+      const pendingAllowed = (email: string) => pendingEmailDomains.includes(email.slice(email.lastIndexOf("@") + 1));
       const clock = await tx.query<{ current_time: Date }>(`SELECT clock_timestamp() AS current_time`);
       const now = clock.rows[0].current_time;
       const validFrom = input.validFrom ?? now;
@@ -699,8 +710,14 @@ export class OAuthAdminRepository {
         return input.scopes.map((scope) => {
           const registered = scopeByName.get(scope);
           const old = user && registered ? existingByPair.get(`${user.id}:${registered.id}`) : undefined;
+          const pendingEmail = !user && identity.type === "email" ? identity.value : null;
+          const oldPending = pendingEmail && registered ? pendingByPair.get(`${pendingEmail}:${registered.id}`) : undefined;
           let operation = "create";
-          if (!user || user.status !== "active") operation = "user_not_found_or_inactive";
+          if (pendingEmail && !pendingAllowed(pendingEmail)) operation = "email_domain_not_allowed";
+          else if (pendingEmail && (!registered || registered.registration_status !== "active")) operation = "scope_not_registered";
+          else if (pendingEmail && registered!.scope_status !== "active") operation = "scope_inactive";
+          else if (pendingEmail) operation = oldPending ? "already_pending" : "create_pending";
+          else if (!user || user.status !== "active") operation = "user_not_found_or_inactive";
           else if (duplicate) operation = "error";
           else if (!registered || registered.registration_status !== "active") operation = "scope_not_registered";
           else if (registered.scope_status !== "active") operation = "scope_inactive";
@@ -710,7 +727,8 @@ export class OAuthAdminRepository {
           else if (old) operation = "error";
           return { user_id: user?.id ?? null, user_email: user?.email ?? (identity.type === "email" ? identity.value : null),
             user_display_name: user?.display_name ?? null, scope, resource_id: input.resourceId,
-            operation, reason: duplicate ? "duplicate_user_input" : operation, existing_grant_id: old?.id ?? null,
+            operation, reason: duplicate ? "duplicate_user_input" : operation, existing_grant_id: old?.id ?? oldPending?.id ?? null,
+            pending_email: pendingEmail,
             scope_id: registered?.id ?? null };
         });
       });
@@ -718,13 +736,26 @@ export class OAuthAdminRepository {
         already_effective: rows.filter((r) => r.operation === "already_effective").length,
         already_active_not_effective: rows.filter((r) => r.operation === "already_active_not_effective").length,
         regrant: rows.filter((r) => r.operation === "elapsed_active_will_expire_then_regrant").length,
-        error: rows.filter((r) => !["create", "already_effective", "already_active_not_effective", "elapsed_active_will_expire_then_regrant"].includes(r.operation)).length };
+        create_pending: rows.filter((r) => r.operation === "create_pending").length,
+        already_pending: rows.filter((r) => r.operation === "already_pending").length,
+        error: rows.filter((r) => !["create", "already_effective", "already_active_not_effective", "elapsed_active_will_expire_then_regrant",
+          "create_pending", "already_pending"].includes(r.operation)).length };
       if (!commit) return { rows, summary };
       if (!ctx || summary.error) reject("bulk_native_grant_validation_failed");
       const changed: string[] = [];
       const mutations: Array<{ id: string; userId: string; scope: string }> = [];
+      const pendingMutations: Array<{ id: string; email: string; scope: string }> = [];
       for (const row of rows) {
-        if (["already_effective", "already_active_not_effective"].includes(row.operation)) continue;
+        if (["already_effective", "already_active_not_effective", "already_pending"].includes(row.operation)) continue;
+        if (row.operation === "create_pending") {
+          const inserted = await tx.query<{ id: string }>(`INSERT INTO oauth_native_human_grants
+            (oauth_resource_id, oauth_scope_id, user_id, email_normalized, status, valid_from, valid_until, created_by_user_id)
+            VALUES ($1, $2, NULL, $3, 'pending_user_link', $4, $5, $6) RETURNING id`,
+          [input.resourceId, row.scope_id, row.pending_email, validFrom, input.validUntil, ctx.actor.userId]);
+          changed.push(inserted.rows[0].id);
+          pendingMutations.push({ id: inserted.rows[0].id, email: row.pending_email!, scope: row.scope });
+          continue;
+        }
         if (row.operation === "elapsed_active_will_expire_then_regrant") await tx.query(
           `UPDATE oauth_native_human_grants SET status = 'expired', updated_at = $2 WHERE id = $1`, [row.existing_grant_id, now]);
         const inserted = await tx.query<{ id: string }>(`INSERT INTO oauth_native_human_grants
@@ -741,6 +772,13 @@ export class OAuthAdminRepository {
           grant_ids: userMutations.map((row) => row.id), valid_from: validFrom.toISOString(),
           valid_until: input.validUntil?.toISOString() ?? null });
       }
+      for (const email of [...new Set(pendingMutations.map((row) => row.email))].sort()) {
+        const emailMutations = pendingMutations.filter((row) => row.email === email);
+        await writeAudit(tx, ctx, "oauth.native_grant.changed", { action: "created_pending", batch: true,
+          oauth_resource_id: input.resourceId, scopes: emailMutations.map((row) => row.scope),
+          grant_ids: emailMutations.map((row) => row.id), valid_from: validFrom.toISOString(),
+          valid_until: input.validUntil?.toISOString() ?? null });
+      }
       if (changed.length) await writeAudit(tx, ctx, "oauth.native_grant.bulk_changed", {
         action: "created", oauth_resource_id: input.resourceId, count: changed.length,
         grant_ids: changed, valid_from: validFrom.toISOString(), valid_until: input.validUntil?.toISOString() ?? null
@@ -754,7 +792,7 @@ export class OAuthAdminRepository {
       if (!commit) await tx.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY");
       const found = await tx.query<{ id: string; status: string; user_id: string; user_email: string | null;
         scope: string; resource_id: string; resource_display_name: string }>(
-        `SELECT g.id, g.status, g.user_id, u.email AS user_email, s.scope,
+        `SELECT g.id, g.status, g.user_id, coalesce(u.email::text, g.email_normalized::text) AS user_email, s.scope,
            g.oauth_resource_id AS resource_id, r.display_name AS resource_display_name
          FROM oauth_native_human_grants g JOIN oauth_scopes s ON s.id = g.oauth_scope_id
          JOIN oauth_resources r ON r.id = g.oauth_resource_id LEFT JOIN users u ON u.id = g.user_id
@@ -765,7 +803,7 @@ export class OAuthAdminRepository {
         return { grant_id: id, user_id: current?.user_id ?? null, user_email: current?.user_email ?? null,
           scope: current?.scope ?? null, resource_id: current?.resource_id ?? null,
           resource_display_name: current?.resource_display_name ?? null, current_status: current?.status ?? null,
-          operation: !current ? "error" : current.status === "active" ? "revoke" : "skip" };
+          operation: !current ? "error" : ["active", "pending_user_link"].includes(current.status) ? "revoke" : "skip" };
       });
       if (!commit) return { rows, summary: { total: rows.length, revoke: rows.filter((r) => r.operation === "revoke").length,
         skip: rows.filter((r) => r.operation === "skip").length, error: rows.filter((r) => r.operation === "error").length } };
@@ -793,7 +831,7 @@ export class OAuthAdminRepository {
          FROM oauth_native_human_grants g JOIN oauth_scopes s ON s.id = g.oauth_scope_id
          WHERE g.id = $1 FOR UPDATE OF g`, [id]);
       if (!grant.rows[0]) reject("native_grant_not_found");
-      if (grant.rows[0].status !== "active") reject("native_grant_terminal");
+      if (!["active", "pending_user_link"].includes(grant.rows[0].status)) reject("native_grant_terminal");
       const result = await tx.query(`UPDATE oauth_native_human_grants SET status = 'revoked',
         revoked_at = GREATEST(now(), created_at), revoked_by_user_id = $2, updated_at = now()
         WHERE id = $1 RETURNING id, status, revoked_at, revoked_by_user_id, updated_at`,

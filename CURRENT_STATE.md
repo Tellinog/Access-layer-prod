@@ -1,5 +1,15 @@
 # CURRENT_STATE.md
 
+## Pending native grants by email, 2026-10-06 (D-054)
+
+- Bulk native grants accept never-signed-in emails at approved domains as `pending_user_link`; they link automatically at the first verified login (any approved provider) and only then can authorize. Pending rows are listed and revocable.
+- Specs `oauth-native-entitlements.v1.yml` / `oauth-admin-operability.v1.yml` and the Admin OpenAPI descriptions are updated. No migration or token/evaluator change. Qualification harnesses (Step4B, OAuth Admin) are not yet extended for pending flows.
+
+## OAuth Admin UI reorganization, 2026-10-06
+
+- `/admin/oauth` is reorganized into tabbed sections with a persistent operation/credential side panel and readable error toasts. Native human grants (tab **User access**) share one resource selector across single and bulk flows and show user-search results and empty states explicitly.
+- Functional behavior is unchanged: same element IDs, endpoints, payloads, preview/commit gating, one-time secret handling and Admin security boundary. Pending-email grants were added afterwards (see D-054 section above).
+
 ## Phase 9A.4 OAuth Admin operability candidate, 2026-10-05
 
 - `/admin/oauth` now has a bulk scope paste path (`scope ; description` or scope plus TAB plus description), a searchable scope catalogue with selected lifecycle preview, searchable exact scope pickers, human-readable resource/client/credential selectors, structured allowance and redirect diffs, and bounded native grant/revoke controls. The existing single-scope, per-grant revoke, resource/client creation, one-time credential and signing-key lifecycle paths remain.
